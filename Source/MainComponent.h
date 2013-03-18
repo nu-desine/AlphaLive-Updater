@@ -24,7 +24,7 @@ class MainContentComponent   :  public Component,
 {
 public:
     //==============================================================================
-    MainContentComponent (JUCEApplication *juceApplication_);
+    MainContentComponent();
     ~MainContentComponent();
 
     void paint (Graphics&);
@@ -36,9 +36,6 @@ public:
 private:
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)
-    
-    JUCEApplication *juceApplication;
-    
     AlphaLiveLookandFeel lookAndFeel;
     Image backgroundImage;
     

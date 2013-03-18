@@ -28,7 +28,7 @@ public:
     {
         // This method is where you should put your application's initialisation code..
 
-        mainWindow = new MainWindow (this);
+        mainWindow = new MainWindow();
     }
 
     void shutdown()
@@ -63,12 +63,11 @@ public:
     class MainWindow    : public DocumentWindow
     {
     public:
-        MainWindow (JUCEApplication *juceApplication)  
-                        : DocumentWindow ("AlphaLive Updater",
-                                          Colours::lightgrey,
-                                          1)
+        MainWindow () : DocumentWindow ("AlphaLive Updater",
+                                        Colours::lightgrey,
+                                        1)
         {
-            setContentOwned (new MainContentComponent (juceApplication), true);
+            setContentOwned (new MainContentComponent(), true);
             
             //use native OS title bar
             setUsingNativeTitleBar(true);
