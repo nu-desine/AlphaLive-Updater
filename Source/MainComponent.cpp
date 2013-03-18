@@ -65,7 +65,9 @@ MainContentComponent::MainContentComponent(JUCEApplication *juceApplication_)
                            "\n" +
                            translate("- Move it to the AlphaLive directory in \"Applications\" on OS X or \"Program Files\" on Windows on this computer.") +
                            "\n" +
-                           translate("- If the download contains a version of this \"AlphaLive Updater\" application in either \"Mac Files\", \"Win32 Files\" or \"Win64 Files\", close this application, move the relevant version to \"AlphaLive/Application Data\" to replace the current version, and relaunch this application from here."), 
+                           translate("- If the download contains a version of this \"AlphaLive Updater\" application in either \"Mac Files\", \"Win32 Files\" or \"Win64 Files\", close this application, move the relevant version to \"AlphaLive/Application Data\" to replace the current version") +
+                           "\n" +
+                           translate("- Make sure AlphaLive is closed, and relaunch \"AlphaLive Updater\" from \"AlphaLive/Application Data\"."), 
                            dontSendNotification);
     }
     else
@@ -102,6 +104,7 @@ MainContentComponent::MainContentComponent(JUCEApplication *juceApplication_)
 
 MainContentComponent::~MainContentComponent()
 {
+    stopThread(1000);
 }
 
 void MainContentComponent::paint (Graphics& g)
@@ -163,8 +166,14 @@ void MainContentComponent::run()
         closeButton->setVisible(false);
         cancelButton->setVisible(true);
         
+        progress = -1;
         progressBar->setVisible(true);
+        
+        infoLabel->setText(translate("Starting update installation..."), dontSendNotification);
+        
     }
+    
+    wait(1000);
     
     bool installationCancelled = false;
     
@@ -187,10 +196,6 @@ void MainContentComponent::run()
         //    
         //    //what about on windows?
         
-        //==== move new files into place, replacing the older ones but not removing any unreplaced files ====
-        
-        // For the non platform-specific files, they should be organised in the same folder structure
-        // Therefore we can just use relative paths
         
         Array<File> filesToCopy;
         File applicatDataDir (updateDirectory.getFullPathName() + File::separatorString + "Application Data");
@@ -201,16 +206,62 @@ void MainContentComponent::run()
         libraryDir.findChildFiles(filesToCopy, 2, true);
         documentationDir.findChildFiles(filesToCopy, 2, true);
         
+        int totalSize = 0;
+        int extractedSize = 0;
+        
+        // === Work out the total size of the files being copied,
+        // so we can work out a percentage for the progress bar ===
+        
+        for (int i = 0; i < filesToCopy.size(); i++)
+            totalSize += filesToCopy[i].getSize();
+        
+        #if JUCE_MAC
+        File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/AlphaLive.app");
+        
+        Array<File> allFiles;
+        newAppFile.findChildFiles(allFiles, 3, true);
+        for (int i = 0; i < allFiles.size(); i++)
+            totalSize += allFiles[i].getSize();
+        allFiles.clear();
+        
+        File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/firmwareUpdater");
+        if (newFirmwareFile.exists())
+            totalSize += newFirmwareFile.getSize();
+
+        #endif 
+        
+        #if JUCE_WINDOWS
+        if (SystemStats::isOperatingSystem64Bit())
+        {
+            File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/AlphaLive.exe");
+            totalSize += newAppFile.getSize();
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/firmwareUpdater.exe");
+            if (newFirmwareFile.exists())
+                totalSize += newFirmwareFile.getSize();
+        }
+        else
+        {
+            File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/AlphaLive.exe");
+            totalSize += newAppFile.getSize();
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/firmwareUpdater.exe");
+            if (newFirmwareFile.exists())
+                totalSize += newFirmwareFile.getSize();
+        }
+        #endif
+        
+        
+        //==== move new files into place, replacing the older ones but not removing any unreplaced files ====
+        
+        // For the non platform-specific files, they should be organised in the same folder structure
+        // Therefore we can just use relative paths
+        
         for (int i = 0; i < filesToCopy.size(); i++)
         {
-            std::cout << filesToCopy[i].getRelativePathFrom(updateDirectory) << std::endl;
-            
             File oldFile (alphaLiveDirectory.getFullPathName() + 
                           File::separatorString + 
                           filesToCopy[i].getRelativePathFrom(updateDirectory));
             
             bool doesParentExist = oldFile.getParentDirectory().isDirectory();
-            std::cout << "Parent Directory? " << doesParentExist << std::endl;
             
             if (doesParentExist == false)
             {
@@ -219,22 +270,59 @@ void MainContentComponent::run()
             }
             
             oldFile.deleteRecursively();
+            
+            // Increase the extracted size to we can work out the current progress bar value
+            extractedSize += filesToCopy[i].getSize();
+            // Get progress to a value between 0 and 1 (NOT 0 and 100) to update the progress bar correctly
+            progress = ((extractedSize * 0.0001)/(totalSize * 0.0001));
+            {
+                const MessageManagerLock mmLock;
+                String string (translate("Extracting files...") + "\n" + filesToCopy[i].getFileName());
+                infoLabel->setText(string, dontSendNotification);
+            }
+            
             std::cout << "Copied? " << filesToCopy[i].copyFileTo(oldFile) << std::endl;
             
         }
         
         //platform specific files - can't use relative paths here
         #if JUCE_MAC
-        File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/AlphaLive.app");
         File oldAppFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.app");
         oldAppFile.deleteRecursively();
+        
+        newAppFile.findChildFiles(allFiles, 3, true);
+        for (int i = 0; i < allFiles.size(); i++)
+        {
+            // Increase the extracted size to we can work out the current progress bar value
+            extractedSize += allFiles[i].getSize();
+            // Get progress to a value between 0 and 1 (NOT 0 and 100) to update the progress bar correctly
+            progress = (extractedSize * 0.0001)/(totalSize * 0.0001);
+            //sleep the thread here so the progress bar GUI is updated in a noticable manner
+            wait(2);
+        }
+        {
+            const MessageManagerLock mmLock;
+            String string (translate("Extracting files...") + "\n" + newAppFile.getFileName());
+            infoLabel->setText(string, dontSendNotification);
+        }
+        
         std::cout << "Copied? " << newAppFile.copyFileTo (oldAppFile) << std::endl;
         
-        File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/firmwareUpdater");
         if (newFirmwareFile.exists())
         {
             File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "Application Data/firmwareUpdater");
             oldFirmwareFile.deleteRecursively();
+            
+            // Increase the extracted size to we can work out the current progress bar value
+            extractedSize += newFirmwareFile.getSize();
+            // Get progress to a value between 0 and 1 (NOT 0 and 100) to update the progress bar correctly
+            progress = ((extractedSize * 0.0001)/(totalSize * 0.0001));
+            {
+                const MessageManagerLock mmLock;
+                String string (translate("Extracting files...") + "\n" + newFirmwareFile.getFileName());
+                infoLabel->setText(string, dontSendNotification);
+            }
+            
             std::cout << "Copied? " << newFirmwareFile.copyFileTo(oldFirmwareFile) << std::endl;
         }
         #endif 
@@ -245,6 +333,13 @@ void MainContentComponent::run()
             File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/AlphaLive.exe");
             File oldAppFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
             oldAppFile.deleteRecursively();
+            
+            {
+                const MessageManagerLock mmLock;
+                String string (translate("Extracting files...") + "\n" + newAppFile.getFileName());
+                infoLabel->setText(string, dontSendNotification);
+            }
+            
             std::cout << "Copied? " << newAppFile.copyFileTo (oldAppFile) << std::endl;
             
             File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/firmwareUpdater.exe");
@@ -252,6 +347,17 @@ void MainContentComponent::run()
             {
                 File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "Application Data/firmwareUpdater.exe");
                 oldFirmwareFile.deleteRecursively();
+                
+                // Increase the extracted size to we can work out the current progress bar value
+                extractedSize += newFirmwareFile.getSize();
+                // Get progress to a value between 0 and 1 (NOT 0 and 100) to update the progress bar correctly
+                progress = ((extractedSize * 0.0001)/(totalSize * 0.0001));
+                {
+                    const MessageManagerLock mmLock;
+                    String string (translate("Extracting files...") + "\n" + newFirmwareFile.getFileName());
+                    infoLabel->setText(string, dontSendNotification);
+                }
+                
                 std::cout << "Copied? " << newFirmwareFile.copyFileTo(oldFirmwareFile) << std::endl;
             }
         }
@@ -260,6 +366,13 @@ void MainContentComponent::run()
             File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/AlphaLive.exe");
             File oldAppFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
             oldAppFile.deleteRecursively();
+            
+            {
+                const MessageManagerLock mmLock;
+                String string (translate("Extracting files...") + "\n" + newAppFile.getFileName());
+                infoLabel->setText(string, dontSendNotification);
+            }
+            
             std::cout << "Copied? " << newAppFile.copyFileTo (oldAppFile) << std::endl;
             
             File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/firmwareUpdater.exe");
@@ -267,6 +380,17 @@ void MainContentComponent::run()
             {
                 File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "Application Data/firmwareUpdater.exe");
                 oldFirmwareFile.deleteRecursively();
+                
+                // Increase the extracted size to we can work out the current progress bar value
+                extractedSize += newFirmwareFile.getSize();
+                // Get progress to a value between 0 and 1 (NOT 0 and 100) to update the progress bar correctly
+                progress = ((extractedSize * 0.0001)/(totalSize * 0.0001));
+                {
+                    const MessageManagerLock mmLock;
+                    String string (translate("Extracting files...") + "\n" + newFirmwareFile.getFileName());
+                    infoLabel->setText(string, dontSendNotification);
+                }
+                
                 std::cout << "Copied? " << newFirmwareFile.copyFileTo(oldFirmwareFile) << std::endl;
             }
         }
@@ -288,28 +412,27 @@ void MainContentComponent::run()
         File appFile (updateDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
         #endif 
         
+        progress = -1;
+        
+        {
+            const MessageManagerLock mmLock;
+            infoLabel->setText(translate("Finishing installation..."), dontSendNotification);
+        }
+            wait(1000);
+        {
+            const MessageManagerLock mmLock;
+            infoLabel->setText(translate("Relaunching AlphaLive..."), dontSendNotification);
+            
+        }
+        
+        wait(1000);
+        
         appFile.startAsProcess();
+        
+        wait(1000);
         
         signalThreadShouldExit();
     }
     
-    if (installationCancelled == true)
-    {
-        const MessageManagerLock mmLock;
-        infoLabel->setText(translate("Installation cancelled!"), dontSendNotification);
-        
-        closeButton->setVisible(true);
-        cancelButton->setVisible(false);
-        progressBar->setVisible(false);
-    }
-    else
-    {
-        const MessageManagerLock mmLock;
-        infoLabel->setText(translate("Installation complete!"), dontSendNotification);
-        
-        closeButton->setVisible(true);
-        cancelButton->setVisible(false);
-        progressBar->setVisible(false);
-        
-    }
+    juceApplication->quit();
 }
