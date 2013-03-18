@@ -281,9 +281,22 @@ void MainContentComponent::run()
                 infoLabel->setText(string, dontSendNotification);
             }
             
-            std::cout << "Copied? " << filesToCopy[i].copyFileTo(oldFile) << std::endl;
+            if (threadShouldExit() == true)
+            {
+                installationCancelled = true;
+                break;
+            }
             
+            filesToCopy[i].copyFileTo(oldFile);
+    
         }
+        
+        if (threadShouldExit() == true)
+        {
+            installationCancelled = true;
+            break;
+        }
+        
         
         //platform specific files - can't use relative paths here
         #if JUCE_MAC
@@ -306,7 +319,13 @@ void MainContentComponent::run()
             infoLabel->setText(string, dontSendNotification);
         }
         
-        std::cout << "Copied? " << newAppFile.copyFileTo (oldAppFile) << std::endl;
+        if (threadShouldExit() == true)
+        {
+            installationCancelled = true;
+            break;
+        }
+        
+        newAppFile.copyFileTo (oldAppFile);
         
         if (newFirmwareFile.exists())
         {
@@ -323,7 +342,7 @@ void MainContentComponent::run()
                 infoLabel->setText(string, dontSendNotification);
             }
             
-            std::cout << "Copied? " << newFirmwareFile.copyFileTo(oldFirmwareFile) << std::endl;
+            newFirmwareFile.copyFileTo(oldFirmwareFile);
         }
         #endif 
         
@@ -340,7 +359,13 @@ void MainContentComponent::run()
                 infoLabel->setText(string, dontSendNotification);
             }
             
-            std::cout << "Copied? " << newAppFile.copyFileTo (oldAppFile) << std::endl;
+            if (threadShouldExit() == true)
+            {
+                installationCancelled = true;
+                break;
+            }
+            
+            newAppFile.copyFileTo (oldAppFile);
             
             File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/firmwareUpdater.exe");
             if (newFirmwareFile.exists())
@@ -358,7 +383,7 @@ void MainContentComponent::run()
                     infoLabel->setText(string, dontSendNotification);
                 }
                 
-                std::cout << "Copied? " << newFirmwareFile.copyFileTo(oldFirmwareFile) << std::endl;
+                newFirmwareFile.copyFileTo(oldFirmwareFile);
             }
         }
         else
@@ -373,7 +398,13 @@ void MainContentComponent::run()
                 infoLabel->setText(string, dontSendNotification);
             }
             
-            std::cout << "Copied? " << newAppFile.copyFileTo (oldAppFile) << std::endl;
+            if (threadShouldExit() == true)
+            {
+                installationCancelled = true;
+                break;
+            }
+            
+            newAppFile.copyFileTo (oldAppFile);
             
             File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/firmwareUpdater.exe");
             if (newFirmwareFile.exists())
@@ -391,7 +422,7 @@ void MainContentComponent::run()
                     infoLabel->setText(string, dontSendNotification);
                 }
                 
-                std::cout << "Copied? " << newFirmwareFile.copyFileTo(oldFirmwareFile) << std::endl;
+                newFirmwareFile.copyFileTo(oldFirmwareFile);
             }
         }
         #endif
@@ -425,14 +456,26 @@ void MainContentComponent::run()
             
         }
         
-        wait(1000);
+        wait(500);
         
         appFile.startAsProcess();
         
-        wait(1000);
+        wait(500);
         
         signalThreadShouldExit();
     }
     
-    juceApplication->quit();
+    if (installationCancelled == true)
+    {
+        const MessageManagerLock mmLock;
+        infoLabel->setText(translate("Update cancelled!"), dontSendNotification);
+        closeButton->triggerClick();
+    }
+    else
+    {
+        const MessageManagerLock mmLock;
+        infoLabel->setText(translate("Update complete!"), dontSendNotification);
+        closeButton->triggerClick();
+        
+    }
 }
