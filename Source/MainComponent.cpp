@@ -30,7 +30,7 @@ MainContentComponent::MainContentComponent(JUCEApplication *juceApplication_)
     Font newFont(12);
     infoLabel->setFont (newFont);
     infoLabel->setText("\n\n" +
-                       translate("This application has been designed to be launched directly from AlphaLive. To update AlphaLive, in AlphaLive go to \"Help -> Update Software\".") + 
+                       translate("This application has been designed to be launched directly from AlphaLive. To update AlphaLive, close this application and in AlphaLive go to \"Help -> Update Software\".") + 
                        "\n\n" + 
                        translate("If you would like to update AlphaLive but this computer does not have an internet connection, follow these steps:") + 
                        "\n" +  
@@ -40,7 +40,7 @@ MainContentComponent::MainContentComponent(JUCEApplication *juceApplication_)
                        "\n" +
                        translate("- Move it to the AlphaLive directory in \"Applications\" on OS X or \"Program Files\" on Windows on this computer.") +
                        "\n" +
-                       translate("- If the download contains a new version of this \"AlphaLive Updater\" application in either \"Mac Files\", \"Win32 Files\" or \"Win64 Files\" , close this application, move the relevant version to \"AlphaLive/Application Data\" to replace the current version, and relaunch this application."), 
+                       translate("- If the download contains a version of this \"AlphaLive Updater\" application in either \"Mac Files\", \"Win32 Files\" or \"Win64 Files\", close this application, move the relevant version to \"AlphaLive/Application Data\" to replace the current version, and relaunch this application."), 
                        dontSendNotification);
     
     addAndMakeVisible (closeButton = new TextButton(translate("Close")));
@@ -105,9 +105,55 @@ void MainContentComponent::buttonClicked (Button *button)
     {
         juceApplication->quit();
     }
+    else if (button == cancelButton)
+    {
+        bool userSelection = AlertWindow::showOkCancelBox(AlertWindow::WarningIcon, 
+                                                          translate("Are you sure?"), 
+                                                          translate("Are you sure you want to cancel? The update may not be fully applied if so and may cause problems when running AlphaLive."));
+        if (userSelection == true)
+        {
+            signalThreadShouldExit();
+        }
+    }
 }
 
 void MainContentComponent::run()
 {
+    // Do the following in a seperate thread so the GUI can be updated correctly.
     
+    {
+        const MessageManagerLock mmLock;
+        closeButton->setVisible(false);
+        cancelButton->setVisible(true);
+        
+        progressBar->setVisible(true);
+    }
+    
+    bool installationCancelled = false;
+    
+    while (! threadShouldExit())
+    {
+        
+        signalThreadShouldExit();
+    }
+    
+    if (installationCancelled == true)
+    {
+        const MessageManagerLock mmLock;
+        infoLabel->setText(translate("Installation cancelled!"), dontSendNotification);
+        
+        closeButton->setVisible(true);
+        cancelButton->setVisible(false);
+        progressBar->setVisible(false);
+    }
+    else
+    {
+        const MessageManagerLock mmLock;
+        infoLabel->setText(translate("Installation complete!"), dontSendNotification);
+        
+        closeButton->setVisible(true);
+        cancelButton->setVisible(false);
+        progressBar->setVisible(false);
+        
+    }
 }

@@ -21,7 +21,7 @@ public:
 
     const String getApplicationName()       { return ProjectInfo::projectName; }
     const String getApplicationVersion()    { return ProjectInfo::versionString; }
-    bool moreThanOneInstanceAllowed()       { return false; }
+    bool moreThanOneInstanceAllowed()       { return true; }
 
     //==============================================================================
     void initialise (const String& commandLine)
