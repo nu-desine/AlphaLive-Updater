@@ -9,6 +9,11 @@
 #include "MainComponent.h"
 #include "BinaryData.h"
 
+//#if JUCE_MAC || JUCE_LINUX
+////#include <sys/types.h>
+//#include <sys/stat.h>
+//#endif
+
 //Dimensions for centre text box
 #define BOX_X getWidth()/10
 #define BOX_Y getHeight()/10
@@ -165,6 +170,125 @@ void MainContentComponent::run()
     
     while (! threadShouldExit())
     {
+        //    #if JUCE_MAC
+        //    //when uncompressed using zlib, the executable bit of any files have for some been removed,
+        //    //meaning that any application files can't be opened, as found here:
+        //    //http://www.rawmaterialsoftware.com/viewtopic.php?f=2&t=5727
+        //    //To fix the file permissions, you can use the command chmod 775 in terminal
+        //    //or use th chmod() function as documented here:
+        //    //http://www.manpagez.com/man/2/chmod/osx-10.4.php
+        //    
+        //    File exe1 (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/firmwareUpdater");
+        //    File exe2 (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/AlphaLive.app/Contents/MacOS/AlphaLive");
+        //    
+        //    chmod (exe1.getFullPathName().toUTF8(), S_IRWXO | S_IRWXU | S_IRWXG);
+        //    chmod (exe2.getFullPathName().toUTF8(), S_IRWXO | S_IRWXU | S_IRWXG);
+        //    #endif 
+        //    
+        //    //what about on windows?
+        
+        //==== move new files into place, replacing the older ones but not removing any unreplaced files ====
+        
+        // For the non platform-specific files, they should be organised in the same folder structure
+        // Therefore we can just use relative paths
+        
+        Array<File> filesToCopy;
+        File applicatDataDir (updateDirectory.getFullPathName() + File::separatorString + "Application Data");
+        File libraryDir (updateDirectory.getFullPathName() + File::separatorString + "Library");
+        File documentationDir (updateDirectory.getFullPathName() + File::separatorString + "Documentation");
+        
+        applicatDataDir.findChildFiles(filesToCopy, 2, true);
+        libraryDir.findChildFiles(filesToCopy, 2, true);
+        documentationDir.findChildFiles(filesToCopy, 2, true);
+        
+        for (int i = 0; i < filesToCopy.size(); i++)
+        {
+            std::cout << filesToCopy[i].getRelativePathFrom(updateDirectory) << std::endl;
+            
+            File oldFile (alphaLiveDirectory.getFullPathName() + 
+                          File::separatorString + 
+                          filesToCopy[i].getRelativePathFrom(updateDirectory));
+            
+            bool doesParentExist = oldFile.getParentDirectory().isDirectory();
+            std::cout << "Parent Directory? " << doesParentExist << std::endl;
+            
+            if (doesParentExist == false)
+            {
+                File parentDir (oldFile.getParentDirectory());
+                parentDir.createDirectory();
+            }
+            
+            oldFile.deleteRecursively();
+            std::cout << "Copied? " << filesToCopy[i].copyFileTo(oldFile) << std::endl;
+            
+        }
+        
+        //platform specific files - can't use relative paths here
+        #if JUCE_MAC
+        File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/AlphaLive.app");
+        File oldAppFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.app");
+        oldAppFile.deleteRecursively();
+        std::cout << "Copied? " << newAppFile.copyFileTo (oldAppFile) << std::endl;
+        
+        File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/firmwareUpdater");
+        if (newFirmwareFile.exists())
+        {
+            File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "Application Data/firmwareUpdater");
+            oldFirmwareFile.deleteRecursively();
+            std::cout << "Copied? " << newFirmwareFile.copyFileTo(oldFirmwareFile) << std::endl;
+        }
+        #endif 
+        
+        #if JUCE_WINDOWS
+        if (SystemStats::isOperatingSystem64Bit())
+        {
+            File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/AlphaLive.exe");
+            File oldAppFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
+            oldAppFile.deleteRecursively();
+            std::cout << "Copied? " << newAppFile.copyFileTo (oldAppFile) << std::endl;
+            
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/firmwareUpdater.exe");
+            if (newFirmwareFile.exists())
+            {
+                File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "Application Data/firmwareUpdater.exe");
+                oldFirmwareFile.deleteRecursively();
+                std::cout << "Copied? " << newFirmwareFile.copyFileTo(oldFirmwareFile) << std::endl;
+            }
+        }
+        else
+        {
+            File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/AlphaLive.exe");
+            File oldAppFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
+            oldAppFile.deleteRecursively();
+            std::cout << "Copied? " << newAppFile.copyFileTo (oldAppFile) << std::endl;
+            
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/firmwareUpdater.exe");
+            if (newFirmwareFile.exists())
+            {
+                File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "Application Data/firmwareUpdater.exe");
+                oldFirmwareFile.deleteRecursively();
+                std::cout << "Copied? " << newFirmwareFile.copyFileTo(oldFirmwareFile) << std::endl;
+            }
+        }
+        #endif
+        
+        
+        // ==== Delete downloaded files ====
+        updateDirectory.deleteRecursively();
+        
+        #if JUCE_MAC
+        File deleteMe = alphaLiveDirectory.getChildFile("__MACOSX");
+        deleteMe.deleteRecursively();
+        #endif 
+        
+        #if JUCE_MAC
+        File appFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.app");
+        #endif 
+        #if JUCE_WINDOWS
+        File appFile (updateDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
+        #endif 
+        
+        appFile.startAsProcess();
         
         signalThreadShouldExit();
     }
