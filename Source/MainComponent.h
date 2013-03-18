@@ -47,6 +47,8 @@ private:
     
     ScopedPointer <ProgressBar> progressBar;
     double progress;
+    
+    File alphaLiveDirectory, updateDirectory;
 };
 
 

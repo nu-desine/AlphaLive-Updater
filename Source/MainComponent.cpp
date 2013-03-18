@@ -22,26 +22,53 @@ MainContentComponent::MainContentComponent(JUCEApplication *juceApplication_)
                                         :   Thread ("installerThread"),
                                             juceApplication (juceApplication_)
 {
-    //load binary data into Image
+    // Load binary data into Image
     backgroundImage = ImageCache::getFromMemory(BinaryData::background_png, BinaryData::background_pngSize);
     
     addAndMakeVisible (infoLabel = new Label());
-    infoLabel->setJustificationType(Justification::topLeft);
-    Font newFont(12);
-    infoLabel->setFont (newFont);
-    infoLabel->setText("\n\n" +
-                       translate("This application has been designed to be launched directly from AlphaLive. To update AlphaLive, close this application and in AlphaLive go to \"Help -> Update Software\".") + 
-                       "\n\n" + 
-                       translate("If you would like to update AlphaLive but this computer does not have an internet connection, follow these steps:") + 
-                       "\n" +  
-                       translate("- On a networked computer, manually download the update from http://www.alphasphere.com/AlphaLive_update.") +
-                       "\n" + 
-                       translate("- Unzip the downloaded folder.") +
-                       "\n" +
-                       translate("- Move it to the AlphaLive directory in \"Applications\" on OS X or \"Program Files\" on Windows on this computer.") +
-                       "\n" +
-                       translate("- If the download contains a version of this \"AlphaLive Updater\" application in either \"Mac Files\", \"Win32 Files\" or \"Win64 Files\", close this application, move the relevant version to \"AlphaLive/Application Data\" to replace the current version, and relaunch this application."), 
-                       dontSendNotification);
+    
+    alphaLiveDirectory = File::getSpecialLocation (File::currentApplicationFile).getParentDirectory().getParentDirectory();
+    updateDirectory = alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive_update";
+    
+    // Make sure this application is being launch from the correct place
+    #if JUCE_MAC || JUCE_LINUX
+    File alphaLiveApp (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.app");
+    #endif
+    #if JUCE_WINDOWS
+    File alphaLiveApp (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
+    #endif
+    
+    bool shouldUpdate;
+    
+    // If the app seems to be launched from the wrong location,
+    // or the update directory doesn't exist, display instructions to the user
+    if ((! alphaLiveApp.exists()) || (! updateDirectory.isDirectory()))
+    {
+        shouldUpdate = false;
+        
+        infoLabel->setJustificationType(Justification::topLeft);
+        Font newFont(12);
+        infoLabel->setFont (newFont);
+        infoLabel->setText("\n\n" +
+                           translate("This application has been designed to be launched directly from AlphaLive. To update AlphaLive, close this application and in AlphaLive go to \"Help -> Update Software\".") + 
+                           "\n\n" + 
+                           translate("If you would like to update AlphaLive but this computer does not have an internet connection, follow these steps:") + 
+                           "\n" +  
+                           translate("- On a networked computer, manually download the update from http://www.alphasphere.com/AlphaLive_update.") +
+                           "\n" + 
+                           translate("- Unzip the downloaded folder.") +
+                           "\n" +
+                           translate("- Move it to the AlphaLive directory in \"Applications\" on OS X or \"Program Files\" on Windows on this computer.") +
+                           "\n" +
+                           translate("- If the download contains a version of this \"AlphaLive Updater\" application in either \"Mac Files\", \"Win32 Files\" or \"Win64 Files\", close this application, move the relevant version to \"AlphaLive/Application Data\" to replace the current version, and relaunch this application from here."), 
+                           dontSendNotification);
+    }
+    else
+    {
+        shouldUpdate = true;
+        
+        infoLabel->setJustificationType(Justification::centred);  
+    }
     
     addAndMakeVisible (closeButton = new TextButton(translate("Close")));
     closeButton->addListener(this);
@@ -61,6 +88,11 @@ MainContentComponent::MainContentComponent(JUCEApplication *juceApplication_)
     //Look-and-feel stuff
     LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
     LookAndFeel::getDefaultLookAndFeel().setUsingNativeAlertWindows(true);
+    
+    if (shouldUpdate)
+    {
+        startThread();
+    }
 }
 
 MainContentComponent::~MainContentComponent()
