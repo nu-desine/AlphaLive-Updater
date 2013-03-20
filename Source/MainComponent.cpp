@@ -171,7 +171,7 @@ void MainContentComponent::run()
         
     }
     
-    wait(1000);
+    wait(4000);
     
     bool installationCancelled = false;
     
@@ -447,14 +447,14 @@ void MainContentComponent::run()
             const MessageManagerLock mmLock;
             infoLabel->setText(translate("Finishing installation..."), dontSendNotification);
         }
-            wait(1000);
+            wait(2000);
         {
             const MessageManagerLock mmLock;
             infoLabel->setText(translate("Relaunching AlphaLive..."), dontSendNotification);
             
         }
         
-        wait(500);
+        wait(2000);
         
         appFile.startAsProcess();
         
