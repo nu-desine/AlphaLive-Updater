@@ -446,10 +446,9 @@ void MainContentComponent::run()
         // ==== Delete downloaded files ====
         updateDirectory.deleteRecursively();
         
-        #if JUCE_MAC
         File deleteMe = alphaLiveDirectory.getChildFile("__MACOSX");
-        deleteMe.deleteRecursively();
-        #endif 
+		if (deleteMe.exists())
+			deleteMe.deleteRecursively();
         
         #if JUCE_MAC
         File appFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.app");
