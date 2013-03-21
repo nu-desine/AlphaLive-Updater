@@ -9,6 +9,12 @@
             file="Source/MainComponent.cpp"/>
       <FILE id="YMsxNQ" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="XIBReg" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
+      <FILE id="ZhP5io" name="AlphaLiveLookandFeel.cpp" compile="1" resource="0"
+            file="Source/AlphaLiveLookandFeel.cpp"/>
+      <FILE id="Qi6tMh" name="AlphaLiveLookandFeel.h" compile="0" resource="0"
+            file="Source/AlphaLiveLookandFeel.h"/>
+      <FILE id="t6ggQN" name="BinaryData.cpp" compile="1" resource="0" file="Source/BinaryData.cpp"/>
+      <FILE id="Y2qqro" name="BinaryData.h" compile="0" resource="0" file="Source/BinaryData.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>
@@ -36,6 +42,14 @@
                        isDebug="0" optimisation="2" targetName="AlphaLive Updater"/>
       </CONFIGURATIONS>
     </XCODE_MAC>
+    <VS2010 targetFolder="Builds/VisualStudio2010" libraryType="1" juceFolder="..\..\GitHub\JUCE\modules">
+      <CONFIGURATIONS>
+        <CONFIGURATION name="Debug" winWarningLevel="4" generateManifest="1" winArchitecture="32-bit"
+                       isDebug="1" optimisation="1" targetName="AlphaLive Updater"/>
+        <CONFIGURATION name="Release" winWarningLevel="4" generateManifest="1" winArchitecture="32-bit"
+                       isDebug="0" optimisation="2" targetName="AlphaLive Updater"/>
+      </CONFIGURATIONS>
+    </VS2010>
   </EXPORTFORMATS>
   <JUCEOPTIONS/>
 </JUCERPROJECT>
