@@ -6,7 +6,7 @@ AlphaLive Updater has been programmed using the [JUCE](http://www.rawmaterialsof
 
 ## License ##
 
-AlphaLive is licensed under the GPLv2. See GPL2.txt for details.
+AlphaLive Updater is licensed under the GPLv2. See GPL2.txt for details.
 
 AlphaLive Updater, AlphaLive and the AlphaSphere have been developed by [nu desine](http://nu-desine.com/).
 
