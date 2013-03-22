@@ -269,40 +269,49 @@ void MainContentComponent::run()
         
         // For the non platform-specific files, they should be organised in the same folder structure
         // Therefore we can just use relative paths
+
+		String dsStore = String::empty;
+		#if !JUCE_MAC
+		dsStore = "DS_Store";
+		#endif
         
         for (int i = 0; i < filesToCopy.size(); i++)
         {
-            File oldFile (alphaLiveDirectory.getFullPathName() + 
-                          File::separatorString + 
-                          filesToCopy[i].getRelativePathFrom(updateDirectory));
+			//if the file in question is a .DS_Store file and we are not on OS X, don't copy the file
+			if (! filesToCopy[i].getFileNameWithoutExtension().contains (dsStore))
+			{
+				File oldFile (alphaLiveDirectory.getFullPathName() + 
+				              File::separatorString + 
+				              filesToCopy[i].getRelativePathFrom(updateDirectory));
+				
+				bool doesParentExist = oldFile.getParentDirectory().isDirectory();
+				
+				if (doesParentExist == false)
+				{
+				    File parentDir (oldFile.getParentDirectory());
+				    parentDir.createDirectory();
+				}
+				
+				oldFile.deleteRecursively();
+				
+				// Increase the extracted size to we can work out the current progress bar value
+				extractedSize += filesToCopy[i].getSize();
+				// Get progress to a value between 0 and 1 (NOT 0 and 100) to update the progress bar correctly
+				progress = ((extractedSize * 0.0001)/(totalSize * 0.0001));
+				{
+				    const MessageManagerLock mmLock;
+				    String string (translate("Extracting files...") + "\n" + filesToCopy[i].getFileName());
+				    infoLabel->setText(string, dontSendNotification);
+				}
+				
+				if (threadShouldExit() == true)
+				{
+				    installationCancelled = true;
+				    break;
+				}
             
-            bool doesParentExist = oldFile.getParentDirectory().isDirectory();
-            
-            if (doesParentExist == false)
-            {
-                File parentDir (oldFile.getParentDirectory());
-                parentDir.createDirectory();
-            }
-            
-            oldFile.deleteRecursively();
-            
-            // Increase the extracted size to we can work out the current progress bar value
-            extractedSize += filesToCopy[i].getSize();
-            // Get progress to a value between 0 and 1 (NOT 0 and 100) to update the progress bar correctly
-            progress = ((extractedSize * 0.0001)/(totalSize * 0.0001));
-            {
-                const MessageManagerLock mmLock;
-                String string (translate("Extracting files...") + "\n" + filesToCopy[i].getFileName());
-                infoLabel->setText(string, dontSendNotification);
-            }
-            
-            if (threadShouldExit() == true)
-            {
-                installationCancelled = true;
-                break;
-            }
-            
-            filesToCopy[i].copyFileTo(oldFile);
+				filesToCopy[i].copyFileTo(oldFile);
+			}
     
         }
         
