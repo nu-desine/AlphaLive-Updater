@@ -269,16 +269,20 @@ void MainContentComponent::run()
         
         // For the non platform-specific files, they should be organised in the same folder structure
         // Therefore we can just use relative paths
-
-		String dsStore = String::empty;
-		#if !JUCE_MAC
-		dsStore = "DS_Store";
-		#endif
         
         for (int i = 0; i < filesToCopy.size(); i++)
         {
 			//if the file in question is a .DS_Store file and we are not on OS X, don't copy the file
-			if (! filesToCopy[i].getFileNameWithoutExtension().contains (dsStore))
+            String dsStore = "DS_Store";
+            bool copyFile = true;
+            #if !JUCE_MAC
+            if (filesToCopy[i].getFileNameWithoutExtension().contains (dsStore))
+            {
+                copyFile = false;
+            }
+            #endif
+            
+			if (copyFile == true)
 			{
 				File oldFile (alphaLiveDirectory.getFullPathName() + 
 				              File::separatorString + 
