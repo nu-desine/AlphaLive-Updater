@@ -194,24 +194,6 @@ void MainContentComponent::run()
     
     while (! threadShouldExit())
     {
-        //    #if JUCE_MAC
-        //    //when uncompressed using zlib, the executable bit of any files have for some been removed,
-        //    //meaning that any application files can't be opened, as found here:
-        //    //http://www.rawmaterialsoftware.com/viewtopic.php?f=2&t=5727
-        //    //To fix the file permissions, you can use the command chmod 775 in terminal
-        //    //or use th chmod() function as documented here:
-        //    //http://www.manpagez.com/man/2/chmod/osx-10.4.php
-        //    
-        //    File exe1 (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/firmwareUpdater");
-        //    File exe2 (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/AlphaLive.app/Contents/MacOS/AlphaLive");
-        //    
-        //    chmod (exe1.getFullPathName().toUTF8(), S_IRWXO | S_IRWXU | S_IRWXG);
-        //    chmod (exe2.getFullPathName().toUTF8(), S_IRWXO | S_IRWXU | S_IRWXG);
-        //    #endif 
-        //    
-        //    //what about on windows?
-        
-        
         Array<File> filesToCopy;
         File applicatDataDir (updateDirectory.getFullPathName() + File::separatorString + "Application Data");
         File libraryDir (updateDirectory.getFullPathName() + File::separatorString + "Library");
@@ -467,7 +449,7 @@ void MainContentComponent::run()
         File appFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.app");
         #endif 
         #if JUCE_WINDOWS
-        File appFile (updateDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
+        File appFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
         #endif 
         
         progress = -1;
