@@ -42,6 +42,8 @@
 //==============================================================================
 MainContentComponent::MainContentComponent() :  Thread ("installerThread")
 {
+    setLocalisation();
+    
     // Load binary data into Image
     backgroundImage = ImageCache::getFromMemory(BinaryData::background_png, BinaryData::background_pngSize);
     
@@ -487,4 +489,88 @@ void MainContentComponent::run()
         closeButton->triggerClick();
         
     }
+}
+
+
+void MainContentComponent::setLocalisation()
+{
+    static String countryCode = SystemStats::getDisplayLanguage();
+    std::cout << "Language: " << countryCode << std::endl;
+    
+    File dataDir = File::getSpecialLocation (File::currentApplicationFile).getParentDirectory();
+    
+    //We may need to find suitable fonst that exists on the current system
+    //for languages such as Chinese, Japanese, and Korean.
+    //http://en.wikipedia.org/wiki/List_of_CJK_fonts
+    
+    StringArray availableFonts = Font::findAllTypefaceNames();
+    
+    //countryCode will equal ISO 639-1 or ISO 639-2 codes as listed here:
+    //http://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
+    
+    if (countryCode == "ja" || countryCode == "jpn") //japanese
+    {
+        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_ja");
+        
+        if (transFile.exists())
+        {
+            trans = new LocalisedStrings (transFile);
+            LocalisedStrings::setCurrentMappings(trans);
+            
+            String fontToUse = "Arial Unicode MS"; // available on OSX 10.5 and above
+            
+            if (availableFonts.contains(fontToUse) == false)
+            {
+                fontToUse = "Meiryo"; // available on Windows Vista and above
+                
+                if (availableFonts.contains(fontToUse) == false)
+                {
+                    fontToUse = "MS PGothic"; // available on Windows XP
+                    
+                    //what about on Linux?
+                }
+            }
+            
+            lookAndFeel.setDefaultSansSerifTypefaceName(fontToUse);
+            
+            currentLanguage = "Japanese";
+        }
+        
+    }
+    else if (countryCode == "zh" || countryCode == "zho" || countryCode == "zh-Hant" || countryCode == "zh-Hans") //chinese. do i need the first two?
+    {
+        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_zh");
+        
+        if (transFile.exists())
+        {
+            trans = new LocalisedStrings (transFile);
+            LocalisedStrings::setCurrentMappings(trans);
+            
+            String fontToUse = "Arial Unicode MS"; // available on OSX 10.5 and above
+            
+            if (availableFonts.contains(fontToUse) == false)
+            {
+                fontToUse = "Microsoft JhengHei"; // available on Windows Vista and above
+                
+                if (availableFonts.contains(fontToUse) == false)
+                {
+                    fontToUse = "SimHei"; // available on Windows XP
+                    
+                    //do we neeed to consider simplified vs traditional?
+                    //what about on Linux?
+                }
+            }
+            
+            lookAndFeel.setDefaultSansSerifTypefaceName(fontToUse);
+            
+            currentLanguage = "Chinese";
+        }
+    }
+    else //english
+    {
+        LocalisedStrings::setCurrentMappings(0);
+        
+        currentLanguage = "English";
+    }
+    
 }

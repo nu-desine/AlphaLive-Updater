@@ -54,6 +54,8 @@ public:
     
     void buttonClicked (Button *button);
     void run();
+    
+    void setLocalisation();
 
 private:
     //==============================================================================
@@ -68,6 +70,9 @@ private:
     double progress;
     
     File alphaLiveDirectory, updateDirectory;
+    
+    LocalisedStrings *trans;
+    String currentLanguage;
 };
 
 
