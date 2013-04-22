@@ -70,19 +70,19 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
         Font newFont(12);
         infoLabel->setFont (newFont);
         infoLabel->setText("\n\n" +
-                           translate("This application has been designed to be launched directly from AlphaLive. To update AlphaLive, close this application and in AlphaLive go to \"Help -> Update Software\".") + 
+                           translate("This application has been designed to be launched directly from AlphaLive. To update AlphaLive, close this application and in AlphaLive go to 'Help -> Check for updates'.") + 
                            "\n\n" + 
                            translate("If you would like to update AlphaLive but this computer does not have an internet connection, follow these steps:") + 
                            "\n" +  
-                           translate("- On a networked computer, manually download the update from http://www.alphasphere.com/AlphaLive_update.") +
+                           translate("- On a networked computer, manually download the update from http://www.alphasphere.com/AlphaLive_update.zip.") +
                            "\n" + 
                            translate("- Unzip the downloaded folder.") +
                            "\n" +
-                           translate("- Move it to the AlphaLive directory in \"Applications\" on OS X or \"Program Files\" on Windows on this computer.") +
+                           translate("- Move it to the AlphaLive directory in 'Applications' on OS X or 'Program Files' on Windows on this computer.") +
                            "\n" +
-                           translate("- If the download contains a version of this \"AlphaLive Updater\" application in either \"Mac Files\", \"Win32 Files\" or \"Win64 Files\", close this application, move the relevant version to \"AlphaLive/Application Data\" to replace the current version") +
+                           translate("- If the download contains a version of this 'AlphaLive Updater' application in either 'Mac Files', 'Win32 Files' or 'Win64 Files', close this application, move the relevant version to 'AlphaLive/Application Data' to replace the current version.") +
                            "\n" +
-                           translate("- Make sure AlphaLive is closed, and relaunch \"AlphaLive Updater\" from \"AlphaLive/Application Data\"."), 
+                           translate("- Make sure AlphaLive is closed, and relaunch 'AlphaLive Updater' from 'AlphaLive/Application Data'."), 
                            dontSendNotification);
     }
     else
