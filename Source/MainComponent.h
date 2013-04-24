@@ -73,6 +73,8 @@ private:
     
     LocalisedStrings *trans;
     String currentLanguage;
+    
+    int labelFontSize;
 };
 
 

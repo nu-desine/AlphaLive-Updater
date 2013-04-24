@@ -69,22 +69,22 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
         shouldUpdate = false;
         
         infoLabel->setJustificationType(Justification::topLeft);
-        Font newFont(12);
+        Font newFont(labelFontSize);
         infoLabel->setFont (newFont);
         infoLabel->setText("\n\n" +
                            translate("This application has been designed to be launched directly from AlphaLive. To update AlphaLive, close this application and in AlphaLive go to 'Help -> Check for updates'.") + 
                            "\n\n" + 
                            translate("If you would like to update AlphaLive but this computer does not have an internet connection, follow these steps:") + 
                            "\n" +  
-                           translate("- On a networked computer, manually download the update from http://www.alphasphere.com/AlphaLive_update.zip.") +
+                           translate("1. On a networked computer, manually download the update from http://www.alphasphere.com/AlphaLive_update.zip.") +
                            "\n" + 
-                           translate("- Unzip the downloaded folder.") +
+                           translate("2. Unzip the downloaded folder.") +
                            "\n" +
-                           translate("- Move it to the AlphaLive directory in 'Applications' on OS X or 'Program Files' on Windows on this computer.") +
+                           translate("3. Move it to the AlphaLive directory in 'Applications' on OS X or 'Program Files' on Windows on this computer.") +
                            "\n" +
-                           translate("- If the download contains a version of this 'AlphaLive Updater' application in either 'Mac Files', 'Win32 Files' or 'Win64 Files', close this application, move the relevant version to 'AlphaLive/Application Data' to replace the current version.") +
+                           translate("4. If the download contains a version of this 'AlphaLive Updater' application in either 'Mac Files', 'Win32 Files' or 'Win64 Files', close this application, move the relevant version to 'AlphaLive/Application Data' to replace the current version.") +
                            "\n" +
-                           translate("- Make sure AlphaLive is closed, and relaunch 'AlphaLive Updater' from 'AlphaLive/Application Data'."), 
+                           translate("5. Make sure AlphaLive is closed, and relaunch 'AlphaLive Updater' from 'AlphaLive/Application Data'."), 
                            dontSendNotification);
     }
     else
@@ -534,6 +534,7 @@ void MainContentComponent::setLocalisation()
             lookAndFeel.setDefaultSansSerifTypefaceName(fontToUse);
             
             currentLanguage = "Japanese";
+            labelFontSize = 14;
         }
         
     }
@@ -564,6 +565,7 @@ void MainContentComponent::setLocalisation()
             lookAndFeel.setDefaultSansSerifTypefaceName(fontToUse);
             
             currentLanguage = "Chinese";
+            labelFontSize = 14;
         }
     }
     else //english
@@ -571,6 +573,7 @@ void MainContentComponent::setLocalisation()
         LocalisedStrings::setCurrentMappings(0);
         
         currentLanguage = "English";
+        labelFontSize = 12;
     }
     
 }
