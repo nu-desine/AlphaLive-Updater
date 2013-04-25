@@ -2666,6 +2666,7 @@
     <ClInclude Include="..\..\JuceLibraryCode\JuceHeader.h">
       <Filter>Juce Library Code</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\JuceLibraryCode\modules\juce_audio_basics\juce_module_info">
