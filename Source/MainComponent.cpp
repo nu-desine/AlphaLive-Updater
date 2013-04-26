@@ -76,7 +76,7 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
                            "\n\n" + 
                            translate("If you would like to update AlphaLive but this computer does not have an internet connection, follow these steps:") + 
                            "\n" +  
-                           translate("1. On a networked computer, manually download the update from http://www.alphasphere.com/AlphaLive_update.zip.") +
+                           translate("1. On a networked computer, manually download the update from http://www.alphasphere.com/AlphaLive_Update.zip.") +
                            "\n" + 
                            translate("2. Unzip the downloaded folder.") +
                            "\n" +
