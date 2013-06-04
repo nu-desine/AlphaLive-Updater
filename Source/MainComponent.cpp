@@ -568,6 +568,28 @@ void MainContentComponent::setLocalisation()
             labelFontSize = 14;
         }
     }
+    else if (countryCode == "ko" || countryCode == "kor") //Korean
+    {
+        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_ko");
+        
+        if (transFile.exists())
+        {
+            trans = new LocalisedStrings (transFile);
+            LocalisedStrings::setCurrentMappings(trans);
+            
+            String fontToUse = "AppleMyungjo"; // available on OSX 10.5 and above
+            
+            if (availableFonts.contains(fontToUse) == false)
+            {
+                fontToUse = "Batang"; // available on Windows.. XP and above?
+            }
+            
+            lookAndFeel.setDefaultSansSerifTypefaceName(fontToUse);
+            labelFontSize = 14;
+            
+            currentLanguage = "Korean";
+        }
+    }
     else //english
     {
         LocalisedStrings::setCurrentMappings(0);
