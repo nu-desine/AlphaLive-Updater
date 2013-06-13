@@ -71,6 +71,8 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
         infoLabel->setJustificationType(Justification::topLeft);
         Font newFont(labelFontSize);
         infoLabel->setFont (newFont);
+        
+        #if JUCE_MAC || JUCE_LINUX
         infoLabel->setText("\n\n" +
                            translate("This application has been designed to be launched directly from AlphaLive. To update AlphaLive, close this application and in AlphaLive go to 'Help -> Check for updates'.") + 
                            "\n\n" + 
@@ -80,12 +82,30 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
                            "\n" + 
                            translate("2. Unzip the downloaded folder.") +
                            "\n" +
-                           translate("3. Move it to the AlphaLive directory in 'Applications' on OS X or 'Program Files' on Windows on this computer.") +
+                           translate("3. Move the unzipped folder to the 'AlphaLive' directory in the 'Applications' directory on this computer.") +
                            "\n" +
-                           translate("4. If the download contains a version of this 'AlphaLive Updater' application in either 'Mac Files', 'Win32 Files' or 'Win64 Files', close this application, move the relevant version to 'AlphaLive/Application Data' to replace the current version.") +
+                           translate("4. If the download contains a version of this 'AlphaLive Updater' application in 'Mac Files', close this application and move the new version to 'AlphaLive/Application Data' to replace the current version.") +
                            "\n" +
-                           translate("5. Make sure AlphaLive is closed, and relaunch 'AlphaLive Updater' from 'AlphaLive/Application Data'."), 
+                           translate("5. Make sure that AlphaLive is closed, and relaunch 'AlphaLive Updater' from 'AlphaLive/Application Data'. If steps 1-4 were done correctly, these instructions won't appear again."), 
                            dontSendNotification);
+        #endif
+        #if JUCE_WINDOWS
+        infoLabel->setText("\n\n" +
+                           translate("This application has been designed to be launched directly from AlphaLive. To update AlphaLive, close this application and in AlphaLive go to 'Help -> Check for updates'.") + 
+                           "\n" + 
+                           translate("If you would like to update AlphaLive but this computer does not have an internet connection, follow these steps:") + 
+                           "\n" +  
+                           translate("1. On a networked computer, manually download the update from http://www.alphasphere.com/AlphaLive_Update.zip.") +
+                           "\n" + 
+                           translate("2. Unzip the downloaded folder, and locate the 'AlphaLive_Update' sub-folder inside of it.") +
+                           "\n" +
+                           translate("3. Move this sub-folder to the 'AlphaLive' directory in the 'Program Files' directory on this computer.") +
+                           "\n" +
+                           translate("4. If the download contains a version of this 'AlphaLive Updater' application in either 'Win32 Files' or 'Win64 Files', close this application and move the new relevant version to 'AlphaLive/Application Data' to replace the current version.") +
+                           "\n" +
+                           translate("5. Make sure that AlphaLive is closed, and relaunch 'AlphaLive Updater' from 'AlphaLive/Application Data'. If steps 1-4 were done correctly, these instructions won't appear again."), 
+                           dontSendNotification);
+    #endif
     }
     else
     {
