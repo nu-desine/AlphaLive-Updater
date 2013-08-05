@@ -66,8 +66,16 @@ public:
         // This is called when the app is being asked to quit: you can ignore this
         // request and let the app carry on running, or call quit() to allow the app to close.
         
-        //Don't allow the application to be quit here (such as cmd-q)
-        // quit();
+        // Don't allow the application to be quit here if the updater thread is currently
+        // running.
+        if (mainWindow->getMainComponent()->isThreadRunning() == false)
+        {
+            quit();
+        }
+        else
+        {
+            LookAndFeel::getDefaultLookAndFeel().playAlertSound();
+        }
     }
 
     void anotherInstanceStarted (const String& commandLine)
@@ -87,9 +95,10 @@ public:
     public:
         MainWindow () : DocumentWindow ("AlphaLive Updater",
                                         Colours::lightgrey,
-                                        1)
+                                        5)
         {
-            setContentOwned (new MainContentComponent(), true);
+            mainComponent = new MainContentComponent();
+            setContentOwned (mainComponent, true);
             
             //use native OS title bar
             setUsingNativeTitleBar(true);
@@ -112,9 +121,15 @@ public:
            you really have to override any DocumentWindow methods, make sure your
            subclass also calls the superclass's method.
         */
+        
+        MainContentComponent* getMainComponent()
+        {
+            return mainComponent;
+        }
 
     private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
+        ScopedPointer<MainContentComponent> mainComponent;
     };
 
 private:
