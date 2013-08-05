@@ -50,7 +50,7 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
     addAndMakeVisible (infoLabel = new Label());
     
     alphaLiveDirectory = File::getSpecialLocation (File::currentApplicationFile).getParentDirectory().getParentDirectory();
-    updateDirectory = alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive_update";
+    updateDirectory = File::getSpecialLocation(File::userDesktopDirectory).getFullPathName() + File::separatorString + "AlphaLive_update";
     
     // Make sure this application is being launch from the correct place
     #if JUCE_MAC || JUCE_LINUX
@@ -82,7 +82,7 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
                            "\n" + 
                            translate("2. Unzip the downloaded folder.") +
                            "\n" +
-                           translate("3. Move the unzipped folder to the 'AlphaLive' directory in the 'Applications' directory on this computer.") +
+                           translate("3. Move the unzipped folder to your Desktop on this computer.") +
                            "\n" +
                            translate("4. If the download contains a version of this 'AlphaLive Updater' application in 'Mac Files', close this application and move the new version to 'AlphaLive/Application Data' to replace the current version.") +
                            "\n" +
@@ -99,7 +99,7 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
                            "\n" + 
                            translate("2. Unzip the downloaded folder, and locate the 'AlphaLive_Update' sub-folder inside of it.") +
                            "\n" +
-                           translate("3. Move this sub-folder to the 'AlphaLive' directory in the 'Program Files' directory on this computer.") +
+                           translate("3. Move this sub-folder to your Desktop on this computer.") +
                            "\n" +
                            translate("4. If the download contains a version of this 'AlphaLive Updater' application in either 'Win32 Files' or 'Win64 Files', close this application and move the new relevant version to 'AlphaLive/Application Data' to replace the current version.") +
                            "\n" +
