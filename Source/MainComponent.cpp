@@ -216,6 +216,41 @@ void MainContentComponent::run()
     
     while (! threadShouldExit())
     {
+        // ==============================================================================
+        // NEW - first, delete some existing files that are not needed anymore.
+        // These files are listed in a new txt file called files_to_delete.txt,
+        // with each the path of each file being on a new line, with the root
+        // directory of each file being the AlphaLive directory.
+        
+        File deleteFile =   updateDirectory.getFullPathName() +
+                            File::separatorString +
+                            "files_to_delete.txt";
+        
+        if (deleteFile.exists())
+        {
+            StringArray filesToDeleteArray;
+            deleteFile.readLines(filesToDeleteArray);
+            
+            for (int i = 0; i < filesToDeleteArray.size(); i++)
+            {
+                String fileString = alphaLiveDirectory.getFullPathName() +
+                                    File::separatorString +
+                                    filesToDeleteArray[i];
+                
+                if (File::isAbsolutePath(fileString))
+                {
+                    File file (fileString);
+                    
+                    if (file.exists())
+                    {
+                        file.deleteRecursively();
+                    }
+                }
+            }
+        }
+        
+        // ==============================================================================
+        
         Array<File> filesToCopy;
         File applicatDataDir (updateDirectory.getFullPathName() + File::separatorString + "Application Data");
         File libraryDir (updateDirectory.getFullPathName() + File::separatorString + "Library");
