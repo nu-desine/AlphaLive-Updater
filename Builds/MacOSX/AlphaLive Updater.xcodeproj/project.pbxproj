@@ -1669,6 +1669,7 @@
 		721FFF74DB6687C80E35E7F1 /* Juce Library Code */ = {
 			isa = PBXGroup;
 			children = (
+				0EA05BFC2430E470F7B6E0AF /* JuceHeader.h */,
 				CF393804532A894B158C254F /* AppConfig.h */,
 				2585531C2A3B738C0625FF55 /* juce_audio_basics.mm */,
 				2C8D729F2A266DD5B0E7C573 /* juce_audio_devices.mm */,
@@ -1683,7 +1684,6 @@
 				65F0CAE6C3BA01FA4F3A4FCE /* juce_gui_extra.mm */,
 				DF758E3E72772860C9DFA9D1 /* juce_opengl.mm */,
 				7D89A7B53E9D6853FCB87937 /* juce_video.mm */,
-				0EA05BFC2430E470F7B6E0AF /* JuceHeader.h */,
 			);
 			name = "Juce Library Code";
 			sourceTree = "<group>";
