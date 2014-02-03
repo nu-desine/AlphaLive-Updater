@@ -565,7 +565,7 @@ void MainContentComponent::setLocalisation()
     
     if (countryCode == "ja" || countryCode == "jpn") //japanese
     {
-        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_ja");
+        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_ja.txt");
         
         if (transFile.exists())
         {
@@ -595,7 +595,7 @@ void MainContentComponent::setLocalisation()
     }
     else if (countryCode == "zh" || countryCode == "zho" || countryCode == "zh-Hant" || countryCode == "zh-Hans") //chinese. do i need the first two?
     {
-        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_zh");
+        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_zh.txt");
         
         if (transFile.exists())
         {
@@ -625,7 +625,7 @@ void MainContentComponent::setLocalisation()
     }
     else if (countryCode == "ko" || countryCode == "kor") //Korean
     {
-        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_ko");
+        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_ko.txt");
         
         if (transFile.exists())
         {
