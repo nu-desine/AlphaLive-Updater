@@ -233,17 +233,24 @@ void MainContentComponent::run()
             
             for (int i = 0; i < filesToDeleteArray.size(); i++)
             {
-                String fileString = alphaLiveDirectory.getFullPathName() +
-                                    File::separatorString +
-                                    filesToDeleteArray[i];
+                //There's chance that the last line of files_to_delete.txt will be an empty one.
+                //If so, we don't want to turn this into a file path to delete otherwise we will
+                //end up deleting the whole AlphaLive directory!
                 
-                if (File::isAbsolutePath(fileString))
+                if (filesToDeleteArray[i] != String::empty)
                 {
-                    File file (fileString);
+                    String fileString = alphaLiveDirectory.getFullPathName() +
+                    File::separatorString +
+                    filesToDeleteArray[i];
                     
-                    if (file.exists())
+                    if (File::isAbsolutePath(fileString))
                     {
-                        file.deleteRecursively();
+                        File file (fileString);
+                        
+                        if (file.exists())
+                        {
+                            file.deleteRecursively();
+                        }
                     }
                 }
             }
