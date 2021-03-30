@@ -1,68 +1,71 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MACADDRESS_JUCEHEADER__
-#define __JUCE_MACADDRESS_JUCEHEADER__
-
-#include "../containers/juce_Array.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
-    A wrapper for a streaming (TCP) socket.
+    Represents a MAC network card adapter address ID.
 
-    This allows low-level use of sockets; for an easier-to-use messaging layer on top of
-    sockets, you could also try the InterprocessConnection class.
-
-    @see DatagramSocket, InterprocessConnection, InterprocessConnectionServer
+    @tags{Core}
 */
-class JUCE_API  MACAddress
+class JUCE_API  MACAddress  final
 {
 public:
     //==============================================================================
+    /** Returns a list of the MAC addresses of all the available network cards. */
+    static Array<MACAddress> getAllAddresses();
+
     /** Populates a list of the MAC addresses of all the available network cards. */
     static void findAllAddresses (Array<MACAddress>& results);
 
     //==============================================================================
     /** Creates a null address (00-00-00-00-00-00). */
-    MACAddress();
+    MACAddress() noexcept;
 
     /** Creates a copy of another address. */
-    MACAddress (const MACAddress& other);
+    MACAddress (const MACAddress&) noexcept;
 
     /** Creates a copy of another address. */
-    MACAddress& operator= (const MACAddress& other);
+    MACAddress& operator= (const MACAddress&) noexcept;
 
     /** Creates an address from 6 bytes. */
-    explicit MACAddress (const uint8 bytes[6]);
+    explicit MACAddress (const uint8 bytes[6]) noexcept;
+
+    /** Creates an address from a hex string.
+        If the string isn't a 6-byte hex value, this will just default-initialise
+        the object.
+    */
+    explicit MACAddress (StringRef address);
 
     /** Returns a pointer to the 6 bytes that make up this address. */
     const uint8* getBytes() const noexcept        { return address; }
 
     /** Returns a dash-separated string in the form "11-22-33-44-55-66" */
     String toString() const;
+
+    /** Returns a hex string of this address, using a custom separator between each byte. */
+    String toString (StringRef separator) const;
 
     /** Returns the address in the lower 6 bytes of an int64.
 
@@ -74,13 +77,12 @@ public:
     /** Returns true if this address is null (00-00-00-00-00-00). */
     bool isNull() const noexcept;
 
-    bool operator== (const MACAddress& other) const noexcept;
-    bool operator!= (const MACAddress& other) const noexcept;
+    bool operator== (const MACAddress&) const noexcept;
+    bool operator!= (const MACAddress&) const noexcept;
 
     //==============================================================================
 private:
     uint8 address[6];
 };
 
-
-#endif   // __JUCE_MACADDRESS_JUCEHEADER__
+} // namespace juce

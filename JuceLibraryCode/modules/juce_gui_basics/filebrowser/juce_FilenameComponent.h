@@ -1,36 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_FILENAMECOMPONENT_JUCEHEADER__
-#define __JUCE_FILENAMECOMPONENT_JUCEHEADER__
-
-#include "../widgets/juce_ComboBox.h"
-#include "../buttons/juce_TextButton.h"
-#include "../mouse/juce_FileDragAndDropTarget.h"
-class FilenameComponent;
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -40,12 +34,14 @@ class FilenameComponent;
     register one of these objects for event callbacks when the filename is changed.
 
     @see FilenameComponent
+
+    @tags{GUI}
 */
 class JUCE_API  FilenameComponentListener
 {
 public:
     /** Destructor. */
-    virtual ~FilenameComponentListener() {}
+    virtual ~FilenameComponentListener() = default;
 
     /** This method is called after the FilenameComponent's file has been changed. */
     virtual void filenameComponentChanged (FilenameComponent* fileComponentThatHasChanged) = 0;
@@ -65,13 +61,13 @@ public:
     and clicking 'ok', or by typing a new filename into the box and pressing return.
 
     @see FileChooser, ComboBox
+
+    @tags{GUI}
 */
 class JUCE_API  FilenameComponent  : public Component,
                                      public SettableTooltipClient,
                                      public FileDragAndDropTarget,
-                                     private AsyncUpdater,
-                                     private ButtonListener,  // (can't use Button::Listener due to idiotic VC2005 bug)
-                                     private ComboBoxListener
+                                     private AsyncUpdater
 {
 public:
     //==============================================================================
@@ -103,17 +99,22 @@ public:
                        const String& textWhenNothingSelected);
 
     /** Destructor. */
-    ~FilenameComponent();
+    ~FilenameComponent() override;
 
     //==============================================================================
     /** Returns the currently displayed filename. */
     File getCurrentFile() const;
 
+    /** Returns the raw text that the user has entered. */
+    String getCurrentFileText() const;
+
     /** Changes the current filename.
 
+        @param newFile                the new filename to use
         @param addToRecentlyUsedList  if true, the filename will also be added to the
                                       drop-down list of recent files.
-        @param notification           whether to send a notification of the change to listeners
+        @param notification           whether to send a notification of the change to listeners.
+                                      A notification will only be sent if the filename has changed.
     */
     void setCurrentFile (File newFile,
                          bool addToRecentlyUsedList,
@@ -128,6 +129,13 @@ public:
         This is only used if the current file hasn't been set.
     */
     void setDefaultBrowseTarget (const File& newDefaultDirectory);
+
+    /** This can be overridden to return a custom location that you want the dialog box
+        to show when the browse button is pushed.
+        The default implementation of this method will return either the current file
+        (if one has been chosen) or the location that was set by setDefaultBrowseTarget().
+    */
+    virtual File getLocationToBrowse();
 
     /** Returns all the entries on the recent files list.
 
@@ -176,42 +184,51 @@ public:
     void removeListener (FilenameComponentListener* listener);
 
     /** Gives the component a tooltip. */
-    void setTooltip (const String& newTooltip);
+    void setTooltip (const String& newTooltip) override;
+
+    //==============================================================================
+    /** This abstract base class is implemented by LookAndFeel classes. */
+    struct JUCE_API  LookAndFeelMethods
+    {
+        virtual ~LookAndFeelMethods() = default;
+
+        virtual Button* createFilenameComponentBrowseButton (const String& text) = 0;
+        virtual void layoutFilenameComponent (FilenameComponent&, ComboBox* filenameBox, Button* browseButton) =  0;
+    };
 
     //==============================================================================
     /** @internal */
-    void paintOverChildren (Graphics& g);
+    void paintOverChildren (Graphics&) override;
     /** @internal */
-    void resized();
+    void resized() override;
     /** @internal */
-    void lookAndFeelChanged();
+    void lookAndFeelChanged() override;
     /** @internal */
-    bool isInterestedInFileDrag (const StringArray& files);
+    bool isInterestedInFileDrag (const StringArray&) override;
     /** @internal */
-    void filesDropped (const StringArray& files, int, int);
+    void filesDropped (const StringArray&, int, int) override;
     /** @internal */
-    void fileDragEnter (const StringArray& files, int, int);
+    void fileDragEnter (const StringArray&, int, int) override;
     /** @internal */
-    void fileDragExit (const StringArray& files);
+    void fileDragExit (const StringArray&) override;
+    /** @internal */
+    KeyboardFocusTraverser* createFocusTraverser() override;
 
 private:
     //==============================================================================
     ComboBox filenameBox;
     String lastFilename;
-    ScopedPointer<Button> browseButton;
-    int maxRecentFiles;
-    bool isDir, isSaving, isFileDragOver;
+    std::unique_ptr<Button> browseButton;
+    int maxRecentFiles = 30;
+    bool isDir, isSaving, isFileDragOver = false;
     String wildcard, enforcedSuffix, browseButtonText;
     ListenerList <FilenameComponentListener> listeners;
     File defaultBrowseFile;
 
-    void comboBoxChanged (ComboBox*);
-    void buttonClicked (Button* button);
-    void handleAsyncUpdate();
+    void showChooser();
+    void handleAsyncUpdate() override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FilenameComponent)
 };
 
-
-
-#endif   // __JUCE_FILENAMECOMPONENT_JUCEHEADER__
+} // namespace juce

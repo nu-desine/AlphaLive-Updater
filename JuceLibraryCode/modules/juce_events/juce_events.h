@@ -1,95 +1,104 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_EVENTS_JUCEHEADER__
-#define __JUCE_EVENTS_JUCEHEADER__
 
-//=============================================================================
-#include "../juce_core/juce_core.h"
+/*******************************************************************************
+ The block below describes the properties of this module, and is read by
+ the Projucer to automatically generate project code that uses it.
+ For details about the syntax and how to create or use a module, see the
+ JUCE Module Format.md file.
 
-namespace juce
-{
 
-// START_AUTOINCLUDE messages, broadcasters, timers,
-// interprocess, native/juce_ScopedXLock*
-#ifndef __JUCE_APPLICATIONBASE_JUCEHEADER__
- #include "messages/juce_ApplicationBase.h"
-#endif
-#ifndef __JUCE_CALLBACKMESSAGE_JUCEHEADER__
- #include "messages/juce_CallbackMessage.h"
-#endif
-#ifndef __JUCE_DELETEDATSHUTDOWN_JUCEHEADER__
- #include "messages/juce_DeletedAtShutdown.h"
-#endif
-#ifndef __JUCE_MESSAGE_JUCEHEADER__
- #include "messages/juce_Message.h"
-#endif
-#ifndef __JUCE_MESSAGELISTENER_JUCEHEADER__
- #include "messages/juce_MessageListener.h"
-#endif
-#ifndef __JUCE_MESSAGEMANAGER_JUCEHEADER__
- #include "messages/juce_MessageManager.h"
-#endif
-#ifndef __JUCE_NOTIFICATIONTYPE_JUCEHEADER__
- #include "messages/juce_NotificationType.h"
-#endif
-#ifndef __JUCE_ACTIONBROADCASTER_JUCEHEADER__
- #include "broadcasters/juce_ActionBroadcaster.h"
-#endif
-#ifndef __JUCE_ACTIONLISTENER_JUCEHEADER__
- #include "broadcasters/juce_ActionListener.h"
-#endif
-#ifndef __JUCE_ASYNCUPDATER_JUCEHEADER__
- #include "broadcasters/juce_AsyncUpdater.h"
-#endif
-#ifndef __JUCE_CHANGEBROADCASTER_JUCEHEADER__
- #include "broadcasters/juce_ChangeBroadcaster.h"
-#endif
-#ifndef __JUCE_CHANGELISTENER_JUCEHEADER__
- #include "broadcasters/juce_ChangeListener.h"
-#endif
-#ifndef __JUCE_LISTENERLIST_JUCEHEADER__
- #include "broadcasters/juce_ListenerList.h"
-#endif
-#ifndef __JUCE_MULTITIMER_JUCEHEADER__
- #include "timers/juce_MultiTimer.h"
-#endif
-#ifndef __JUCE_TIMER_JUCEHEADER__
- #include "timers/juce_Timer.h"
-#endif
-#ifndef __JUCE_INTERPROCESSCONNECTION_JUCEHEADER__
- #include "interprocess/juce_InterprocessConnection.h"
-#endif
-#ifndef __JUCE_INTERPROCESSCONNECTIONSERVER_JUCEHEADER__
- #include "interprocess/juce_InterprocessConnectionServer.h"
-#endif
-#ifndef __JUCE_SCOPEDXLOCK_JUCEHEADER__
- #include "native/juce_ScopedXLock.h"
-#endif
-// END_AUTOINCLUDE
+ BEGIN_JUCE_MODULE_DECLARATION
 
-}
+  ID:                 juce_events
+  vendor:             juce
+  version:            6.0.8
+  name:               JUCE message and event handling classes
+  description:        Classes for running an application's main event loop and sending/receiving messages, timers, etc.
+  website:            http://www.juce.com/juce
+  license:            ISC
 
-#endif   // __JUCE_EVENTS_JUCEHEADER__
+  dependencies:       juce_core
+
+ END_JUCE_MODULE_DECLARATION
+
+*******************************************************************************/
+
+
+#pragma once
+#define JUCE_EVENTS_H_INCLUDED
+
+#include <juce_core/juce_core.h>
+
+//==============================================================================
+/** Config: JUCE_EXECUTE_APP_SUSPEND_ON_BACKGROUND_TASK
+    Will execute your application's suspend method on an iOS background task, giving
+    you extra time to save your applications state.
+*/
+#ifndef JUCE_EXECUTE_APP_SUSPEND_ON_BACKGROUND_TASK
+ #define JUCE_EXECUTE_APP_SUSPEND_ON_BACKGROUND_TASK 0
+#endif
+
+#if JUCE_WINDOWS && JUCE_EVENTS_INCLUDE_WINRT_WRAPPER
+ // If this header file is missing then you are probably attempting to use WinRT
+ // functionality without the WinRT libraries installed on your system. Try installing
+ // the latest Windows Standalone SDK and maybe also adding the path to the WinRT
+ // headers to your build system. This path should have the form
+ // "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\winrt".
+ #include <inspectable.h>
+ #include <hstring.h>
+#endif
+
+#include "messages/juce_MessageManager.h"
+#include "messages/juce_Message.h"
+#include "messages/juce_MessageListener.h"
+#include "messages/juce_CallbackMessage.h"
+#include "messages/juce_DeletedAtShutdown.h"
+#include "messages/juce_NotificationType.h"
+#include "messages/juce_ApplicationBase.h"
+#include "messages/juce_Initialisation.h"
+#include "messages/juce_MountedVolumeListChangeDetector.h"
+#include "broadcasters/juce_ActionBroadcaster.h"
+#include "broadcasters/juce_ActionListener.h"
+#include "broadcasters/juce_AsyncUpdater.h"
+#include "broadcasters/juce_ChangeListener.h"
+#include "broadcasters/juce_ChangeBroadcaster.h"
+#include "timers/juce_Timer.h"
+#include "timers/juce_MultiTimer.h"
+#include "interprocess/juce_InterprocessConnection.h"
+#include "interprocess/juce_InterprocessConnectionServer.h"
+#include "interprocess/juce_ConnectedChildProcess.h"
+#include "interprocess/juce_NetworkServiceDiscovery.h"
+
+#if JUCE_LINUX
+ #include "native/juce_linux_EventLoop.h"
+#endif
+
+#if JUCE_WINDOWS
+ #if JUCE_EVENTS_INCLUDE_WIN32_MESSAGE_WINDOW
+  #include "native/juce_win32_HiddenMessageWindow.h"
+ #endif
+ #if JUCE_EVENTS_INCLUDE_WINRT_WRAPPER
+  #include "native/juce_win32_WinRTWrapper.h"
+ #endif
+#endif

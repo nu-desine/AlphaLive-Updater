@@ -1,34 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_LEAKEDOBJECTDETECTOR_JUCEHEADER__
-#define __JUCE_LEAKEDOBJECTDETECTOR_JUCEHEADER__
-
-#include "../text/juce_String.h"
-#include "juce_Atomic.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -42,6 +35,8 @@
     To use it, use the JUCE_LEAK_DETECTOR macro as a simple way to put one in your
     class declaration. Have a look through the juce codebase for examples, it's used
     in most of the classes.
+
+    @tags{Core}
 */
 template <class OwnerClass>
 class LeakedObjectDetector
@@ -50,6 +45,8 @@ public:
     //==============================================================================
     LeakedObjectDetector() noexcept                                 { ++(getCounter().numObjects); }
     LeakedObjectDetector (const LeakedObjectDetector&) noexcept     { ++(getCounter().numObjects); }
+
+    LeakedObjectDetector& operator= (const LeakedObjectDetector&) noexcept = default;
 
     ~LeakedObjectDetector()
     {
@@ -65,7 +62,7 @@ public:
                 at an earlier point in the program, and simply not been detected until now.
 
                 Most errors like this are caused by using old-fashioned, non-RAII techniques for
-                your object management. Tut, tut. Always, always use ScopedPointers, OwnedArrays,
+                your object management. Tut, tut. Always, always use std::unique_ptrs, OwnedArrays,
                 ReferenceCountedObjects, etc, and avoid the 'delete' operator at all costs!
             */
             jassertfalse;
@@ -77,7 +74,7 @@ private:
     class LeakCounter
     {
     public:
-        LeakCounter() noexcept {}
+        LeakCounter() = default;
 
         ~LeakCounter()
         {
@@ -89,7 +86,7 @@ private:
                     the 'OwnerClass' template parameter - the name should have been printed by the line above.
 
                     If you're leaking, it's probably because you're using old-fashioned, non-RAII techniques for
-                    your object management. Tut, tut. Always, always use ScopedPointers, OwnedArrays,
+                    your object management. Tut, tut. Always, always use std::unique_ptrs, OwnedArrays,
                     ReferenceCountedObjects, etc, and avoid the 'delete' operator at all costs!
                 */
                 jassertfalse;
@@ -142,5 +139,4 @@ private:
  #endif
 #endif
 
-
-#endif   // __JUCE_LEAKEDOBJECTDETECTOR_JUCEHEADER__
+} // namespace juce

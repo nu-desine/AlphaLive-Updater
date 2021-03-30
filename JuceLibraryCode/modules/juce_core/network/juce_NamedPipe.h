@@ -1,32 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_NAMEDPIPE_JUCEHEADER__
-#define __JUCE_NAMEDPIPE_JUCEHEADER__
-
-#include "../threads/juce_ReadWriteLock.h"
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -35,8 +30,10 @@
     Two processes can use NamedPipe objects to exchange blocks of data.
 
     @see InterprocessConnection
+
+    @tags{Core}
 */
-class JUCE_API  NamedPipe
+class JUCE_API  NamedPipe  final
 {
 public:
     //==============================================================================
@@ -54,8 +51,10 @@ public:
 
     /** Tries to create a new pipe.
         Returns true if it succeeds.
+        If mustNotExist is true then it will fail if a pipe is already
+        open with the same name.
     */
-    bool createNewPipe (const String& pipeName);
+    bool createNewPipe (const String& pipeName, bool mustNotExist = false);
 
     /** Closes the pipe, if it's open. */
     void close();
@@ -89,14 +88,13 @@ public:
 private:
     //==============================================================================
     JUCE_PUBLIC_IN_DLL_BUILD (class Pimpl)
-    ScopedPointer<Pimpl> pimpl;
+    std::unique_ptr<Pimpl> pimpl;
     String currentPipeName;
     ReadWriteLock lock;
 
-    bool openInternal (const String& pipeName, const bool createPipe);
+    bool openInternal (const String& pipeName, bool createPipe, bool mustNotExist);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NamedPipe)
 };
 
-
-#endif   // __JUCE_NAMEDPIPE_JUCEHEADER__
+} // namespace juce

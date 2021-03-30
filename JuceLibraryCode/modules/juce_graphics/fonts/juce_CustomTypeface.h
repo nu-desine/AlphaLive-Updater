@@ -1,35 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_CUSTOMTYPEFACE_JUCEHEADER__
-#define __JUCE_CUSTOMTYPEFACE_JUCEHEADER__
-
-#include "juce_Typeface.h"
-class InputStream;
-class OutputStream;
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -41,7 +36,14 @@ class OutputStream;
     If you want to create a copy of a native face, you can use addGlyphsFromOtherTypeface()
     to copy glyphs into this face.
 
+    NOTE! For most people this class is almost certainly NOT the right tool to use!
+    If what you want to do is to embed a font into your exe, then your best plan is
+    probably to embed your TTF/OTF font file into your binary using the Projucer,
+    and then call Typeface::createSystemTypefaceFor() to load it from memory.
+
     @see Typeface, Font
+
+    @tags{Graphics}
 */
 class JUCE_API  CustomTypeface  : public Typeface
 {
@@ -52,12 +54,17 @@ public:
 
     /** Loads a typeface from a previously saved stream.
         The stream must have been created by writeToStream().
+
+        NOTE! Since this class was written, support was added for loading real font files from
+        memory, so for most people, using Typeface::createSystemTypefaceFor() to load a real font
+        is more appropriate than using this class to store it in a proprietary format.
+
         @see writeToStream
     */
     explicit CustomTypeface (InputStream& serialisedTypefaceStream);
 
     /** Destructor. */
-    ~CustomTypeface();
+    ~CustomTypeface() override;
 
     //==============================================================================
     /** Resets this typeface, deleting all its glyphs and settings. */
@@ -113,18 +120,22 @@ public:
     /** Saves this typeface as a Juce-formatted font file.
         A CustomTypeface can be created to reload the data that is written - see the CustomTypeface
         constructor.
+
+        NOTE! Since this class was written, support was added for loading real font files from
+        memory, so for most people, using Typeface::createSystemTypefaceFor() to load a real font
+        is more appropriate than using this class to store it in a proprietary format.
     */
     bool writeToStream (OutputStream& outputStream);
 
     //==============================================================================
     // The following methods implement the basic Typeface behaviour.
-    float getAscent() const;
-    float getDescent() const;
-    float getHeightToPointsFactor() const;
-    float getStringWidth (const String& text);
-    void getGlyphPositions (const String& text, Array <int>& glyphs, Array<float>& xOffsets);
-    bool getOutlineForGlyph (int glyphNumber, Path& path);
-    EdgeTable* getEdgeTableForGlyph (int glyphNumber, const AffineTransform& transform);
+    float getAscent() const override;
+    float getDescent() const override;
+    float getHeightToPointsFactor() const override;
+    float getStringWidth (const String&) override;
+    void getGlyphPositions (const String&, Array<int>& glyphs, Array<float>& xOffsets) override;
+    bool getOutlineForGlyph (int glyphNumber, Path&) override;
+    EdgeTable* getEdgeTableForGlyph (int glyphNumber, const AffineTransform&, float fontHeight) override;
 
 protected:
     //==============================================================================
@@ -143,13 +154,12 @@ protected:
 private:
     //==============================================================================
     class GlyphInfo;
-    friend class OwnedArray<GlyphInfo>;
-    OwnedArray <GlyphInfo> glyphs;
-    short lookupTable [128];
+    OwnedArray<GlyphInfo> glyphs;
+    short lookupTable[128];
 
     GlyphInfo* findGlyph (const juce_wchar character, bool loadIfNeeded) noexcept;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CustomTypeface)
 };
 
-#endif   // __JUCE_CUSTOMTYPEFACE_JUCEHEADER__
+} // namespace juce

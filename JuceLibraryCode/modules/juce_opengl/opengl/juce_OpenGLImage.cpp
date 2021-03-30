@@ -1,34 +1,37 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 class OpenGLFrameBufferImage   : public ImagePixelData
 {
 public:
-    OpenGLFrameBufferImage (OpenGLContext& context_, int width, int height)
-        : ImagePixelData (Image::ARGB, width, height),
-          context (context_),
+    OpenGLFrameBufferImage (OpenGLContext& c, int w, int h)
+        : ImagePixelData (Image::ARGB, w, h),
+          context (c),
           pixelStride (4),
           lineStride (width * pixelStride)
     {
@@ -36,32 +39,36 @@ public:
 
     bool initialise()
     {
-        return frameBuffer.initialise (context, width, height);
+        if (! frameBuffer.initialise (context, width, height))
+            return false;
+
+        frameBuffer.clear (Colours::transparentBlack);
+        return true;
     }
 
-    LowLevelGraphicsContext* createLowLevelContext()
+    std::unique_ptr<LowLevelGraphicsContext> createLowLevelContext() override
     {
+        sendDataChangeMessage();
         return createOpenGLGraphicsContext (context, frameBuffer);
     }
 
-    ImageType* createType() const     { return new OpenGLImageType(); }
+    std::unique_ptr<ImageType> createType() const override     { return std::make_unique<OpenGLImageType>(); }
 
-    ImagePixelData* clone()
+    ImagePixelData::Ptr clone() override
     {
-        OpenGLFrameBufferImage* im = new OpenGLFrameBufferImage (context, width, height);
-        im->incReferenceCount();
+        std::unique_ptr<OpenGLFrameBufferImage> im (new OpenGLFrameBufferImage (context, width, height));
 
-        {
-            Image newImage (im);
-            Graphics g (newImage);
-            g.drawImageAt (Image (this), 0, 0, false);
-        }
+        if (! im->initialise())
+            return ImagePixelData::Ptr();
 
-        im->resetReferenceCount();
-        return im;
+        Image newImage (im.release());
+        Graphics g (newImage);
+        g.drawImageAt (Image (*this), 0, 0, false);
+
+        return ImagePixelData::Ptr (newImage.getPixelData());
     }
 
-    void initialiseBitmapData (Image::BitmapData& bitmapData, int x, int y, Image::BitmapData::ReadWriteMode mode)
+    void initialiseBitmapData (Image::BitmapData& bitmapData, int x, int y, Image::BitmapData::ReadWriteMode mode) override
     {
         bitmapData.pixelFormat = pixelFormat;
         bitmapData.lineStride  = lineStride;
@@ -74,6 +81,9 @@ public:
             case Image::BitmapData::readWrite:  DataReleaser<Reader, Writer>::initialise (frameBuffer, bitmapData, x, y); break;
             default:                            jassertfalse; break;
         }
+
+        if (mode != Image::BitmapData::readOnly)
+            sendDataChangeMessage();
     }
 
     OpenGLContext& context;
@@ -102,7 +112,7 @@ private:
         static void verticalRowFlip (PixelARGB* const data, const int w, const int h)
         {
             HeapBlock<PixelARGB> tempRow (w);
-            const int rowSize = sizeof (PixelARGB) * w;
+            auto rowSize = (size_t) w * sizeof (PixelARGB);
 
             for (int y = 0; y < h / 2; ++y)
             {
@@ -117,14 +127,14 @@ private:
 
     struct Writer
     {
-        Writer (OpenGLFrameBuffer& frameBuffer_, int x, int y, int w, int h) noexcept
-            : frameBuffer (frameBuffer_), area (x, y, w, h)
+        Writer (OpenGLFrameBuffer& fb, int x, int y, int w, int h) noexcept
+            : frameBuffer (fb), area (x, y, w, h)
         {}
 
         void write (const PixelARGB* const data) const noexcept
         {
             HeapBlock<PixelARGB> invertedCopy (area.getWidth() * area.getHeight());
-            const int rowSize = sizeof (PixelARGB) * area.getWidth();
+            auto rowSize = (size_t) area.getWidth() * sizeof (PixelARGB);
 
             for (int y = 0; y < area.getHeight(); ++y)
                 memcpy (invertedCopy + area.getWidth() * y,
@@ -143,7 +153,7 @@ private:
     struct DataReleaser  : public Image::BitmapData::BitmapDataReleaser
     {
         DataReleaser (OpenGLFrameBuffer& fb, int x, int y, int w, int h)
-            : data (w * h),
+            : data ((size_t) (w * h)),
               writer (fb, x, y, w, h)
         {}
 
@@ -154,9 +164,11 @@ private:
 
         static void initialise (OpenGLFrameBuffer& frameBuffer, Image::BitmapData& bitmapData, int x, int y)
         {
-            DataReleaser* r = new DataReleaser (frameBuffer, x, y, bitmapData.width, bitmapData.height);
-            bitmapData.dataReleaser = r;
-            bitmapData.data = (uint8*) (r->data + (x + y * bitmapData.width));
+            auto* r = new DataReleaser (frameBuffer, x, y, bitmapData.width, bitmapData.height);
+            bitmapData.dataReleaser.reset (r);
+
+            bitmapData.data = (uint8*) r->data.get();
+            bitmapData.lineStride = (bitmapData.width * bitmapData.pixelStride + 3) & ~3;
 
             ReaderType::read (frameBuffer, bitmapData, x, y);
         }
@@ -183,18 +195,20 @@ ImagePixelData::Ptr OpenGLImageType::create (Image::PixelFormat, int width, int 
     OpenGLContext* currentContext = OpenGLContext::getCurrentContext();
     jassert (currentContext != nullptr); // an OpenGL image can only be created when a valid context is active!
 
-    ScopedPointer<OpenGLFrameBufferImage> im (new OpenGLFrameBufferImage (*currentContext, width, height));
+    std::unique_ptr<OpenGLFrameBufferImage> im (new OpenGLFrameBufferImage (*currentContext, width, height));
 
     if (! im->initialise())
-        return nullptr;
+        return ImagePixelData::Ptr();
 
-    im->frameBuffer.clear (Colours::transparentBlack);
-    return im.release();
+    return *im.release();
 }
 
 OpenGLFrameBuffer* OpenGLImageType::getFrameBufferFrom (const Image& image)
 {
-    OpenGLFrameBufferImage* const glImage = dynamic_cast<OpenGLFrameBufferImage*> (image.getPixelData());
+    if (OpenGLFrameBufferImage* const glImage = dynamic_cast<OpenGLFrameBufferImage*> (image.getPixelData()))
+        return &(glImage->frameBuffer);
 
-    return glImage != nullptr ? &(glImage->frameBuffer) : nullptr;
+    return nullptr;
 }
+
+} // namespace juce

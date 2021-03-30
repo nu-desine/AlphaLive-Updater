@@ -1,43 +1,44 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-ToolbarItemPalette::ToolbarItemPalette (ToolbarItemFactory& factory_,
-                                        Toolbar* const toolbar_)
-    : factory (factory_),
-      toolbar (toolbar_)
+namespace juce
 {
-    Component* const itemHolder = new Component();
+
+ToolbarItemPalette::ToolbarItemPalette (ToolbarItemFactory& tbf, Toolbar& bar)
+    : factory (tbf), toolbar (bar)
+{
+    auto* itemHolder = new Component();
     viewport.setViewedComponent (itemHolder);
 
-    Array <int> allIds;
+    Array<int> allIds;
     factory.getAllToolbarItemIds (allIds);
 
-    for (int i = 0; i < allIds.size(); ++i)
-        addComponent (allIds.getUnchecked (i), -1);
+    for (auto& i : allIds)
+        addComponent (i, -1);
 
-    addAndMakeVisible (&viewport);
+    addAndMakeVisible (viewport);
 }
 
 ToolbarItemPalette::~ToolbarItemPalette()
@@ -47,7 +48,7 @@ ToolbarItemPalette::~ToolbarItemPalette()
 //==============================================================================
 void ToolbarItemPalette::addComponent (const int itemId, const int index)
 {
-    if (ToolbarItemComponent* const tc = Toolbar::createItem (factory, itemId))
+    if (auto* tc = Toolbar::createItem (factory, itemId))
     {
         items.insert (index, tc);
         viewport.getViewedComponent()->addAndMakeVisible (tc, index);
@@ -59,13 +60,13 @@ void ToolbarItemPalette::addComponent (const int itemId, const int index)
     }
 }
 
-void ToolbarItemPalette::replaceComponent (ToolbarItemComponent* const comp)
+void ToolbarItemPalette::replaceComponent (ToolbarItemComponent& comp)
 {
-    const int index = items.indexOf (comp);
+    auto index = items.indexOf (&comp);
     jassert (index >= 0);
-    items.removeObject (comp, false);
+    items.removeObject (&comp, false);
 
-    addComponent (comp->getItemId(), index);
+    addComponent (comp.getItemId(), index);
     resized();
 }
 
@@ -73,20 +74,18 @@ void ToolbarItemPalette::resized()
 {
     viewport.setBoundsInset (BorderSize<int> (1));
 
-    Component* const itemHolder = viewport.getViewedComponent();
+    auto* itemHolder = viewport.getViewedComponent();
 
     const int indent = 8;
     const int preferredWidth = viewport.getWidth() - viewport.getScrollBarThickness() - indent;
-    const int height = toolbar->getThickness();
-    int x = indent;
-    int y = indent;
+    const int height = toolbar.getThickness();
+    auto x = indent;
+    auto y = indent;
     int maxX = 0;
 
-    for (int i = 0; i < items.size(); ++i)
+    for (auto* tc : items)
     {
-        ToolbarItemComponent* const tc = items.getUnchecked(i);
-
-        tc->setStyle (toolbar->getStyle());
+        tc->setStyle (toolbar.getStyle());
 
         int preferredSize = 1, minSize = 1, maxSize = 1;
 
@@ -107,3 +106,5 @@ void ToolbarItemPalette::resized()
 
     itemHolder->setSize (maxX, y + height + 8);
 }
+
+} // namespace juce

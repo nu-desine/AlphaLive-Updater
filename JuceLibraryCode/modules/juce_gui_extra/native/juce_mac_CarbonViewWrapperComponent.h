@@ -1,31 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MAC_CARBONVIEWWRAPPERCOMPONENT_JUCEHEADER__
-#define __JUCE_MAC_CARBONVIEWWRAPPERCOMPONENT_JUCEHEADER__
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -33,6 +32,8 @@
 
     This is a handy class that's designed to be inlined where needed, e.g.
     in the audio plugin hosting code.
+
+    @tags{GUI}
 */
 class CarbonViewWrapperComponent  : public Component,
                                     public ComponentMovementWatcher,
@@ -41,14 +42,16 @@ class CarbonViewWrapperComponent  : public Component,
 public:
     CarbonViewWrapperComponent()
         : ComponentMovementWatcher (this),
-          wrapperWindow (0),
-          carbonWindow (0),
+          carbonWindow (nil),
+          keepPluginWindowWhenHidden (false),
+          wrapperWindow (nil),
           embeddedView (0),
-          recursiveResize (false)
+          recursiveResize (false),
+          repaintChildOnCreation (true)
     {
     }
 
-    virtual ~CarbonViewWrapperComponent()
+    ~CarbonViewWrapperComponent()
     {
         jassert (embeddedView == 0); // must call deleteWindow() in the subclass's destructor!
     }
@@ -72,7 +75,7 @@ public:
 
     void createWindow()
     {
-        if (wrapperWindow == 0)
+        if (wrapperWindow == nil)
         {
             Rect r;
             r.left   = (short) getScreenX();
@@ -98,11 +101,10 @@ public:
 
             // Check for the plugin creating its own floating window, and if there is one,
             // we need to reparent it to make it visible..
-            NSWindow* floatingChildWindow = [[carbonWindow childWindows] objectAtIndex: 0];
-
-            if (floatingChildWindow != nil)
-                [getOwnerWindow() addChildWindow: floatingChildWindow
-                                         ordered: NSWindowAbove];
+            if (carbonWindow.childWindows.count > 0)
+                if (NSWindow* floatingChildWindow = [[carbonWindow childWindows] objectAtIndex: 0])
+                    [getOwnerWindow() addChildWindow: floatingChildWindow
+                                             ordered: NSWindowAbove];
 
             EventTypeSpec windowEventTypes[] =
             {
@@ -112,7 +114,7 @@ public:
                 { kEventClassMouse,  kEventMouseDown },
                 { kEventClassMouse,  kEventMouseMoved },
                 { kEventClassMouse,  kEventMouseDragged },
-                { kEventClassMouse,  kEventMouseUp},
+                { kEventClassMouse,  kEventMouseUp },
                 { kEventClassWindow, kEventWindowDrawContent },
                 { kEventClassWindow, kEventWindowShown },
                 { kEventClassWindow, kEventWindowHidden }
@@ -135,7 +137,7 @@ public:
         removeView (embeddedView);
         embeddedView = 0;
 
-        if (wrapperWindow != 0)
+        if (wrapperWindow != nil)
         {
             NSWindow* ownerWindow = getOwnerWindow();
 
@@ -147,7 +149,7 @@ public:
 
             RemoveEventHandler (eventHandlerRef);
             DisposeWindow (wrapperWindow);
-            wrapperWindow = 0;
+            wrapperWindow = nil;
         }
     }
 
@@ -192,15 +194,30 @@ public:
                 HIViewSetFrame (embeddedView, &r);
             }
 
-            if (wrapperWindow != 0)
+            if (wrapperWindow != nil)
             {
+                jassert (getTopLevelComponent()->getDesktopScaleFactor() == 1.0f);
+                Rectangle<int> screenBounds (getScreenBounds() * Desktop::getInstance().getGlobalScaleFactor());
+
                 Rect wr;
-                wr.left   = (short) getScreenX();
-                wr.top    = (short) getScreenY();
-                wr.right  = (short) (wr.left + getWidth());
-                wr.bottom = (short) (wr.top + getHeight());
+                wr.left   = (short) screenBounds.getX();
+                wr.top    = (short) screenBounds.getY();
+                wr.right  = (short) screenBounds.getRight();
+                wr.bottom = (short) screenBounds.getBottom();
 
                 SetWindowBounds (wrapperWindow, kWindowContentRgn, &wr);
+
+                // This group stuff is mainly a workaround for Mackie plugins like FinalMix..
+                WindowGroupRef group = GetWindowGroup (wrapperWindow);
+                WindowRef attachedWindow;
+
+                if (GetIndexedWindow (group, 2, kWindowGroupContentsReturnWindows, &attachedWindow) == noErr)
+                {
+                    SelectWindow (attachedWindow);
+                    ActivateWindow (attachedWindow, TRUE);
+                    HideWindow (wrapperWindow);
+                }
+
                 ShowWindow (wrapperWindow);
             }
 
@@ -208,22 +225,31 @@ public:
         }
     }
 
-    void componentMovedOrResized (bool /*wasMoved*/, bool /*wasResized*/)
+    void componentMovedOrResized (bool /*wasMoved*/, bool /*wasResized*/) override
     {
         setEmbeddedWindowToOurSize();
     }
 
-    void componentPeerChanged()
+    // (overridden to intercept movements of the top-level window)
+    void componentMovedOrResized (Component& component, bool wasMoved, bool wasResized) override
+    {
+        ComponentMovementWatcher::componentMovedOrResized (component, wasMoved, wasResized);
+
+        if (&component == getTopLevelComponent())
+            setEmbeddedWindowToOurSize();
+    }
+
+    void componentPeerChanged() override
     {
         deleteWindow();
         createWindow();
     }
 
-    void componentVisibilityChanged()
+    void componentVisibilityChanged() override
     {
         if (isShowing())
             createWindow();
-        else
+        else if (! keepPluginWindowWhenHidden)
             deleteWindow();
 
         setEmbeddedWindowToOurSize();
@@ -241,14 +267,22 @@ public:
         }
     }
 
-    void timerCallback()
+    void timerCallback() override
     {
-        setOurSizeToEmbeddedViewSize();
+        if (isShowing())
+        {
+            setOurSizeToEmbeddedViewSize();
 
-        // To avoid strange overpainting problems when the UI is first opened, we'll
-        // repaint it a few times during the first second that it's on-screen..
-        if ((Time::getCurrentTime() - creationTime).inMilliseconds() < 1000)
-            recursiveHIViewRepaint (HIViewGetRoot (wrapperWindow));
+            // To avoid strange overpainting problems when the UI is first opened, we'll
+            // repaint it a few times during the first second that it's on-screen..
+            if (repaintChildOnCreation && (Time::getCurrentTime() - creationTime).inMilliseconds() < 1000)
+                recursiveHIViewRepaint (HIViewGetRoot (wrapperWindow));
+        }
+    }
+
+    void setRepaintsChildHIViewWhenCreated (bool b) noexcept
+    {
+        repaintChildOnCreation = b;
     }
 
     OSStatus carbonEventHandler (EventHandlerCallRef /*nextHandlerRef*/, EventRef event)
@@ -269,7 +303,9 @@ public:
                 SetEventParameter (event, kEventParamClickActivation, typeClickActivationResult,
                                    sizeof (ClickActivationResult), &howToHandleClick);
 
-                HIViewSetNeedsDisplay (embeddedView, true);
+                if (embeddedView != 0)
+                    HIViewSetNeedsDisplay (embeddedView, true);
+
                 return noErr;
             }
         }
@@ -282,11 +318,13 @@ public:
         return ((CarbonViewWrapperComponent*) userData)->carbonEventHandler (nextHandlerRef, event);
     }
 
+    NSWindow* carbonWindow;
+    bool keepPluginWindowWhenHidden;
+
 protected:
     WindowRef wrapperWindow;
-    NSWindow* carbonWindow;
     HIViewRef embeddedView;
-    bool recursiveResize;
+    bool recursiveResize, repaintChildOnCreation;
     Time creationTime;
 
     EventHandlerRef eventHandlerRef;
@@ -294,4 +332,15 @@ protected:
     NSWindow* getOwnerWindow() const    { return [((NSView*) getWindowHandle()) window]; }
 };
 
-#endif   // __JUCE_MAC_CARBONVIEWWRAPPERCOMPONENT_JUCEHEADER__
+//==============================================================================
+// Non-public utility function that hosts can use if they need to get hold of the
+// internals of a carbon wrapper window..
+void* getCarbonWindow (Component* possibleCarbonComponent)
+{
+    if (CarbonViewWrapperComponent* cv = dynamic_cast<CarbonViewWrapperComponent*> (possibleCarbonComponent))
+        return cv->carbonWindow;
+
+    return nullptr;
+}
+
+} // namespace juce

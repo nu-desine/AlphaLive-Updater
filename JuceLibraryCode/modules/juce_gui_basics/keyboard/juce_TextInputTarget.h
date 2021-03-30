@@ -1,31 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_TEXTINPUTTARGET_JUCEHEADER__
-#define __JUCE_TEXTINPUTTARGET_JUCEHEADER__
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -35,16 +34,18 @@
     This class allows different types of text editor component to provide a uniform
     interface, which can be used by things like OS-specific input methods, on-screen
     keyboards, etc.
+
+    @tags{GUI}
 */
 class JUCE_API  TextInputTarget
 {
 public:
     //==============================================================================
     /** */
-    TextInputTarget() {}
+    TextInputTarget() = default;
 
     /** Destructor. */
-    virtual ~TextInputTarget() {}
+    virtual ~TextInputTarget() = default;
 
     /** Returns true if this input target is currently accepting input.
         For example, a text editor might return false if it's in read-only mode.
@@ -62,7 +63,7 @@ public:
     /** Sets a number of temporarily underlined sections.
         This is needed by MS Windows input method UI.
     */
-    virtual void setTemporaryUnderlining (const Array <Range<int> >& underlinedRegions) = 0;
+    virtual void setTemporaryUnderlining (const Array<Range<int>>& underlinedRegions) = 0;
 
     /** Returns a specified sub-section of the text. */
     virtual String getTextInRange (const Range<int>& range) const = 0;
@@ -72,7 +73,24 @@ public:
 
     /** Returns the position of the caret, relative to the component's origin. */
     virtual Rectangle<int> getCaretRectangle() = 0;
+
+    /** A set of possible on-screen keyboard types, for use in the
+        getKeyboardType() method.
+    */
+    enum VirtualKeyboardType
+    {
+        textKeyboard = 0,
+        numericKeyboard,
+        decimalKeyboard,
+        urlKeyboard,
+        emailAddressKeyboard,
+        phoneNumberKeyboard
+    };
+
+    /** Returns the target's preference for the type of keyboard that would be most appropriate.
+        This may be ignored, depending on the capabilities of the OS.
+    */
+    virtual VirtualKeyboardType getKeyboardType()       { return textKeyboard; }
 };
 
-
-#endif   // __JUCE_TEXTINPUTTARGET_JUCEHEADER__
+} // namespace juce

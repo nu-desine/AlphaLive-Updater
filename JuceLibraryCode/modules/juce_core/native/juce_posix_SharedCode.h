@@ -1,36 +1,28 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-/*
-    This file contains posix routines that are common to both the Linux and Mac builds.
+namespace juce
+{
 
-    It gets included directly in the cpp files for these platforms.
-*/
-
-
-//==============================================================================
 CriticalSection::CriticalSection() noexcept
 {
     pthread_mutexattr_t atts;
@@ -39,112 +31,14 @@ CriticalSection::CriticalSection() noexcept
    #if ! JUCE_ANDROID
     pthread_mutexattr_setprotocol (&atts, PTHREAD_PRIO_INHERIT);
    #endif
-    pthread_mutex_init (&internal, &atts);
+    pthread_mutex_init (&lock, &atts);
+    pthread_mutexattr_destroy (&atts);
 }
 
-CriticalSection::~CriticalSection() noexcept
-{
-    pthread_mutex_destroy (&internal);
-}
-
-void CriticalSection::enter() const noexcept
-{
-    pthread_mutex_lock (&internal);
-}
-
-bool CriticalSection::tryEnter() const noexcept
-{
-    return pthread_mutex_trylock (&internal) == 0;
-}
-
-void CriticalSection::exit() const noexcept
-{
-    pthread_mutex_unlock (&internal);
-}
-
-
-//==============================================================================
-WaitableEvent::WaitableEvent (const bool useManualReset) noexcept
-    : triggered (false), manualReset (useManualReset)
-{
-    pthread_cond_init (&condition, 0);
-
-    pthread_mutexattr_t atts;
-    pthread_mutexattr_init (&atts);
-   #if ! JUCE_ANDROID
-    pthread_mutexattr_setprotocol (&atts, PTHREAD_PRIO_INHERIT);
-   #endif
-    pthread_mutex_init (&mutex, &atts);
-}
-
-WaitableEvent::~WaitableEvent() noexcept
-{
-    pthread_cond_destroy (&condition);
-    pthread_mutex_destroy (&mutex);
-}
-
-bool WaitableEvent::wait (const int timeOutMillisecs) const noexcept
-{
-    pthread_mutex_lock (&mutex);
-
-    if (! triggered)
-    {
-        if (timeOutMillisecs < 0)
-        {
-            do
-            {
-                pthread_cond_wait (&condition, &mutex);
-            }
-            while (! triggered);
-        }
-        else
-        {
-            struct timeval now;
-            gettimeofday (&now, 0);
-
-            struct timespec time;
-            time.tv_sec  = now.tv_sec  + (timeOutMillisecs / 1000);
-            time.tv_nsec = (now.tv_usec + ((timeOutMillisecs % 1000) * 1000)) * 1000;
-
-            if (time.tv_nsec >= 1000000000)
-            {
-                time.tv_nsec -= 1000000000;
-                time.tv_sec++;
-            }
-
-            do
-            {
-                if (pthread_cond_timedwait (&condition, &mutex, &time) == ETIMEDOUT)
-                {
-                    pthread_mutex_unlock (&mutex);
-                    return false;
-                }
-            }
-            while (! triggered);
-        }
-    }
-
-    if (! manualReset)
-        triggered = false;
-
-    pthread_mutex_unlock (&mutex);
-    return true;
-}
-
-void WaitableEvent::signal() const noexcept
-{
-    pthread_mutex_lock (&mutex);
-    triggered = true;
-    pthread_cond_broadcast (&condition);
-    pthread_mutex_unlock (&mutex);
-}
-
-void WaitableEvent::reset() const noexcept
-{
-    pthread_mutex_lock (&mutex);
-    triggered = false;
-    pthread_mutex_unlock (&mutex);
-}
+CriticalSection::~CriticalSection() noexcept        { pthread_mutex_destroy (&lock); }
+void CriticalSection::enter() const noexcept        { pthread_mutex_lock (&lock); }
+bool CriticalSection::tryEnter() const noexcept     { return pthread_mutex_trylock (&lock) == 0; }
+void CriticalSection::exit() const noexcept         { pthread_mutex_unlock (&lock); }
 
 //==============================================================================
 void JUCE_CALLTYPE Thread::sleep (int millisecs)
@@ -155,18 +49,70 @@ void JUCE_CALLTYPE Thread::sleep (int millisecs)
     nanosleep (&time, nullptr);
 }
 
+void JUCE_CALLTYPE Process::terminate()
+{
+   #if JUCE_ANDROID
+    _exit (EXIT_FAILURE);
+   #else
+    std::_Exit (EXIT_FAILURE);
+   #endif
+}
+
+
+#if JUCE_MAC || JUCE_LINUX
+bool Process::setMaxNumberOfFileHandles (int newMaxNumber) noexcept
+{
+    rlimit lim;
+
+    if (getrlimit (RLIMIT_NOFILE, &lim) == 0)
+    {
+        if (newMaxNumber <= 0 && lim.rlim_cur == RLIM_INFINITY && lim.rlim_max == RLIM_INFINITY)
+            return true;
+
+        if (newMaxNumber > 0 && lim.rlim_cur >= (rlim_t) newMaxNumber)
+            return true;
+    }
+
+    lim.rlim_cur = lim.rlim_max = newMaxNumber <= 0 ? RLIM_INFINITY : (rlim_t) newMaxNumber;
+    return setrlimit (RLIMIT_NOFILE, &lim) == 0;
+}
+
+struct MaxNumFileHandlesInitialiser
+{
+    MaxNumFileHandlesInitialiser() noexcept
+    {
+       #ifndef JUCE_PREFERRED_MAX_FILE_HANDLES
+        enum { JUCE_PREFERRED_MAX_FILE_HANDLES = 8192 };
+       #endif
+
+        // Try to give our app a decent number of file handles by default
+        if (! Process::setMaxNumberOfFileHandles (0))
+        {
+            for (int num = JUCE_PREFERRED_MAX_FILE_HANDLES; num > 256; num -= 1024)
+                if (Process::setMaxNumberOfFileHandles (num))
+                    break;
+        }
+    }
+};
+
+static MaxNumFileHandlesInitialiser maxNumFileHandlesInitialiser;
+#endif
 
 //==============================================================================
-const juce_wchar File::separator = '/';
-const String File::separatorString ("/");
+JUCE_DECLARE_DEPRECATED_STATIC (const juce_wchar File::separator = '/';)
+JUCE_DECLARE_DEPRECATED_STATIC (const StringRef File::separatorString ("/");)
+
+juce_wchar File::getSeparatorChar()    { return '/'; }
+StringRef File::getSeparatorString()   { return "/"; }
+
 
 //==============================================================================
 File File::getCurrentWorkingDirectory()
 {
     HeapBlock<char> heapBuffer;
 
-    char localBuffer [1024];
-    char* cwd = getcwd (localBuffer, sizeof (localBuffer) - 1);
+    char localBuffer[1024];
+    auto cwd = getcwd (localBuffer, sizeof (localBuffer) - 1);
     size_t bufferSize = 4096;
 
     while (cwd == nullptr && errno == ERANGE)
@@ -185,14 +131,40 @@ bool File::setAsCurrentWorkingDirectory() const
 }
 
 //==============================================================================
+// The unix siginterrupt function is deprecated - this does the same job.
+int juce_siginterrupt (int sig, int flag)
+{
+   #if JUCE_WASM
+    ignoreUnused (sig, flag);
+    return 0;
+   #else
+    #if JUCE_ANDROID
+     using juce_sigactionflags_type = unsigned long;
+    #else
+     using juce_sigactionflags_type = int;
+    #endif
+
+    struct ::sigaction act;
+    (void) ::sigaction (sig, nullptr, &act);
+
+    if (flag != 0)
+        act.sa_flags &= static_cast<juce_sigactionflags_type> (~SA_RESTART);
+    else
+        act.sa_flags |= static_cast<juce_sigactionflags_type> (SA_RESTART);
+
+    return ::sigaction (sig, &act, nullptr);
+   #endif
+}
+
+//==============================================================================
 namespace
 {
    #if JUCE_LINUX || (JUCE_IOS && ! __DARWIN_ONLY_64_BIT_INO_T) // (this iOS stuff is to avoid a simulator bug)
-    typedef struct stat64 juce_statStruct;
-    #define JUCE_STAT     stat64
+    using juce_statStruct = struct stat64;
+    #define JUCE_STAT  stat64
    #else
-    typedef struct stat   juce_statStruct;
-    #define JUCE_STAT     stat
+    using juce_statStruct = struct stat;
+    #define JUCE_STAT  stat
    #endif
 
     bool juce_stat (const String& fileName, juce_statStruct& info)
@@ -201,6 +173,7 @@ namespace
                  && JUCE_STAT (fileName.toUTF8(), &info) == 0;
     }
 
+   #if ! JUCE_WASM
     // if this file doesn't exist, find a parent of it that does..
     bool juce_doStatFS (File f, struct statfs& result)
     {
@@ -215,8 +188,14 @@ namespace
         return statfs (f.getFullPathName().toUTF8(), &result) == 0;
     }
 
-    void updateStatInfoForFile (const String& path, bool* const isDir, int64* const fileSize,
-                                Time* const modTime, Time* const creationTime, bool* const isReadOnly)
+   #if JUCE_MAC || JUCE_IOS
+    static int64 getCreationTime (const juce_statStruct& s) noexcept     { return (int64) s.st_birthtime; }
+   #else
+    static int64 getCreationTime (const juce_statStruct& s) noexcept     { return (int64) s.st_ctime; }
+   #endif
+
+    void updateStatInfoForFile (const String& path, bool* isDir, int64* fileSize,
+                                Time* modTime, Time* creationTime, bool* isReadOnly)
     {
         if (isDir != nullptr || fileSize != nullptr || modTime != nullptr || creationTime != nullptr)
         {
@@ -224,14 +203,15 @@ namespace
             const bool statOk = juce_stat (path, info);
 
             if (isDir != nullptr)         *isDir        = statOk && ((info.st_mode & S_IFDIR) != 0);
-            if (fileSize != nullptr)      *fileSize     = statOk ? info.st_size : 0;
-            if (modTime != nullptr)       *modTime      = Time (statOk ? (int64) info.st_mtime * 1000 : 0);
-            if (creationTime != nullptr)  *creationTime = Time (statOk ? (int64) info.st_ctime * 1000 : 0);
+            if (fileSize != nullptr)      *fileSize     = statOk ? (int64) info.st_size : 0;
+            if (modTime != nullptr)       *modTime      = Time (statOk ? (int64) info.st_mtime  * 1000 : 0);
+            if (creationTime != nullptr)  *creationTime = Time (statOk ? getCreationTime (info) * 1000 : 0);
         }
 
         if (isReadOnly != nullptr)
             *isReadOnly = access (path.toUTF8(), W_OK) != 0;
     }
+   #endif
 
     Result getResultForErrno()
     {
@@ -251,8 +231,8 @@ bool File::isDirectory() const
 {
     juce_statStruct info;
 
-    return fullPath.isEmpty()
-            || (juce_stat (fullPath, info) && ((info.st_mode & S_IFDIR) != 0));
+    return fullPath.isNotEmpty()
+             && (juce_stat (fullPath, info) && ((info.st_mode & S_IFDIR) != 0));
 }
 
 bool File::exists() const
@@ -272,33 +252,60 @@ int64 File::getSize() const
     return juce_stat (fullPath, info) ? info.st_size : 0;
 }
 
+uint64 File::getFileIdentifier() const
+{
+    juce_statStruct info;
+    return juce_stat (fullPath, info) ? (uint64) info.st_ino : 0;
+}
+
+static bool hasEffectiveRootFilePermissions()
+{
+   #if JUCE_LINUX
+    return geteuid() == 0;
+   #else
+    return false;
+   #endif
+}
+
 //==============================================================================
 bool File::hasWriteAccess() const
 {
     if (exists())
-        return access (fullPath.toUTF8(), W_OK) == 0;
+        return (hasEffectiveRootFilePermissions()
+             || access (fullPath.toUTF8(), W_OK) == 0);
 
-    if ((! isDirectory()) && fullPath.containsChar (separator))
+    if ((! isDirectory()) && fullPath.containsChar (getSeparatorChar()))
         return getParentDirectory().hasWriteAccess();
 
     return false;
 }
 
-bool File::setFileReadOnlyInternal (const bool shouldBeReadOnly) const
+static bool setFileModeFlags (const String& fullPath, mode_t flags, bool shouldSet) noexcept
 {
     juce_statStruct info;
+
     if (! juce_stat (fullPath, info))
         return false;
 
-    info.st_mode &= 0777;   // Just permissions
+    info.st_mode &= 0777;
 
-    if (shouldBeReadOnly)
-        info.st_mode &= ~(S_IWUSR | S_IWGRP | S_IWOTH);
+    if (shouldSet)
+        info.st_mode |= flags;
     else
-        // Give everybody write permission?
-        info.st_mode |= S_IWUSR | S_IWGRP | S_IWOTH;
+        info.st_mode &= ~flags;
 
-    return chmod (fullPath.toUTF8(), info.st_mode) == 0;
+    return chmod (fullPath.toUTF8(), (mode_t) info.st_mode) == 0;
+}
+
+bool File::setFileReadOnlyInternal (bool shouldBeReadOnly) const
+{
+    // Hmm.. should we give global write permission or just the current user?
+    return setFileModeFlags (fullPath, S_IWUSR | S_IWGRP | S_IWOTH, ! shouldBeReadOnly);
+}
+
+bool File::setFileExecutableInternal (bool shouldBeExecutable) const
+{
+    return setFileModeFlags (fullPath, S_IXUSR | S_IXGRP | S_IXOTH, shouldBeExecutable);
 }
 
 void File::getFileTimesInternal (int64& modificationTime, int64& accessTime, int64& creationTime) const
@@ -308,37 +315,74 @@ void File::getFileTimesInternal (int64& modificationTime, int64& accessTime, int
     creationTime = 0;
 
     juce_statStruct info;
+
     if (juce_stat (fullPath, info))
     {
-        modificationTime = (int64) info.st_mtime * 1000;
-        accessTime = (int64) info.st_atime * 1000;
-        creationTime = (int64) info.st_ctime * 1000;
+      #if JUCE_MAC || (JUCE_IOS && __DARWIN_ONLY_64_BIT_INO_T)
+        modificationTime  = (int64) info.st_mtimespec.tv_sec * 1000 + info.st_mtimespec.tv_nsec / 1000000;
+        accessTime        = (int64) info.st_atimespec.tv_sec * 1000 + info.st_atimespec.tv_nsec / 1000000;
+        creationTime      = (int64) info.st_birthtimespec.tv_sec * 1000 + info.st_birthtimespec.tv_nsec / 1000000;
+      #else
+        modificationTime  = (int64) info.st_mtime * 1000;
+        accessTime        = (int64) info.st_atime * 1000;
+       #if JUCE_IOS
+        creationTime      = (int64) info.st_birthtime * 1000;
+       #else
+        creationTime      = (int64) info.st_ctime * 1000;
+       #endif
+      #endif
     }
 }
 
 bool File::setFileTimesInternal (int64 modificationTime, int64 accessTime, int64 /*creationTime*/) const
 {
+   #if ! JUCE_WASM
     juce_statStruct info;
 
     if ((modificationTime != 0 || accessTime != 0) && juce_stat (fullPath, info))
     {
+       #if JUCE_MAC || (JUCE_IOS && __DARWIN_ONLY_64_BIT_INO_T)
+        struct timeval times[2];
+
+        bool setModificationTime = (modificationTime != 0);
+        bool setAccessTime       = (accessTime != 0);
+
+        times[0].tv_sec  = setAccessTime ? static_cast<__darwin_time_t> (accessTime / 1000)
+                                         : info.st_atimespec.tv_sec;
+
+        times[0].tv_usec = setAccessTime ? static_cast<__darwin_suseconds_t> ((accessTime % 1000) * 1000)
+                                         : static_cast<__darwin_suseconds_t> (info.st_atimespec.tv_nsec / 1000);
+
+        times[1].tv_sec  = setModificationTime ? static_cast<__darwin_time_t> (modificationTime / 1000)
+                                               : info.st_mtimespec.tv_sec;
+
+        times[1].tv_usec = setModificationTime ? static_cast<__darwin_suseconds_t> ((modificationTime % 1000) * 1000)
+                                               : static_cast<__darwin_suseconds_t> (info.st_mtimespec.tv_nsec / 1000);
+
+        return utimes (fullPath.toUTF8(), times) == 0;
+       #else
         struct utimbuf times;
-        times.actime  = accessTime != 0       ? (time_t) (accessTime / 1000)       : info.st_atime;
-        times.modtime = modificationTime != 0 ? (time_t) (modificationTime / 1000) : info.st_mtime;
+        times.actime  = accessTime != 0       ? static_cast<time_t> (accessTime / 1000)       : static_cast<time_t> (info.st_atime);
+        times.modtime = modificationTime != 0 ? static_cast<time_t> (modificationTime / 1000) : static_cast<time_t> (info.st_mtime);
 
         return utime (fullPath.toUTF8(), &times) == 0;
+       #endif
     }
+   #endif
 
     return false;
 }
 
 bool File::deleteFile() const
 {
-    if (! exists())
-        return true;
+    if (! isSymbolicLink())
+    {
+        if (! exists())
+            return true;
 
-    if (isDirectory())
-        return rmdir (fullPath.toUTF8()) == 0;
+        if (isDirectory())
+            return rmdir (fullPath.toUTF8()) == 0;
+    }
 
     return remove (fullPath.toUTF8()) == 0;
 }
@@ -359,15 +403,20 @@ bool File::moveInternal (const File& dest) const
     return false;
 }
 
+bool File::replaceInternal (const File& dest) const
+{
+    return moveInternal (dest);
+}
+
 Result File::createDirectoryInternal (const String& fileName) const
 {
     return getResultForReturnValue (mkdir (fileName.toUTF8(), 0777));
 }
 
-//=====================================================================
+//==============================================================================
 int64 juce_fileSetPosition (void* handle, int64 pos)
 {
-    if (handle != 0 && lseek (getFD (handle), pos, SEEK_SET) == pos)
+    if (handle != nullptr && lseek (getFD (handle), (off_t) pos, SEEK_SET) == pos)
         return pos;
 
     return -1;
@@ -375,7 +424,7 @@ int64 juce_fileSetPosition (void* handle, int64 pos)
 
 void FileInputStream::openHandle()
 {
-    const int f = open (file.getFullPathName().toUTF8(), O_RDONLY, 00644);
+    auto f = open (file.getFullPathName().toUTF8(), O_RDONLY);
 
     if (f != -1)
         fileHandle = fdToVoidPointer (f);
@@ -383,20 +432,17 @@ void FileInputStream::openHandle()
         status = getResultForErrno();
 }
 
-void FileInputStream::closeHandle()
+FileInputStream::~FileInputStream()
 {
-    if (fileHandle != 0)
-    {
+    if (fileHandle != nullptr)
         close (getFD (fileHandle));
-        fileHandle = 0;
-    }
 }
 
-size_t FileInputStream::readInternal (void* const buffer, const size_t numBytes)
+size_t FileInputStream::readInternal (void* buffer, size_t numBytes)
 {
     ssize_t result = 0;
 
-    if (fileHandle != 0)
+    if (fileHandle != nullptr)
     {
         result = ::read (getFD (fileHandle), buffer, numBytes);
 
@@ -415,7 +461,7 @@ void FileOutputStream::openHandle()
 {
     if (file.exists())
     {
-        const int f = open (file.getFullPathName().toUTF8(), O_RDWR, 00644);
+        auto f = open (file.getFullPathName().toUTF8(), O_RDWR);
 
         if (f != -1)
         {
@@ -438,7 +484,7 @@ void FileOutputStream::openHandle()
     }
     else
     {
-        const int f = open (file.getFullPathName().toUTF8(), O_RDWR + O_CREAT, 00644);
+        auto f = open (file.getFullPathName().toUTF8(), O_RDWR | O_CREAT, 00644);
 
         if (f != -1)
             fileHandle = fdToVoidPointer (f);
@@ -449,49 +495,37 @@ void FileOutputStream::openHandle()
 
 void FileOutputStream::closeHandle()
 {
-    if (fileHandle != 0)
+    if (fileHandle != nullptr)
     {
         close (getFD (fileHandle));
-        fileHandle = 0;
+        fileHandle = nullptr;
     }
 }
 
-ssize_t FileOutputStream::writeInternal (const void* const data, const size_t numBytes)
+ssize_t FileOutputStream::writeInternal (const void* data, size_t numBytes)
 {
-    ssize_t result = 0;
+    if (fileHandle == nullptr)
+        return 0;
 
-    if (fileHandle != 0)
-    {
-        result = ::write (getFD (fileHandle), data, numBytes);
+    auto result = ::write (getFD (fileHandle), data, numBytes);
 
-        if (result == -1)
-            status = getResultForErrno();
-    }
+    if (result == -1)
+        status = getResultForErrno();
 
-    return result;
+    return (ssize_t) result;
 }
 
+#ifndef JUCE_ANDROID
 void FileOutputStream::flushInternal()
 {
-    if (fileHandle != 0)
-    {
-        if (fsync (getFD (fileHandle)) == -1)
-            status = getResultForErrno();
-
-       #if JUCE_ANDROID
-        // This stuff tells the OS to asynchronously update the metadata
-        // that the OS has cached aboud the file - this metadata is used
-        // when the device is acting as a USB drive, and unless it's explicitly
-        // refreshed, it'll get out of step with the real file.
-        const LocalRef<jstring> t (javaString (file.getFullPathName()));
-        android.activity.callVoidMethod (JuceAppActivity.scanFile, t.get());
-       #endif
-    }
+    if (fileHandle != nullptr && fsync (getFD (fileHandle)) == -1)
+        status = getResultForErrno();
 }
+#endif
 
 Result FileOutputStream::truncate()
 {
-    if (fileHandle == 0)
+    if (fileHandle == nullptr)
         return status;
 
     flush();
@@ -501,32 +535,37 @@ Result FileOutputStream::truncate()
 //==============================================================================
 String SystemStats::getEnvironmentVariable (const String& name, const String& defaultValue)
 {
-    if (const char* s = ::getenv (name.toUTF8()))
+    if (auto s = ::getenv (name.toUTF8()))
         return String::fromUTF8 (s);
 
     return defaultValue;
 }
 
 //==============================================================================
-void MemoryMappedFile::openInternal (const File& file, AccessMode mode)
+#if ! JUCE_WASM
+void MemoryMappedFile::openInternal (const File& file, AccessMode mode, bool exclusive)
 {
     jassert (mode == readOnly || mode == readWrite);
 
     if (range.getStart() > 0)
     {
-        const long pageSize = sysconf (_SC_PAGE_SIZE);
+        auto pageSize = sysconf (_SC_PAGE_SIZE);
         range.setStart (range.getStart() - (range.getStart() % pageSize));
     }
 
-    fileHandle = open (file.getFullPathName().toUTF8(),
-                       mode == readWrite ? (O_CREAT + O_RDWR) : O_RDONLY, 00644);
+    auto filename = file.getFullPathName().toUTF8();
+
+    if (mode == readWrite)
+        fileHandle = open (filename, O_CREAT | O_RDWR, 00644);
+    else
+        fileHandle = open (filename, O_RDONLY);
 
     if (fileHandle != -1)
     {
-        void* m = mmap (0, (size_t) range.getLength(),
-                        mode == readWrite ? (PROT_READ | PROT_WRITE) : PROT_READ,
-                        MAP_SHARED, fileHandle,
-                        (off_t) range.getStart());
+        auto m = mmap (nullptr, (size_t) range.getLength(),
+                       mode == readWrite ? (PROT_READ | PROT_WRITE) : PROT_READ,
+                       exclusive ? MAP_PRIVATE : MAP_SHARED, fileHandle,
+                       (off_t) range.getStart());
 
         if (m != MAP_FAILED)
         {
@@ -543,44 +582,37 @@ void MemoryMappedFile::openInternal (const File& file, AccessMode mode)
 MemoryMappedFile::~MemoryMappedFile()
 {
     if (address != nullptr)
-        munmap (address, range.getLength());
+        munmap (address, (size_t) range.getLength());
 
     if (fileHandle != 0)
         close (fileHandle);
 }
 
 //==============================================================================
-#if JUCE_PROJUCER_LIVE_BUILD
-extern "C" const char* juce_getCurrentExecutablePath();
-#endif
-
 File juce_getExecutableFile();
 File juce_getExecutableFile()
 {
-   #if JUCE_PROJUCER_LIVE_BUILD
-    return File (juce_getCurrentExecutablePath());
-   #elif JUCE_ANDROID
-    return File (android.appFile);
-   #else
     struct DLAddrReader
     {
         static String getFilename()
         {
             Dl_info exeInfo;
-            dladdr ((void*) juce_getExecutableFile, &exeInfo);
+
+            auto localSymbol = (void*) juce_getExecutableFile;
+            dladdr (localSymbol, &exeInfo);
             return CharPointer_UTF8 (exeInfo.dli_fname);
         }
     };
 
-    static String filename (DLAddrReader::getFilename());
+    static String filename = DLAddrReader::getFilename();
     return File::getCurrentWorkingDirectory().getChildFile (filename);
-   #endif
 }
 
 //==============================================================================
 int64 File::getBytesFreeOnVolume() const
 {
     struct statfs buf;
+
     if (juce_doStatFS (*this, buf))
         return (int64) buf.f_bsize * (int64) buf.f_bavail; // Note: this returns space available to non-super user
 
@@ -590,6 +622,7 @@ int64 File::getBytesFreeOnVolume() const
 int64 File::getVolumeTotalSize() const
 {
     struct statfs buf;
+
     if (juce_doStatFS (*this, buf))
         return (int64) buf.f_bsize * (int64) buf.f_blocks;
 
@@ -603,11 +636,11 @@ String File::getVolumeLabel() const
     {
         u_int32_t       length;
         attrreference_t mountPointRef;
-        char            mountPointSpace [MAXPATHLEN];
+        char            mountPointSpace[MAXPATHLEN];
     } attrBuf;
 
     struct attrlist attrList;
-    zerostruct (attrList); // (can't use "= { 0 }" on this object because it's typedef'ed as a C struct)
+    zerostruct (attrList); // (can't use "= {}" on this object because it's a C struct)
     attrList.bitmapcount = ATTR_BIT_MAP_COUNT;
     attrList.volattr = ATTR_VOL_INFO | ATTR_VOL_NAME;
 
@@ -619,7 +652,7 @@ String File::getVolumeLabel() const
             return String::fromUTF8 (((const char*) &attrBuf.mountPointRef) + attrBuf.mountPointRef.attr_dataoffset,
                                      (int) attrBuf.mountPointRef.attr_length);
 
-        const File parent (f.getParentDirectory());
+        auto parent = f.getParentDirectory();
 
         if (f == parent)
             break;
@@ -628,64 +661,48 @@ String File::getVolumeLabel() const
     }
    #endif
 
-    return String::empty;
+    return {};
 }
 
 int File::getVolumeSerialNumber() const
 {
-    int result = 0;
-/*    int fd = open (getFullPathName().toUTF8(), O_RDONLY | O_NONBLOCK);
-
-    char info [512];
-
-    #ifndef HDIO_GET_IDENTITY
-     #define HDIO_GET_IDENTITY 0x030d
-    #endif
-
-    if (ioctl (fd, HDIO_GET_IDENTITY, info) == 0)
-    {
-        DBG (String (info + 20, 20));
-        result = String (info + 20, 20).trim().getIntValue();
-    }
-
-    close (fd);*/
-    return result;
+    return 0;
 }
 
+#endif
+
 //==============================================================================
+#if ! JUCE_IOS
 void juce_runSystemCommand (const String&);
 void juce_runSystemCommand (const String& command)
 {
     int result = system (command.toUTF8());
-    (void) result;
+    ignoreUnused (result);
 }
 
 String juce_getOutputFromCommand (const String&);
 String juce_getOutputFromCommand (const String& command)
 {
     // slight bodge here, as we just pipe the output into a temp file and read it...
-    const File tempFile (File::getSpecialLocation (File::tempDirectory)
-                           .getNonexistentChildFile (String::toHexString (Random::getSystemRandom().nextInt()), ".tmp", false));
+    auto tempFile = File::getSpecialLocation (File::tempDirectory)
+                      .getNonexistentChildFile (String::toHexString (Random::getSystemRandom().nextInt()), ".tmp", false);
 
     juce_runSystemCommand (command + " > " + tempFile.getFullPathName());
 
-    String result (tempFile.loadFileAsString());
+    auto result = tempFile.loadFileAsString();
     tempFile.deleteFile();
     return result;
 }
-
+#endif
 
 //==============================================================================
 #if JUCE_IOS
 class InterProcessLock::Pimpl
 {
 public:
-    Pimpl (const String&, int)
-        : handle (1), refCount (1) // On iOS just fake success..
-    {
-    }
+    Pimpl (const String&, int)  {}
 
-    int handle, refCount;
+    int handle = 1, refCount = 1;  // On iOS just fake success..
 };
 
 #else
@@ -693,8 +710,7 @@ public:
 class InterProcessLock::Pimpl
 {
 public:
-    Pimpl (const String& lockName, const int timeOutMillisecs)
-        : handle (0), refCount (1)
+    Pimpl (const String& lockName, int timeOutMillisecs)
     {
        #if JUCE_MAC
         if (! createLockFile (File ("~/Library/Caches/com.juce.locks").getChildFile (lockName), timeOutMillisecs))
@@ -703,6 +719,7 @@ public:
 
        #else
         File tempFolder ("/var/tmp");
+
         if (! tempFolder.isDirectory())
             tempFolder = "/tmp";
 
@@ -715,7 +732,7 @@ public:
         closeFile();
     }
 
-    bool createLockFile (const File& file, const int timeOutMillisecs)
+    bool createLockFile (const File& file, int timeOutMillisecs)
     {
         file.create();
         handle = open (file.getFullPathName().toUTF8(), O_RDWR);
@@ -728,16 +745,16 @@ public:
             fl.l_whence = SEEK_SET;
             fl.l_type = F_WRLCK;
 
-            const int64 endTime = Time::currentTimeMillis() + timeOutMillisecs;
+            auto endTime = Time::currentTimeMillis() + timeOutMillisecs;
 
             for (;;)
             {
-                const int result = fcntl (handle, F_SETLK, &fl);
+                auto result = fcntl (handle, F_SETLK, &fl);
 
                 if (result >= 0)
                     return true;
 
-                const int error = errno;
+                auto error = errno;
 
                 if (error != EINTR)
                 {
@@ -775,7 +792,7 @@ public:
         }
     }
 
-    int handle, refCount;
+    int handle = 0, refCount = 1;
 };
 #endif
 
@@ -787,16 +804,16 @@ InterProcessLock::~InterProcessLock()
 {
 }
 
-bool InterProcessLock::enter (const int timeOutMillisecs)
+bool InterProcessLock::enter (int timeOutMillisecs)
 {
     const ScopedLock sl (lock);
 
     if (pimpl == nullptr)
     {
-        pimpl = new Pimpl (name, timeOutMillisecs);
+        pimpl.reset (new Pimpl (name, timeOutMillisecs));
 
         if (pimpl->handle == 0)
-            pimpl = nullptr;
+            pimpl.reset();
     }
     else
     {
@@ -814,69 +831,122 @@ void InterProcessLock::exit()
     jassert (pimpl != nullptr);
 
     if (pimpl != nullptr && --(pimpl->refCount) == 0)
-        pimpl = nullptr;
+        pimpl.reset();
 }
 
 //==============================================================================
 void JUCE_API juce_threadEntryPoint (void*);
 
-extern "C" void* threadEntryProc (void*);
-extern "C" void* threadEntryProc (void* userData)
+#if JUCE_ANDROID
+extern JavaVM* androidJNIJavaVM;
+#endif
+
+static void* threadEntryProc (void* userData)
 {
+    auto* myself = static_cast<Thread*> (userData);
+
     JUCE_AUTORELEASEPOOL
+    {
+        juce_threadEntryPoint (myself);
+    }
 
    #if JUCE_ANDROID
-    struct AndroidThreadScope
+    if (androidJNIJavaVM != nullptr)
     {
-        AndroidThreadScope()   { threadLocalJNIEnvHolder.attach(); }
-        ~AndroidThreadScope()  { threadLocalJNIEnvHolder.detach(); }
-    };
+        void* env = nullptr;
+        androidJNIJavaVM->GetEnv(&env, JNI_VERSION_1_2);
 
-    const AndroidThreadScope androidEnv;
+        // only detach if we have actually been attached
+        if (env != nullptr)
+            androidJNIJavaVM->DetachCurrentThread();
+    }
    #endif
 
-    juce_threadEntryPoint (userData);
     return nullptr;
 }
 
+#if JUCE_ANDROID && JUCE_MODULE_AVAILABLE_juce_audio_devices && \
+   ((JUCE_USE_ANDROID_OPENSLES || (! defined(JUCE_USE_ANDROID_OPENSLES) && JUCE_ANDROID_API_VERSION > 8)) \
+ || (JUCE_USE_ANDROID_OBOE || (! defined(JUCE_USE_ANDROID_OBOE) && JUCE_ANDROID_API_VERSION > 15)))
+
+  #define JUCE_ANDROID_REALTIME_THREAD_AVAILABLE 1
+#endif
+
+#if JUCE_ANDROID_REALTIME_THREAD_AVAILABLE
+extern pthread_t juce_createRealtimeAudioThread (void* (*entry) (void*), void* userPtr);
+#endif
+
 void Thread::launchThread()
 {
-    threadHandle = 0;
-    pthread_t handle = 0;
+   #if JUCE_ANDROID
+    if (isAndroidRealtimeThread)
+    {
+       #if JUCE_ANDROID_REALTIME_THREAD_AVAILABLE
+        threadHandle = (void*) juce_createRealtimeAudioThread (threadEntryProc, this);
+        threadId = (ThreadID) threadHandle.get();
 
-    if (pthread_create (&handle, 0, threadEntryProc, this) == 0)
+        return;
+       #else
+        jassertfalse;
+       #endif
+    }
+   #endif
+
+    threadHandle = {};
+    pthread_t handle = {};
+    pthread_attr_t attr;
+    pthread_attr_t* attrPtr = nullptr;
+
+    if (pthread_attr_init (&attr) == 0)
+    {
+        attrPtr = &attr;
+        pthread_attr_setstacksize (attrPtr, threadStackSize);
+    }
+
+
+    if (pthread_create (&handle, attrPtr, threadEntryProc, this) == 0)
     {
         pthread_detach (handle);
         threadHandle = (void*) handle;
-        threadId = (ThreadID) threadHandle;
+        threadId = (ThreadID) threadHandle.get();
     }
+
+    if (attrPtr != nullptr)
+        pthread_attr_destroy (attrPtr);
 }
 
 void Thread::closeThreadHandle()
 {
-    threadId = 0;
-    threadHandle = 0;
+    threadId = {};
+    threadHandle = {};
 }
 
 void Thread::killThread()
 {
-    if (threadHandle != 0)
+    if (threadHandle.get() != nullptr)
     {
        #if JUCE_ANDROID
         jassertfalse; // pthread_cancel not available!
        #else
-        pthread_cancel ((pthread_t) threadHandle);
+        pthread_cancel ((pthread_t) threadHandle.get());
        #endif
     }
 }
 
-void Thread::setCurrentThreadName (const String& name)
+void JUCE_CALLTYPE Thread::setCurrentThreadName (const String& name)
 {
-   #if JUCE_IOS || (JUCE_MAC && defined (MAC_OS_X_VERSION_10_5) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_5)
+   #if JUCE_IOS || JUCE_MAC
     JUCE_AUTORELEASEPOOL
-    [[NSThread currentThread] setName: juceStringToNS (name)];
-   #elif JUCE_LINUX
-    prctl (PR_SET_NAME, name.toUTF8().getAddress(), 0, 0, 0);
+    {
+        [[NSThread currentThread] setName: juceStringToNS (name)];
+    }
+   #elif JUCE_LINUX || JUCE_ANDROID
+    #if ((JUCE_LINUX && (__GLIBC__ * 1000 + __GLIBC_MINOR__) >= 2012) \
+          || JUCE_ANDROID && __ANDROID_API__ >= 9)
+     pthread_setname_np (pthread_self(), name.toRawUTF8());
+    #else
+     prctl (PR_SET_NAME, name.toRawUTF8(), 0, 0, 0);
+    #endif
    #endif
 }
 
@@ -886,7 +956,7 @@ bool Thread::setThreadPriority (void* handle, int priority)
     int policy;
     priority = jlimit (0, 10, priority);
 
-    if (handle == 0)
+    if (handle == nullptr)
         handle = (void*) pthread_self();
 
     if (pthread_getschedparam ((pthread_t) handle, &policy, &param) != 0)
@@ -901,12 +971,12 @@ bool Thread::setThreadPriority (void* handle, int priority)
     return pthread_setschedparam ((pthread_t) handle, policy, &param) == 0;
 }
 
-Thread::ThreadID Thread::getCurrentThreadId()
+Thread::ThreadID JUCE_CALLTYPE Thread::getCurrentThreadId()
 {
     return (ThreadID) pthread_self();
 }
 
-void Thread::yield()
+void JUCE_CALLTYPE Thread::yield()
 {
     sched_yield();
 }
@@ -920,41 +990,44 @@ void Thread::yield()
  #define SUPPORT_AFFINITIES 1
 #endif
 
-void Thread::setCurrentThreadAffinityMask (const uint32 affinityMask)
+void JUCE_CALLTYPE Thread::setCurrentThreadAffinityMask (uint32 affinityMask)
 {
    #if SUPPORT_AFFINITIES
     cpu_set_t affinity;
     CPU_ZERO (&affinity);
 
     for (int i = 0; i < 32; ++i)
-        if ((affinityMask & (1 << i)) != 0)
-            CPU_SET (i, &affinity);
+        if ((affinityMask & (uint32) (1 << i)) != 0)
+            CPU_SET ((size_t) i, &affinity);
 
-    /*
-       N.B. If this line causes a compile error, then you've probably not got the latest
-       version of glibc installed.
-
-       If you don't want to update your copy of glibc and don't care about cpu affinities,
-       then you can just disable all this stuff by setting the SUPPORT_AFFINITIES macro to 0.
-    */
+   #if (! JUCE_ANDROID) && ((! JUCE_LINUX) || ((__GLIBC__ * 1000 + __GLIBC_MINOR__) >= 2004))
+    pthread_setaffinity_np (pthread_self(), sizeof (cpu_set_t), &affinity);
+   #elif JUCE_ANDROID
+    sched_setaffinity (gettid(), sizeof (cpu_set_t), &affinity);
+   #else
+    // NB: this call isn't really correct because it sets the affinity of the process,
+    // (getpid) not the thread (not gettid). But it's included here as a fallback for
+    // people who are using ridiculously old versions of glibc
     sched_setaffinity (getpid(), sizeof (cpu_set_t), &affinity);
+   #endif
+
     sched_yield();
 
    #else
-    /* affinities aren't supported because either the appropriate header files weren't found,
-       or the SUPPORT_AFFINITIES macro was turned off
-    */
+    // affinities aren't supported because either the appropriate header files weren't found,
+    // or the SUPPORT_AFFINITIES macro was turned off
     jassertfalse;
-    (void) affinityMask;
+    ignoreUnused (affinityMask);
    #endif
 }
 
 //==============================================================================
+#if ! JUCE_WASM
 bool DynamicLibrary::open (const String& name)
 {
     close();
-    handle = dlopen (name.toUTF8(), RTLD_LOCAL | RTLD_NOW);
-    return handle != 0;
+    handle = dlopen (name.isEmpty() ? nullptr : name.toUTF8().getAddress(), RTLD_LOCAL | RTLD_NOW);
+    return handle != nullptr;
 }
 
 void DynamicLibrary::close()
@@ -971,20 +1044,40 @@ void* DynamicLibrary::getFunction (const String& functionName) noexcept
     return handle != nullptr ? dlsym (handle, functionName.toUTF8()) : nullptr;
 }
 
+//==============================================================================
+#if JUCE_LINUX || JUCE_ANDROID
+static String readPosixConfigFileValue (const char* file, const char* key)
+{
+    StringArray lines;
+    File (file).readLines (lines);
+
+    for (int i = lines.size(); --i >= 0;) // (NB - it's important that this runs in reverse order)
+        if (lines[i].upToFirstOccurrenceOf (":", false, false).trim().equalsIgnoreCase (key))
+            return lines[i].fromFirstOccurrenceOf (":", false, false).trim();
+
+    return {};
+}
+#endif
 
 
 //==============================================================================
 class ChildProcess::ActiveProcess
 {
 public:
-    ActiveProcess (const StringArray& arguments)
-        : childPID (0), pipeHandle (0), readHandle (0)
+    ActiveProcess (const StringArray& arguments, int streamFlags)
     {
-        int pipeHandles[2] = { 0 };
+        auto exe = arguments[0].unquoted();
+
+        // Looks like you're trying to launch a non-existent exe or a folder (perhaps on OSX
+        // you're trying to launch the .app folder rather than the actual binary inside it?)
+        jassert (File::getCurrentWorkingDirectory().getChildFile (exe).existsAsFile()
+                  || ! exe.containsChar (File::getSeparatorChar()));
+
+        int pipeHandles[2] = {};
 
         if (pipe (pipeHandles) == 0)
         {
-            const pid_t result = fork();
+            auto result = fork();
 
             if (result < 0)
             {
@@ -995,19 +1088,29 @@ public:
             {
                 // we're the child process..
                 close (pipeHandles[0]);   // close the read handle
-                dup2 (pipeHandles[1], 1); // turns the pipe into stdout
-                dup2 (pipeHandles[1], 2); //  + stderr
+
+                if ((streamFlags & wantStdOut) != 0)
+                    dup2 (pipeHandles[1], STDOUT_FILENO); // turns the pipe into stdout
+                else
+                    dup2 (open ("/dev/null", O_WRONLY), STDOUT_FILENO);
+
+                if ((streamFlags & wantStdErr) != 0)
+                    dup2 (pipeHandles[1], STDERR_FILENO);
+                else
+                    dup2 (open ("/dev/null", O_WRONLY), STDERR_FILENO);
+
                 close (pipeHandles[1]);
 
                 Array<char*> argv;
-                for (int i = 0; i < arguments.size(); ++i)
-                    if (arguments[i].isNotEmpty())
-                        argv.add (arguments[i].toUTF8().getAddress());
+
+                for (auto& arg : arguments)
+                    if (arg.isNotEmpty())
+                        argv.add (const_cast<char*> (arg.toRawUTF8()));
 
                 argv.add (nullptr);
 
-                execvp (argv[0], argv.getRawDataPointer());
-                exit (-1);
+                execvp (exe.toRawUTF8(), argv.getRawDataPointer());
+                _exit (-1);
             }
             else
             {
@@ -1021,223 +1124,239 @@ public:
 
     ~ActiveProcess()
     {
-        if (readHandle != 0)
+        if (readHandle != nullptr)
             fclose (readHandle);
 
         if (pipeHandle != 0)
             close (pipeHandle);
     }
 
-    bool isRunning() const
+    bool isRunning() noexcept
     {
-        if (childPID != 0)
+        if (childPID == 0)
+            return false;
+
+        int childState = 0;
+        auto pid = waitpid (childPID, &childState, WNOHANG);
+
+        if (pid == 0)
+            return true;
+
+        if (WIFEXITED (childState))
         {
-            int childState;
-            const int pid = waitpid (childPID, &childState, WNOHANG);
-            return pid == 0 || ! (WIFEXITED (childState) || WIFSIGNALED (childState));
+            exitCode = WEXITSTATUS (childState);
+            return false;
         }
 
-        return false;
+        return ! WIFSIGNALED (childState);
     }
 
-    int read (void* const dest, const int numBytes)
+    int read (void* dest, int numBytes) noexcept
     {
-        jassert (dest != nullptr);
+        jassert (dest != nullptr && numBytes > 0);
 
         #ifdef fdopen
-         #error // the zlib headers define this function as NULL!
+         #error // some crazy 3rd party headers (e.g. zlib) define this function as NULL!
         #endif
 
-        if (readHandle == 0 && childPID != 0)
+        if (readHandle == nullptr && childPID != 0)
             readHandle = fdopen (pipeHandle, "r");
 
-        if (readHandle != 0)
-            return (int) fread (dest, 1, (size_t) numBytes, readHandle);
+        if (readHandle != nullptr)
+        {
+            for (;;)
+            {
+                auto numBytesRead = (int) fread (dest, 1, (size_t) numBytes, readHandle);
+
+                if (numBytesRead > 0 || feof (readHandle))
+                    return numBytesRead;
+
+                // signal occurred during fread() so try again
+                if (ferror (readHandle) && errno == EINTR)
+                    continue;
+
+                break;
+            }
+        }
 
         return 0;
     }
 
-    bool killProcess() const
+    bool killProcess() const noexcept
     {
         return ::kill (childPID, SIGKILL) == 0;
     }
 
-    int childPID;
+    uint32 getExitCode() noexcept
+    {
+        if (exitCode >= 0)
+            return (uint32) exitCode;
 
-private:
-    int pipeHandle;
-    FILE* readHandle;
+        if (childPID != 0)
+        {
+            int childState = 0;
+            auto pid = waitpid (childPID, &childState, WNOHANG);
+
+            if (pid >= 0 && WIFEXITED (childState))
+            {
+                exitCode = WEXITSTATUS (childState);
+                return (uint32) exitCode;
+            }
+        }
+
+        return 0;
+    }
+
+    int childPID = 0;
+    int pipeHandle = 0;
+    int exitCode = -1;
+    FILE* readHandle = {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ActiveProcess)
 };
 
-bool ChildProcess::start (const String& command)
+bool ChildProcess::start (const String& command, int streamFlags)
 {
-    StringArray tokens;
-    tokens.addTokens (command, true);
-    return start (tokens);
+    return start (StringArray::fromTokens (command, true), streamFlags);
 }
 
-bool ChildProcess::start (const StringArray& args)
+bool ChildProcess::start (const StringArray& args, int streamFlags)
 {
     if (args.size() == 0)
         return false;
 
-    activeProcess = new ActiveProcess (args);
+    activeProcess.reset (new ActiveProcess (args, streamFlags));
 
     if (activeProcess->childPID == 0)
-        activeProcess = nullptr;
+        activeProcess.reset();
 
     return activeProcess != nullptr;
 }
 
-bool ChildProcess::isRunning() const
-{
-    return activeProcess != nullptr && activeProcess->isRunning();
-}
-
-int ChildProcess::readProcessOutput (void* dest, int numBytes)
-{
-    return activeProcess != nullptr ? activeProcess->read (dest, numBytes) : 0;
-}
-
-bool ChildProcess::kill()
-{
-    return activeProcess == nullptr || activeProcess->killProcess();
-}
+#endif
 
 //==============================================================================
 struct HighResolutionTimer::Pimpl
 {
-    Pimpl (HighResolutionTimer& t)  : owner (t), thread (0), shouldStop (false)
-    {
-    }
+    explicit Pimpl (HighResolutionTimer& t)
+        : owner (t)
+    {}
 
     ~Pimpl()
     {
-        jassert (thread == 0);
+        jassert (periodMs == 0);
+        stop();
     }
 
     void start (int newPeriod)
     {
+        if (periodMs == newPeriod)
+            return;
+
+        if (thread.get_id() == std::this_thread::get_id())
+        {
+            periodMs = newPeriod;
+            return;
+        }
+
+        stop();
+
         periodMs = newPeriod;
 
-        if (thread == 0)
+        thread = std::thread ([this, newPeriod]
         {
-            shouldStop = false;
+            setThisThreadToRealtime ((uint64) newPeriod);
 
-            if (pthread_create (&thread, nullptr, timerThread, this) == 0)
-                setThreadToRealtime (thread, newPeriod);
-            else
-                jassertfalse;
-        }
+            auto lastPeriod = periodMs.load();
+            Clock clock (lastPeriod);
+
+            std::unique_lock<std::mutex> unique_lock (timerMutex);
+
+            while (periodMs != 0)
+            {
+                clock.next();
+                while (periodMs != 0 && clock.wait (stopCond, unique_lock));
+
+                if (periodMs == 0)
+                    break;
+
+                owner.hiResTimerCallback();
+
+                auto nextPeriod = periodMs.load();
+
+                if (lastPeriod != nextPeriod)
+                {
+                    lastPeriod = nextPeriod;
+                    clock = Clock (lastPeriod);
+                }
+            }
+
+            periodMs = 0;
+        });
     }
 
     void stop()
     {
-        if (thread != 0)
-        {
-            shouldStop = true;
+        periodMs = 0;
 
-            while (thread != 0 && thread != pthread_self())
-                Thread::yield();
+        const auto thread_id = thread.get_id();
+
+        if (thread_id == std::thread::id() || thread_id == std::this_thread::get_id())
+            return;
+
+        {
+            std::unique_lock<std::mutex> unique_lock (timerMutex);
+            stopCond.notify_one();
         }
+
+        thread.join();
     }
 
     HighResolutionTimer& owner;
-    int volatile periodMs;
+    std::atomic<int> periodMs { 0 };
 
 private:
-    pthread_t thread;
-    bool volatile shouldStop;
+    std::thread thread;
+    std::condition_variable stopCond;
+    std::mutex timerMutex;
 
-    static void* timerThread (void* param)
+    class Clock
     {
-       #if ! JUCE_ANDROID
-        int dummy;
-        pthread_setcancelstate (PTHREAD_CANCEL_ENABLE, &dummy);
-       #endif
+    public:
+        explicit Clock (std::chrono::steady_clock::rep millis) noexcept
+            : time (std::chrono::steady_clock::now()),
+              delta (std::chrono::milliseconds (millis))
+        {}
 
-        reinterpret_cast<Pimpl*> (param)->timerThread();
-        return nullptr;
-    }
-
-    void timerThread()
-    {
-        Clock clock (periodMs);
-
-        while (! shouldStop)
+        bool wait (std::condition_variable& cond, std::unique_lock<std::mutex>& lock) noexcept
         {
-            clock.wait();
-            owner.hiResTimerCallback();
+            return cond.wait_until (lock, time) != std::cv_status::timeout;
         }
 
-        periodMs = 0;
-        thread = 0;
-    }
-
-    struct Clock
-    {
-       #if JUCE_MAC || JUCE_IOS
-        Clock (double millis) noexcept
-        {
-            mach_timebase_info_data_t timebase;
-            (void) mach_timebase_info (&timebase);
-            delta = (((uint64_t) (millis * 1000000.0)) * timebase.numer) / timebase.denom;
-            time = mach_absolute_time();
-        }
-
-        void wait() noexcept
+        void next() noexcept
         {
             time += delta;
-            mach_wait_until (time);
         }
 
-        uint64_t time, delta;
-
-       #elif JUCE_ANDROID
-        Clock (double millis) noexcept  : delta ((uint64) (millis * 1000000))
-        {
-        }
-
-        void wait() noexcept
-        {
-            struct timespec t;
-            t.tv_sec  = (time_t) (delta / 1000000000);
-            t.tv_nsec = (long)   (delta % 1000000000);
-            nanosleep (&t, nullptr);
-        }
-
-        uint64 delta;
-       #else
-        Clock (double millis) noexcept  : delta ((uint64) (millis * 1000000))
-        {
-            struct timespec t;
-            clock_gettime (CLOCK_MONOTONIC, &t);
-            time = 1000000000 * (int64) t.tv_sec + t.tv_nsec;
-        }
-
-        void wait() noexcept
-        {
-            time += delta;
-
-            struct timespec t;
-            t.tv_sec  = (time_t) (time / 1000000000);
-            t.tv_nsec = (long)   (time % 1000000000);
-
-            clock_nanosleep (CLOCK_MONOTONIC, TIMER_ABSTIME, &t, nullptr);
-        }
-
-        uint64 time, delta;
-       #endif
+    private:
+        std::chrono::time_point<std::chrono::steady_clock> time;
+        std::chrono::steady_clock::duration delta;
     };
 
-    static bool setThreadToRealtime (pthread_t thread, uint64 periodMs)
+    static bool setThisThreadToRealtime (uint64 periodMs)
     {
+        const auto thread = pthread_self();
+
        #if JUCE_MAC || JUCE_IOS
+        mach_timebase_info_data_t timebase;
+        mach_timebase_info (&timebase);
+
+        const auto ticksPerMs = ((double) timebase.denom * 1000000.0) / (double) timebase.numer;
+        const auto periodTicks = (uint32_t) (ticksPerMs * periodMs);
+
         thread_time_constraint_policy_data_t policy;
-        policy.period      = (uint32_t) (periodMs * 1000000);
-        policy.computation = 50000;
+        policy.period      = periodTicks;
+        policy.computation = jmin ((uint32_t) 50000, policy.period);
         policy.constraint  = policy.period;
         policy.preemptible = true;
 
@@ -1247,13 +1366,14 @@ private:
                                   THREAD_TIME_CONSTRAINT_POLICY_COUNT) == KERN_SUCCESS;
 
        #else
-        (void) periodMs;
+        ignoreUnused (periodMs);
         struct sched_param param;
         param.sched_priority = sched_get_priority_max (SCHED_RR);
         return pthread_setschedparam (thread, SCHED_RR, &param) == 0;
-
        #endif
     }
 
     JUCE_DECLARE_NON_COPYABLE (Pimpl)
 };
+
+} // namespace juce

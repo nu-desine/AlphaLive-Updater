@@ -1,42 +1,40 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_RECTANGLEPLACEMENT_JUCEHEADER__
-#define __JUCE_RECTANGLEPLACEMENT_JUCEHEADER__
-
-#include "../geometry/juce_AffineTransform.h"
-#include "../geometry/juce_Rectangle.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
-    Defines the method used to postion some kind of rectangular object within
+    Defines the method used to position some kind of rectangular object within
     a rectangular viewport.
 
     Although similar to Justification, this is more specific, and has some extra
     options.
+
+    @tags{Graphics}
 */
 class JUCE_API  RectanglePlacement
 {
@@ -45,14 +43,17 @@ public:
     /** Creates a RectanglePlacement object using a combination of flags from the Flags enum. */
     inline RectanglePlacement (int placementFlags) noexcept  : flags (placementFlags) {}
 
+    /** Creates a default RectanglePlacement object, which is equivalent to using the 'centred' flag. */
+    inline RectanglePlacement() = default;
+
     /** Creates a copy of another RectanglePlacement object. */
-    RectanglePlacement (const RectanglePlacement& other) noexcept;
+    RectanglePlacement (const RectanglePlacement&) = default;
 
     /** Copies another RectanglePlacement object. */
-    RectanglePlacement& operator= (const RectanglePlacement& other) noexcept;
+    RectanglePlacement& operator= (const RectanglePlacement&) = default;
 
-    bool operator== (const RectanglePlacement& other) const noexcept;
-    bool operator!= (const RectanglePlacement& other) const noexcept;
+    bool operator== (const RectanglePlacement&) const noexcept;
+    bool operator!= (const RectanglePlacement&) const noexcept;
 
     //==============================================================================
     /** Flag values that can be combined and used in the constructor. */
@@ -132,7 +133,7 @@ public:
     //==============================================================================
     /** Adjusts the position and size of a rectangle to fit it into a space.
 
-        The source rectangle co-ordinates will be adjusted so that they fit into
+        The source rectangle coordinates will be adjusted so that they fit into
         the destination rectangle based on this object's flags.
     */
     void applyTo (double& sourceX,
@@ -152,13 +153,13 @@ public:
                                     const Rectangle<ValueType>& destination) const noexcept
     {
         double x = source.getX(), y = source.getY(), w = source.getWidth(), h = source.getHeight();
-        applyTo (x, y, w, h, static_cast <double> (destination.getX()), static_cast <double> (destination.getY()),
-                 static_cast <double> (destination.getWidth()), static_cast <double> (destination.getHeight()));
-        return Rectangle<ValueType> (static_cast <ValueType> (x), static_cast <ValueType> (y),
-                                     static_cast <ValueType> (w), static_cast <ValueType> (h));
+        applyTo (x, y, w, h, static_cast<double> (destination.getX()), static_cast<double> (destination.getY()),
+                 static_cast<double> (destination.getWidth()), static_cast<double> (destination.getHeight()));
+        return Rectangle<ValueType> (static_cast<ValueType> (x), static_cast<ValueType> (y),
+                                     static_cast<ValueType> (w), static_cast<ValueType> (h));
     }
 
-    /** Returns the transform that should be applied to these source co-ordinates to fit them
+    /** Returns the transform that should be applied to these source coordinates to fit them
         into the destination rectangle using the current flags.
     */
     AffineTransform getTransformToFit (const Rectangle<float>& source,
@@ -167,7 +168,7 @@ public:
 
 private:
     //==============================================================================
-    int flags;
+    int flags { centred };
 };
 
-#endif   // __JUCE_RECTANGLEPLACEMENT_JUCEHEADER__
+} // namespace juce

@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_ABSTRACTFIFO_JUCEHEADER__
-#define __JUCE_ABSTRACTFIFO_JUCEHEADER__
-
-#include "../memory/juce_Atomic.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -44,13 +38,8 @@
 
     e.g.
     @code
-    class MyFifo
+    struct MyFifo
     {
-    public:
-        MyFifo()  : abstractFifo (1024)
-        {
-        }
-
         void addToFifo (const int* someData, int numItems)
         {
             int start1, size1, start2, size2;
@@ -68,7 +57,7 @@
         void readFromFifo (int* someData, int numItems)
         {
             int start1, size1, start2, size2;
-            abstractFifo.prepareToRead (numSamples, start1, size1, start2, size2);
+            abstractFifo.prepareToRead (numItems, start1, size1, start2, size2);
 
             if (size1 > 0)
                 copySomeData (someData, myBuffer + start1, size1);
@@ -79,11 +68,12 @@
             abstractFifo.finishedRead (size1 + size2);
         }
 
-    private:
-        AbstractFifo abstractFifo;
-        int myBuffer [1024];
+        AbstractFifo abstractFifo { 1024 };
+        int myBuffer[1024];
     };
     @endcode
+
+    @tags{Core}
 */
 class JUCE_API  AbstractFifo
 {
@@ -206,14 +196,147 @@ public:
     */
     void finishedRead (int numRead) noexcept;
 
+    //==============================================================================
+
+private:
+    enum class ReadOrWrite
+    {
+        read,
+        write
+    };
+
+public:
+    /** Class for a scoped reader/writer */
+    template <ReadOrWrite mode>
+    class ScopedReadWrite final
+    {
+    public:
+        /** Construct an unassigned reader/writer. Doesn't do anything upon destruction. */
+        ScopedReadWrite() = default;
+
+        /** Construct a reader/writer and immediately call prepareRead/prepareWrite
+            on the abstractFifo which was passed in.
+            This object will hold a pointer back to the fifo, so make sure that
+            the fifo outlives this object.
+        */
+        ScopedReadWrite (AbstractFifo& f, int num) noexcept  : fifo (&f)
+        {
+            prepare (*fifo, num);
+        }
+
+        ScopedReadWrite (const ScopedReadWrite&) = delete;
+        ScopedReadWrite (ScopedReadWrite&&) noexcept;
+
+        ScopedReadWrite& operator= (const ScopedReadWrite&) = delete;
+        ScopedReadWrite& operator= (ScopedReadWrite&&) noexcept;
+
+        /** Calls finishedRead or finishedWrite if this is a non-null scoped
+            reader/writer.
+        */
+        ~ScopedReadWrite() noexcept
+        {
+            if (fifo != nullptr)
+                finish (*fifo, blockSize1 + blockSize2);
+        }
+
+        /** Calls the passed function with each index that was deemed valid
+            for the current read/write operation.
+        */
+        template <typename FunctionToApply>
+        void forEach (FunctionToApply&& func) const
+        {
+            for (auto i = startIndex1, e = startIndex1 + blockSize1; i != e; ++i)  func (i);
+            for (auto i = startIndex2, e = startIndex2 + blockSize2; i != e; ++i)  func (i);
+        }
+
+        int startIndex1, blockSize1, startIndex2, blockSize2;
+
+    private:
+        void prepare (AbstractFifo&, int) noexcept;
+        static void finish (AbstractFifo&, int) noexcept;
+        void swap (ScopedReadWrite&) noexcept;
+
+        AbstractFifo* fifo = nullptr;
+    };
+
+    using ScopedRead  = ScopedReadWrite<ReadOrWrite::read>;
+    using ScopedWrite = ScopedReadWrite<ReadOrWrite::write>;
+
+    /** Replaces prepareToRead/finishedRead with a single function.
+        This function returns an object which contains the start indices and
+        block sizes, and also automatically finishes the read operation when
+        it goes out of scope.
+        @code
+        {
+            auto readHandle = fifo.read (4);
+
+            for (auto i = 0; i != readHandle.blockSize1; ++i)
+            {
+                // read the item at index readHandle.startIndex1 + i
+            }
+
+            for (auto i = 0; i != readHandle.blockSize2; ++i)
+            {
+                // read the item at index readHandle.startIndex2 + i
+            }
+        } // readHandle goes out of scope here, finishing the read operation
+        @endcode
+    */
+    ScopedRead read (int numToRead) noexcept;
+
+    /** Replaces prepareToWrite/finishedWrite with a single function.
+        This function returns an object which contains the start indices and
+        block sizes, and also automatically finishes the write operation when
+        it goes out of scope.
+        @code
+        {
+            auto writeHandle = fifo.write (5);
+
+            for (auto i = 0; i != writeHandle.blockSize1; ++i)
+            {
+                // write the item at index writeHandle.startIndex1 + i
+            }
+
+            for (auto i = 0; i != writeHandle.blockSize2; ++i)
+            {
+                // write the item at index writeHandle.startIndex2 + i
+            }
+        } // writeHandle goes out of scope here, finishing the write operation
+        @endcode
+    */
+    ScopedWrite write (int numToWrite) noexcept;
 
 private:
     //==============================================================================
     int bufferSize;
-    Atomic <int> validStart, validEnd;
+    Atomic<int> validStart, validEnd;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AbstractFifo)
 };
 
+template <>
+inline void AbstractFifo::ScopedReadWrite<AbstractFifo::ReadOrWrite::read>::finish (AbstractFifo& f, int num) noexcept
+{
+    f.finishedRead (num);
+}
 
-#endif   // __JUCE_ABSTRACTFIFO_JUCEHEADER__
+template <>
+inline void AbstractFifo::ScopedReadWrite<AbstractFifo::ReadOrWrite::write>::finish (AbstractFifo& f, int num) noexcept
+{
+    f.finishedWrite (num);
+}
+
+template <>
+inline void AbstractFifo::ScopedReadWrite<AbstractFifo::ReadOrWrite::read>::prepare (AbstractFifo& f, int num) noexcept
+{
+    f.prepareToRead (num, startIndex1, blockSize1, startIndex2, blockSize2);
+}
+
+template <>
+inline void AbstractFifo::ScopedReadWrite<AbstractFifo::ReadOrWrite::write>::prepare (AbstractFifo& f, int num) noexcept
+{
+    f.prepareToWrite (num, startIndex1, blockSize1, startIndex2, blockSize2);
+}
+
+
+} // namespace juce

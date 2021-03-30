@@ -1,27 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
 
 #if JUCE_MAC || JUCE_IOS || DOXYGEN
 
@@ -33,7 +36,9 @@
     This should be able to understand formats such as mp3, m4a, etc.
 
     @see AudioFormat
- */
+
+    @tags{Audio}
+*/
 class JUCE_API  CoreAudioFormat     : public AudioFormat
 {
 public:
@@ -42,27 +47,40 @@ public:
     CoreAudioFormat();
 
     /** Destructor. */
-    ~CoreAudioFormat();
+    ~CoreAudioFormat() override;
 
     //==============================================================================
-    Array<int> getPossibleSampleRates();
-    Array<int> getPossibleBitDepths();
-    bool canDoStereo();
-    bool canDoMono();
+    /** Metadata property name used when reading a caf file with a MIDI chunk. */
+    static const char* const midiDataBase64;
+    /** Metadata property name used when reading a caf file with tempo information. */
+    static const char* const tempo;
+    /** Metadata property name used when reading a caf file time signature information. */
+    static const char* const timeSig;
+    /** Metadata property name used when reading a caf file time signature information. */
+    static const char* const keySig;
 
     //==============================================================================
-    AudioFormatReader* createReaderFor (InputStream* sourceStream,
-                                        bool deleteStreamIfOpeningFails);
+    Array<int> getPossibleSampleRates() override;
+    Array<int> getPossibleBitDepths() override;
+    bool canDoStereo() override;
+    bool canDoMono() override;
 
-    AudioFormatWriter* createWriterFor (OutputStream* streamToWriteTo,
+    //==============================================================================
+    AudioFormatReader* createReaderFor (InputStream*,
+                                        bool deleteStreamIfOpeningFails) override;
+
+    AudioFormatWriter* createWriterFor (OutputStream*,
                                         double sampleRateToUse,
                                         unsigned int numberOfChannels,
                                         int bitsPerSample,
                                         const StringPairArray& metadataValues,
-                                        int qualityOptionIndex);
+                                        int qualityOptionIndex) override;
+    using AudioFormat::createWriterFor;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CoreAudioFormat)
 };
 
 #endif
+
+} // namespace juce

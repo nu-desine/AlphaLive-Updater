@@ -1,31 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_ATTRIBUTEDSTRING_JUCEHEADER__
-#define __JUCE_ATTRIBUTEDSTRING_JUCEHEADER__
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -36,29 +35,26 @@
     layout, etc., and draw it using AttributedString::draw().
 
     @see TextLayout
+
+    @tags{Graphics}
 */
 class JUCE_API  AttributedString
 {
 public:
     /** Creates an empty attributed string. */
-    AttributedString();
+    AttributedString() = default;
 
     /** Creates an attributed string with the given text. */
-    explicit AttributedString (const String& text);
+    explicit AttributedString (const String& newString)  { setText (newString); }
 
-    AttributedString (const AttributedString&);
-    AttributedString& operator= (const AttributedString&);
-   #if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
-    AttributedString (AttributedString&&) noexcept;
-    AttributedString& operator= (AttributedString&&) noexcept;
-   #endif
-
-    /** Destructor. */
-    ~AttributedString();
+    AttributedString (const AttributedString&) = default;
+    AttributedString& operator= (const AttributedString&) = default;
+    AttributedString (AttributedString&&) noexcept = default;
+    AttributedString& operator= (AttributedString&&) noexcept = default;
 
     //==============================================================================
     /** Returns the complete text of this attributed string. */
-    const String& getText() const noexcept                  { return text; }
+    const String& getText() const noexcept    { return text; }
 
     /** Replaces all the text.
         This will change the text, but won't affect any of the colour or font attributes
@@ -71,9 +67,9 @@ public:
     /** Appends some text, with a specified font, and the default colour (black). */
     void append (const String& textToAppend, const Font& font);
     /** Appends some text, with a specified colour, and the default font. */
-    void append (const String& textToAppend, const Colour& colour);
+    void append (const String& textToAppend, Colour colour);
     /** Appends some text, with a specified font and colour. */
-    void append (const String& textToAppend, const Font& font, const Colour& colour);
+    void append (const String& textToAppend, const Font& font, Colour colour);
 
     /** Appends another AttributedString to this one.
         Note that this will only append the text, fonts, and colours - it won't copy any
@@ -103,7 +99,7 @@ public:
     /** Sets the justification that should be used for laying-out the text.
         This may include both vertical and horizontal flags.
     */
-    void setJustification (const Justification& newJustification) noexcept;
+    void setJustification (Justification newJustification) noexcept;
 
     //==============================================================================
     /** Types of word-wrap behaviour.
@@ -151,36 +147,26 @@ public:
     class JUCE_API  Attribute
     {
     public:
-        /** Creates an attribute that changes the colour for a range of characters.
-            @see AttributedString::setColour()
-        */
-        Attribute (const Range<int>& range, const Colour& colour);
+        Attribute() = default;
 
-        /** Creates an attribute that changes the font for a range of characters.
-            @see AttributedString::setFont()
-        */
-        Attribute (const Range<int>& range, const Font& font);
+        Attribute (const Attribute&) = default;
+        Attribute& operator= (const Attribute&) = default;
+        Attribute (Attribute&&) noexcept = default;
+        Attribute& operator= (Attribute&&) noexcept = default;
 
-        Attribute (const Attribute&);
-        ~Attribute();
-
-        /** If this attribute specifies a font, this returns it; otherwise it returns nullptr. */
-        const Font* getFont() const noexcept            { return font; }
-
-        /** If this attribute specifies a colour, this returns it; otherwise it returns nullptr. */
-        const Colour* getColour() const noexcept        { return colour; }
+        /** Creates an attribute that specifies the font and colour for a range of characters. */
+        Attribute (Range<int> range, const Font& font, Colour colour) noexcept;
 
         /** The range of characters to which this attribute will be applied. */
-        const Range<int> range;
+        Range<int> range;
+
+        /** The font for this range of characters. */
+        Font font;
+
+        /** The colour for this range of characters. */
+        Colour colour { 0xff000000 };
 
     private:
-        ScopedPointer<Font> font;
-        ScopedPointer<Colour> colour;
-
-        friend class AttributedString;
-        Attribute (const Attribute&, int);
-        Attribute& operator= (const Attribute&);
-
         JUCE_LEAK_DETECTOR (Attribute)
     };
 
@@ -190,30 +176,30 @@ public:
     /** Returns one of the string's attributes.
         The index provided must be less than getNumAttributes(), and >= 0.
     */
-    const Attribute* getAttribute (int index) const noexcept    { return attributes.getUnchecked (index); }
+    const Attribute& getAttribute (int index) const noexcept    { return attributes.getReference (index); }
 
     //==============================================================================
     /** Adds a colour attribute for the specified range. */
-    void setColour (const Range<int>& range, const Colour& colour);
+    void setColour (Range<int> range, Colour colour);
 
     /** Removes all existing colour attributes, and applies this colour to the whole string. */
-    void setColour (const Colour& colour);
+    void setColour (Colour colour);
 
     /** Adds a font attribute for the specified range. */
-    void setFont (const Range<int>& range, const Font& font);
+    void setFont (Range<int> range, const Font& font);
 
     /** Removes all existing font attributes, and applies this font to the whole string. */
     void setFont (const Font& font);
 
 private:
     String text;
-    float lineSpacing;
-    Justification justification;
-    WordWrap wordWrap;
-    ReadingDirection readingDirection;
-    OwnedArray<Attribute> attributes;
+    float lineSpacing = 0.0f;
+    Justification justification = Justification::left;
+    WordWrap wordWrap = AttributedString::byWord;
+    ReadingDirection readingDirection = AttributedString::natural;
+    Array<Attribute> attributes;
 
     JUCE_LEAK_DETECTOR (AttributedString)
 };
 
-#endif   // __JUCE_ATTRIBUTEDSTRING_JUCEHEADER__
+} // namespace juce

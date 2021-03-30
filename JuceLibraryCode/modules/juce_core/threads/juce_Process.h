@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_PROCESS_JUCEHEADER__
-#define __JUCE_PROCESS_JUCEHEADER__
-
-#include "../text/juce_String.h"
-
+namespace juce
+{
 
 //==============================================================================
 /** Represents the current executable's process.
@@ -35,7 +29,9 @@
     This contains methods for controlling the current application at the
     process-level.
 
-    @see Thread, JUCEApplication
+    @see Thread, JUCEApplicationBase
+
+    @tags{Core}
 */
 class JUCE_API  Process
 {
@@ -54,7 +50,7 @@ public:
         @param priority     the process priority, where
                             0=low, 1=normal, 2=high, 3=realtime
     */
-    static void setPriority (const ProcessPriority priority);
+    static void JUCE_CALLTYPE setPriority (const ProcessPriority priority);
 
     /** Kills the current process immediately.
 
@@ -62,20 +58,23 @@ public:
         immediately - it's intended only for use only when something goes
         horribly wrong.
 
-        @see JUCEApplication::quit
+        @see JUCEApplicationBase::quit
     */
-    static void terminate();
+    static void JUCE_CALLTYPE terminate();
 
     //==============================================================================
     /** Returns true if this application process is the one that the user is
         currently using.
     */
-    static bool isForegroundProcess();
+    static bool JUCE_CALLTYPE isForegroundProcess();
 
     /** Attempts to make the current process the active one.
         (This is not possible on some platforms).
     */
-    static void makeForegroundProcess();
+    static void JUCE_CALLTYPE makeForegroundProcess();
+
+    /** Hides the application (on an OS that supports this, e.g. OSX, iOS, Android) */
+    static void JUCE_CALLTYPE hide();
 
     //==============================================================================
     /** Raises the current process's privilege level.
@@ -83,29 +82,29 @@ public:
         Does nothing if this isn't supported by the current OS, or if process
         privilege level is fixed.
     */
-    static void raisePrivilege();
+    static void JUCE_CALLTYPE raisePrivilege();
 
     /** Lowers the current process's privilege level.
 
         Does nothing if this isn't supported by the current OS, or if process
         privilege level is fixed.
     */
-    static void lowerPrivilege();
+    static void JUCE_CALLTYPE lowerPrivilege();
 
     //==============================================================================
     /** Returns true if this process is being hosted by a debugger. */
-    static bool JUCE_CALLTYPE isRunningUnderDebugger();
+    static bool JUCE_CALLTYPE isRunningUnderDebugger() noexcept;
 
 
     //==============================================================================
     /** Tries to launch the OS's default reader application for a given file or URL. */
-    static bool openDocument (const String& documentURL, const String& parameters);
+    static bool JUCE_CALLTYPE openDocument (const String& documentURL, const String& parameters);
 
     /** Tries to launch the OS's default email application to let the user create a message. */
-    static bool openEmailWithAttachments (const String& targetEmailAddress,
-                                          const String& emailSubject,
-                                          const String& bodyText,
-                                          const StringArray& filesToAttach);
+    static bool JUCE_CALLTYPE openEmailWithAttachments (const String& targetEmailAddress,
+                                                        const String& emailSubject,
+                                                        const String& bodyText,
+                                                        const StringArray& filesToAttach);
 
    #if JUCE_WINDOWS || DOXYGEN
     //==============================================================================
@@ -134,10 +133,19 @@ public:
     static void JUCE_CALLTYPE setCurrentModuleInstanceHandle (void* newHandle) noexcept;
    #endif
 
-   #if JUCE_MAC || DOXYGEN
+   #if (JUCE_MAC && JUCE_MODULE_AVAILABLE_juce_gui_basics) || DOXYGEN
     //==============================================================================
     /** OSX ONLY - Shows or hides the OSX dock icon for this app. */
     static void setDockIconVisible (bool isVisible);
+   #endif
+
+   #if JUCE_MAC || JUCE_LINUX || DOXYGEN
+    //==============================================================================
+    /** UNIX ONLY - Attempts to use setrlimit to change the maximum number of file
+        handles that the app can open. Pass 0 or less as the parameter to mean
+        'infinite'. Returns true if it succeeds.
+    */
+    static bool setMaxNumberOfFileHandles (int maxNumberOfFiles) noexcept;
    #endif
 
 private:
@@ -145,5 +153,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (Process)
 };
 
-
-#endif   // __JUCE_PROCESS_JUCEHEADER__
+} // namespace juce

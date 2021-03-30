@@ -1,37 +1,35 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MIDIMESSAGE_JUCEHEADER__
-#define __JUCE_MIDIMESSAGE_JUCEHEADER__
-
+namespace juce
+{
 
 //==============================================================================
 /**
     Encapsulates a MIDI message.
 
     @see MidiMessageSequence, MidiOutput, MidiInput
+
+    @tags{Audio}
 */
 class JUCE_API  MidiMessage
 {
@@ -64,6 +62,18 @@ public:
     */
     MidiMessage (int byte1, double timeStamp = 0) noexcept;
 
+    /** Creates a midi message from a list of bytes. */
+    template <typename... Data>
+    MidiMessage (int byte1, int byte2, int byte3, Data... otherBytes)  : size (3 + sizeof... (otherBytes))
+    {
+        // this checks that the length matches the data..
+        jassert (size > 3 || byte1 >= 0xf0 || getMessageLengthFromFirstByte ((uint8) byte1) == size);
+
+        const uint8 data[] = { (uint8) byte1, (uint8) byte2, (uint8) byte3, static_cast<uint8> (otherBytes)... };
+        memcpy (allocateSpace (size), data, (size_t) size);
+    }
+
+
     /** Creates a midi message from a block of data. */
     MidiMessage (const void* data, int numBytes, double timeStamp = 0);
 
@@ -73,20 +83,24 @@ public:
         complete message, and will return the number of bytes it used. This lets
         you read a sequence of midi messages from a file or stream.
 
-        @param data             the data to read from
-        @param maxBytesToUse    the maximum number of bytes it's allowed to read
-        @param numBytesUsed     returns the number of bytes that were actually needed
-        @param lastStatusByte   in a sequence of midi messages, the initial byte
-                                can be dropped from a message if it's the same as the
-                                first byte of the previous message, so this lets you
-                                supply the byte to use if the first byte of the message
-                                has in fact been dropped.
-        @param timeStamp        the time to give the midi message - this value doesn't
-                                use any particular units, so will be application-specific
+        @param data                     the data to read from
+        @param maxBytesToUse            the maximum number of bytes it's allowed to read
+        @param numBytesUsed             returns the number of bytes that were actually needed
+        @param lastStatusByte           in a sequence of midi messages, the initial byte
+                                        can be dropped from a message if it's the same as the
+                                        first byte of the previous message, so this lets you
+                                        supply the byte to use if the first byte of the message
+                                        has in fact been dropped.
+        @param timeStamp                the time to give the midi message - this value doesn't
+                                        use any particular units, so will be application-specific
+        @param sysexHasEmbeddedLength   when reading sysexes, this flag indicates whether
+                                        to expect the data to begin with a variable-length
+                                        field indicating its size
     */
     MidiMessage (const void* data, int maxBytesToUse,
                  int& numBytesUsed, uint8 lastStatusByte,
-                 double timeStamp = 0);
+                 double timeStamp = 0,
+                 bool sysexHasEmbeddedLength = true);
 
     /** Creates an active-sense message.
         Since the MidiMessage has to contain a valid message, this default constructor
@@ -95,34 +109,39 @@ public:
     MidiMessage() noexcept;
 
     /** Creates a copy of another midi message. */
-    MidiMessage (const MidiMessage& other);
+    MidiMessage (const MidiMessage&);
 
     /** Creates a copy of another midi message, with a different timestamp. */
-    MidiMessage (const MidiMessage& other, double newTimeStamp);
+    MidiMessage (const MidiMessage&, double newTimeStamp);
 
     /** Destructor. */
-    ~MidiMessage();
+    ~MidiMessage() noexcept;
 
     /** Copies this message from another one. */
     MidiMessage& operator= (const MidiMessage& other);
 
-   #if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
-    MidiMessage (MidiMessage&& other) noexcept;
-    MidiMessage& operator= (MidiMessage&& other) noexcept;
-   #endif
+    /** Move constructor */
+    MidiMessage (MidiMessage&&) noexcept;
+
+    /** Move assignment operator */
+    MidiMessage& operator= (MidiMessage&&) noexcept;
 
     //==============================================================================
     /** Returns a pointer to the raw midi data.
-
         @see getRawDataSize
     */
-    const uint8* getRawData() const noexcept                    { return data; }
+    const uint8* getRawData() const noexcept            { return getData(); }
 
     /** Returns the number of bytes of data in the message.
-
         @see getRawData
     */
-    int getRawDataSize() const noexcept                         { return size; }
+    int getRawDataSize() const noexcept                 { return size; }
+
+    //==============================================================================
+    /** Returns a human-readable description of the midi message as a string,
+        for example "Note On C#3 Velocity 120 Channel 1".
+    */
+    String getDescription() const;
 
     //==============================================================================
     /** Returns the timestamp associated with this message.
@@ -141,21 +160,23 @@ public:
 
         @see setTimeStamp, addToTimeStamp
     */
-    double getTimeStamp() const noexcept                        { return timeStamp; }
+    double getTimeStamp() const noexcept                { return timeStamp; }
 
     /** Changes the message's associated timestamp.
-
         The units for the timestamp will be application-specific - see the notes for getTimeStamp().
-
         @see addToTimeStamp, getTimeStamp
     */
-    void setTimeStamp (double newTimestamp) noexcept      { timeStamp = newTimestamp; }
+    void setTimeStamp (double newTimestamp) noexcept    { timeStamp = newTimestamp; }
 
     /** Adds a value to the message's timestamp.
-
         The units for the timestamp will be application-specific.
     */
-    void addToTimeStamp (double delta) noexcept           { timeStamp += delta; }
+    void addToTimeStamp (double delta) noexcept         { timeStamp += delta; }
+
+    /** Return a copy of this message with a new timestamp.
+        The units for the timestamp will be application-specific - see the notes for getTimeStamp().
+    */
+    MidiMessage withTimeStamp (double newTimestamp) const;
 
     //==============================================================================
     /** Returns the midi channel associated with the message.
@@ -174,9 +195,7 @@ public:
     bool isForChannel (int channelNumber) const noexcept;
 
     /** Changes the message's midi channel.
-
         This won't do anything for non-channel messages like sysexes.
-
         @param newChannelNumber    the channel number to change it to, in the range 1 to 16
     */
     void setChannel (int newChannelNumber) noexcept;
@@ -187,17 +206,13 @@ public:
     bool isSysEx() const noexcept;
 
     /** Returns a pointer to the sysex data inside the message.
-
         If this event isn't a sysex event, it'll return 0.
-
         @see getSysExDataSize
     */
     const uint8* getSysExData() const noexcept;
 
     /** Returns the size of the sysex data.
-
         This value excludes the 0xf0 header byte and the 0xf7 at the end.
-
         @see getSysExData
     */
     int getSysExDataSize() const noexcept;
@@ -246,10 +261,27 @@ public:
 
         @param channel      the midi channel, in the range 1 to 16
         @param noteNumber   the key number, 0 to 127
+        @param velocity     in the range 0 to 1.0
+        @see isNoteOff
+    */
+    static MidiMessage noteOff (int channel, int noteNumber, float velocity) noexcept;
+
+    /** Creates a key-up message.
+
+        @param channel      the midi channel, in the range 1 to 16
+        @param noteNumber   the key number, 0 to 127
         @param velocity     in the range 0 to 127
         @see isNoteOff
     */
-    static MidiMessage noteOff (int channel, int noteNumber, uint8 velocity = 0) noexcept;
+    static MidiMessage noteOff (int channel, int noteNumber, uint8 velocity) noexcept;
+
+    /** Creates a key-up message.
+
+        @param channel      the midi channel, in the range 1 to 16
+        @param noteNumber   the key number, 0 to 127
+        @see isNoteOff
+    */
+    static MidiMessage noteOff (int channel, int noteNumber) noexcept;
 
     /** Returns true if this message is a 'key-down' or 'key-up' event.
 
@@ -258,15 +290,12 @@ public:
     bool isNoteOnOrOff() const noexcept;
 
     /** Returns the midi note number for note-on and note-off messages.
-
         If the message isn't a note-on or off, the value returned is undefined.
-
         @see isNoteOff, getMidiNoteName, getMidiNoteInHertz, setNoteNumber
     */
     int getNoteNumber() const noexcept;
 
     /** Changes the midi note number of a note-on or note-off message.
-
         If the message isn't a note on or off, this will do nothing.
     */
     void setNoteNumber (int newNoteNumber) noexcept;
@@ -326,16 +355,12 @@ public:
 
     //==============================================================================
     /** Returns true if the message is a program (patch) change message.
-
         @see getProgramChangeNumber, getGMInstrumentName
     */
     bool isProgramChange() const noexcept;
 
     /** Returns the new program number of a program change message.
-
-        If the message isn't a program change, the value returned will be
-        nonsense.
-
+        If the message isn't a program change, the value returned is undefined.
         @see isProgramChange, getGMInstrumentName
     */
     int getProgramChangeNumber() const noexcept;
@@ -350,7 +375,6 @@ public:
 
     //==============================================================================
     /** Returns true if the message is a pitch-wheel move.
-
         @see getPitchWheelValue, pitchWheel
     */
     bool isPitchWheel() const noexcept;
@@ -377,7 +401,7 @@ public:
     /** Returns true if the message is an aftertouch event.
 
         For aftertouch events, use the getNoteNumber() method to find out the key
-        that it applies to, and getAftertouchValue() to find out the amount. Use
+        that it applies to, and getAfterTouchValue() to find out the amount. Use
         getChannel() to find out the channel.
 
         @see getAftertouchValue, getNoteNumber
@@ -439,7 +463,6 @@ public:
     /** Returns the controller number of a controller message.
 
         The name of the controller can be looked up using the getControllerName() method.
-
         Note that the value returned is invalid for messages that aren't controller changes.
 
         @see isController, getControllerName, getControllerValue
@@ -449,7 +472,6 @@ public:
     /** Returns the controller value from a controller message.
 
         A value 0 to 127 is returned to indicate the new controller position.
-
         Note that the value returned is invalid for messages that aren't controller changes.
 
         @see isController, getControllerNumber
@@ -462,7 +484,6 @@ public:
     bool isControllerOfType (int controllerType) const noexcept;
 
     /** Creates a controller message.
-
         @param channel          the midi channel, in the range 1 to 16
         @param controllerType   the type of controller
         @param value            the controller value
@@ -473,33 +494,33 @@ public:
                                         int value) noexcept;
 
     /** Checks whether this message is an all-notes-off message.
-
         @see allNotesOff
     */
     bool isAllNotesOff() const noexcept;
 
     /** Checks whether this message is an all-sound-off message.
-
         @see allSoundOff
     */
     bool isAllSoundOff() const noexcept;
 
-    /** Creates an all-notes-off message.
+    /** Checks whether this message is a reset all controllers message.
+        @see allControllerOff
+    */
+    bool isResetAllControllers() const noexcept;
 
+    /** Creates an all-notes-off message.
         @param channel              the midi channel, in the range 1 to 16
         @see isAllNotesOff
     */
     static MidiMessage allNotesOff (int channel) noexcept;
 
     /** Creates an all-sound-off message.
-
         @param channel              the midi channel, in the range 1 to 16
         @see isAllSoundOff
     */
     static MidiMessage allSoundOff (int channel) noexcept;
 
     /** Creates an all-controllers-off message.
-
         @param channel              the midi channel, in the range 1 to 16
     */
     static MidiMessage allControllersOff (int channel) noexcept;
@@ -526,13 +547,11 @@ public:
     int getMetaEventType() const noexcept;
 
     /** Returns a pointer to the data in a meta-event.
-
         @see isMetaEvent, getMetaEventLength
     */
     const uint8* getMetaEventData() const noexcept;
 
     /** Returns the length of the data for a meta-event.
-
         @see isMetaEvent, getMetaEventData
     */
     int getMetaEventLength() const noexcept;
@@ -545,32 +564,30 @@ public:
     bool isEndOfTrackMetaEvent() const noexcept;
 
     /** Creates an end-of-track meta-event.
-
         @see isEndOfTrackMetaEvent
     */
     static MidiMessage endOfTrack() noexcept;
 
     /** Returns true if this is an 'track name' meta-event.
-
         You can use the getTextFromTextMetaEvent() method to get the track's name.
     */
     bool isTrackNameEvent() const noexcept;
 
     /** Returns true if this is a 'text' meta-event.
-
         @see getTextFromTextMetaEvent
     */
     bool isTextMetaEvent() const noexcept;
 
     /** Returns the text from a text meta-event.
-
         @see isTextMetaEvent
     */
     String getTextFromTextMetaEvent() const;
 
+    /** Creates a text meta-event. */
+    static MidiMessage textMetaEvent (int type, StringRef text);
+
     //==============================================================================
     /** Returns true if this is a 'tempo' meta-event.
-
         @see getTempoMetaEventTickLength, getTempoSecondsPerQuarterNote
     */
     bool isTempoMetaEvent() const noexcept;
@@ -584,48 +601,58 @@ public:
     double getTempoMetaEventTickLength (short timeFormat) const noexcept;
 
     /** Calculates the seconds-per-quarter-note from a tempo meta-event.
-
         @see isTempoMetaEvent, getTempoMetaEventTickLength
     */
     double getTempoSecondsPerQuarterNote() const noexcept;
 
     /** Creates a tempo meta-event.
-
         @see isTempoMetaEvent
     */
     static MidiMessage tempoMetaEvent (int microsecondsPerQuarterNote) noexcept;
 
     //==============================================================================
     /** Returns true if this is a 'time-signature' meta-event.
-
         @see getTimeSignatureInfo
     */
     bool isTimeSignatureMetaEvent() const noexcept;
 
     /** Returns the time-signature values from a time-signature meta-event.
-
         @see isTimeSignatureMetaEvent
     */
     void getTimeSignatureInfo (int& numerator, int& denominator) const noexcept;
 
     /** Creates a time-signature meta-event.
-
         @see isTimeSignatureMetaEvent
     */
     static MidiMessage timeSignatureMetaEvent (int numerator, int denominator);
 
     //==============================================================================
     /** Returns true if this is a 'key-signature' meta-event.
-
-        @see getKeySignatureNumberOfSharpsOrFlats
+        @see getKeySignatureNumberOfSharpsOrFlats, isKeySignatureMajorKey
     */
     bool isKeySignatureMetaEvent() const noexcept;
 
     /** Returns the key from a key-signature meta-event.
-
-        @see isKeySignatureMetaEvent
+        This method must only be called if isKeySignatureMetaEvent() is true.
+        A positive number here indicates the number of sharps in the key signature,
+        and a negative number indicates a number of flats. So e.g. 3 = F# + C# + G#,
+        -2 = Bb + Eb
+        @see isKeySignatureMetaEvent, isKeySignatureMajorKey
     */
     int getKeySignatureNumberOfSharpsOrFlats() const noexcept;
+
+    /** Returns true if this key-signature event is major, or false if it's minor.
+        This method must only be called if isKeySignatureMetaEvent() is true.
+    */
+    bool isKeySignatureMajorKey() const noexcept;
+
+    /** Creates a key-signature meta-event.
+        @param numberOfSharpsOrFlats    if positive, this indicates the number of sharps
+                                        in the key; if negative, the number of flats
+        @param isMinorKey               if true, the key is minor; if false, it is major
+        @see isKeySignatureMetaEvent
+    */
+    static MidiMessage keySignatureMetaEvent (int numberOfSharpsOrFlats, bool isMinorKey);
 
     //==============================================================================
     /** Returns true if this is a 'channel' meta-event.
@@ -657,7 +684,6 @@ public:
 
     //==============================================================================
     /** Returns true if this is a midi start event.
-
         @see midiStart
     */
     bool isMidiStart() const noexcept;
@@ -666,7 +692,6 @@ public:
     static MidiMessage midiStart() noexcept;
 
     /** Returns true if this is a midi continue event.
-
         @see midiContinue
     */
     bool isMidiContinue() const noexcept;
@@ -675,7 +700,6 @@ public:
     static MidiMessage midiContinue() noexcept;
 
     /** Returns true if this is a midi stop event.
-
         @see midiStop
     */
     bool isMidiStop() const noexcept;
@@ -684,7 +708,6 @@ public:
     static MidiMessage midiStop() noexcept;
 
     /** Returns true if this is a midi clock event.
-
         @see midiClock, songPositionPointer
     */
     bool isMidiClock() const noexcept;
@@ -693,13 +716,11 @@ public:
     static MidiMessage midiClock() noexcept;
 
     /** Returns true if this is a song-position-pointer message.
-
         @see getSongPositionPointerMidiBeat, songPositionPointer
     */
     bool isSongPositionPointer() const noexcept;
 
     /** Returns the midi beat-number of a song-position-pointer message.
-
         @see isSongPositionPointer, songPositionPointer
     */
     int getSongPositionPointerMidiBeat() const noexcept;
@@ -716,23 +737,18 @@ public:
 
     //==============================================================================
     /** Returns true if this is a quarter-frame midi timecode message.
-
         @see quarterFrame, getQuarterFrameSequenceNumber, getQuarterFrameValue
     */
     bool isQuarterFrame() const noexcept;
 
     /** Returns the sequence number of a quarter-frame midi timecode message.
-
         This will be a value between 0 and 7.
-
         @see isQuarterFrame, getQuarterFrameValue, quarterFrame
     */
     int getQuarterFrameSequenceNumber() const noexcept;
 
     /** Returns the value from a quarter-frame message.
-
-        This will be the lower nybble of the message's data-byte, a value
-        between 0 and 15
+        This will be the lower nybble of the message's data-byte, a value between 0 and 15
     */
     int getQuarterFrameValue() const noexcept;
 
@@ -744,7 +760,6 @@ public:
     static MidiMessage quarterFrame (int sequenceNumber, int value) noexcept;
 
     /** SMPTE timecode types.
-
         Used by the getFullFrameParameters() and fullFrame() methods.
     */
     enum SmpteTimecodeType
@@ -755,8 +770,7 @@ public:
         fps30       = 3
     };
 
-    /** Returns true if this is a full-frame midi timecode message.
-    */
+    /** Returns true if this is a full-frame midi timecode message. */
     bool isFullFrame() const noexcept;
 
     /** Extracts the timecode information from a full-frame midi timecode message.
@@ -770,8 +784,7 @@ public:
                                  int& frames,
                                  SmpteTimecodeType& timecodeType) const noexcept;
 
-    /** Creates a full-frame MTC message.
-    */
+    /** Creates a full-frame MTC message. */
     static MidiMessage fullFrame (int hours,
                                   int minutes,
                                   int seconds,
@@ -796,7 +809,6 @@ public:
     };
 
     /** Checks whether this is an MMC message.
-
         If it is, you can use the getMidiMachineControlCommand() to find out its type.
     */
     bool isMidiMachineControlMessage() const noexcept;
@@ -808,14 +820,11 @@ public:
     */
     MidiMachineControlCommand getMidiMachineControlCommand() const noexcept;
 
-    /** Creates an MMC message.
-    */
+    /** Creates an MMC message. */
     static MidiMessage midiMachineControlCommand (MidiMachineControlCommand command);
 
     /** Checks whether this is an MMC "goto" message.
-
         If it is, the parameters passed-in are set to the time that the message contains.
-
         @see midiMachineControlGoto
     */
     bool isMidiMachineControlGoto (int& hours,
@@ -824,9 +833,7 @@ public:
                                    int& frames) const noexcept;
 
     /** Creates an MMC "goto" message.
-
         This messages tells the device to go to a specific frame.
-
         @see isMidiMachineControlGoto
     */
     static MidiMessage midiMachineControlGoto (int hours,
@@ -836,14 +843,12 @@ public:
 
     //==============================================================================
     /** Creates a master-volume change message.
-
         @param volume   the volume, 0 to 1.0
     */
     static MidiMessage masterVolume (float volume);
 
     //==============================================================================
     /** Creates a system-exclusive message.
-
         The data passed in is wrapped with header and tail bytes of 0xf0 and 0xf7.
     */
     static MidiMessage createSysExMessage (const void* sysexData,
@@ -853,18 +858,52 @@ public:
     //==============================================================================
     /** Reads a midi variable-length integer.
 
-        @param data             the data to read the number from
-        @param numBytesUsed     on return, this will be set to the number of bytes that were read
+        This signature has been deprecated in favour of the safer
+        readVariableLengthValue.
+
+        The `data` argument indicates the data to read the number from,
+        and `numBytesUsed` is used as an out-parameter to indicate the number
+        of bytes that were read.
     */
-    static int readVariableLengthVal (const uint8* data,
-                                      int& numBytesUsed) noexcept;
+    JUCE_DEPRECATED (static int readVariableLengthVal (const uint8* data,
+                                                       int& numBytesUsed) noexcept);
+
+    /** Holds information about a variable-length value which was parsed
+        from a stream of bytes.
+
+        A valid value requires that `bytesUsed` is greater than 0.
+    */
+    struct VariableLengthValue
+    {
+        VariableLengthValue() = default;
+
+        VariableLengthValue (int valueIn, int bytesUsedIn)
+            : value (valueIn), bytesUsed (bytesUsedIn) {}
+
+        bool isValid() const noexcept  { return bytesUsed > 0; }
+
+        int value = 0;
+        int bytesUsed = 0;
+    };
+
+    /** Reads a midi variable-length integer, with protection against buffer overflow.
+
+        @param data             the data to read the number from
+        @param maxBytesToUse    the number of bytes in the region following `data`
+        @returns                a struct containing the parsed value, and the number
+                                of bytes that were read. If parsing fails, both the
+                                `value` and `bytesUsed` fields will be set to 0 and
+                                `isValid()` will return false
+    */
+    static VariableLengthValue readVariableLengthValue (const uint8* data,
+                                                        int maxBytesToUse) noexcept;
 
     /** Based on the first byte of a short midi message, this uses a lookup table
         to return the message length (either 1, 2, or 3 bytes).
 
         The value passed in must be 0x80 or higher.
     */
-    static int getMessageLengthFromFirstByte (const uint8 firstByte) noexcept;
+    static int getMessageLengthFromFirstByte (uint8 firstByte) noexcept;
 
     //==============================================================================
     /** Returns the name of a midi note number.
@@ -891,50 +930,57 @@ public:
         The frequencyOfA parameter is an optional frequency for 'A', normally 440-444Hz for concert pitch.
         @see getMidiNoteName
     */
-    static double getMidiNoteInHertz (int noteNumber, const double frequencyOfA = 440.0) noexcept;
+    static double getMidiNoteInHertz (int noteNumber, double frequencyOfA = 440.0) noexcept;
 
-    /** Returns the standard name of a GM instrument.
+    /** Returns true if the given midi note number is a black key. */
+    static bool isMidiNoteBlack (int noteNumber) noexcept;
+
+    /** Returns the standard name of a GM instrument, or nullptr if unknown for this index.
 
         @param midiInstrumentNumber     the program number 0 to 127
         @see getProgramChangeNumber
     */
-    static String getGMInstrumentName (int midiInstrumentNumber);
+    static const char* getGMInstrumentName (int midiInstrumentNumber);
 
-    /** Returns the name of a bank of GM instruments.
-
+    /** Returns the name of a bank of GM instruments, or nullptr if unknown for this bank number.
         @param midiBankNumber   the bank, 0 to 15
     */
-    static String getGMInstrumentBankName (int midiBankNumber);
+    static const char* getGMInstrumentBankName (int midiBankNumber);
 
-    /** Returns the standard name of a channel 10 percussion sound.
-
+    /** Returns the standard name of a channel 10 percussion sound, or nullptr if unknown for this note number.
         @param midiNoteNumber   the key number, 35 to 81
     */
-    static String getRhythmInstrumentName (int midiNoteNumber);
+    static const char* getRhythmInstrumentName (int midiNoteNumber);
 
-    /** Returns the name of a controller type number.
-
+    /** Returns the name of a controller type number, or nullptr if unknown for this controller number.
         @see getControllerNumber
     */
-    static String getControllerName (int controllerNumber);
+    static const char* getControllerName (int controllerNumber);
+
+    /** Converts a floating-point value between 0 and 1 to a MIDI 7-bit value between 0 and 127. */
+    static uint8 floatValueToMidiByte (float valueBetween0and1) noexcept;
+
+    /** Converts a pitchbend value in semitones to a MIDI 14-bit pitchwheel position value. */
+    static uint16 pitchbendToPitchwheelPos (float pitchbendInSemitones,
+                                            float pitchbendRangeInSemitones) noexcept;
 
 private:
     //==============================================================================
-    double timeStamp;
-    uint8* data;
-    int size;
-
    #ifndef DOXYGEN
-    union
+    union PackedData
     {
-        uint8 asBytes[4];
-        uint32 asInt32;
-    } preallocatedData;
+        uint8* allocatedData;
+        uint8 asBytes[sizeof (uint8*)];
+    };
+
+    PackedData packedData;
+    double timeStamp = 0;
+    int size;
    #endif
 
-    void freeData() noexcept;
-    void setToUseInternalData() noexcept;
-    bool usesAllocatedData() const noexcept;
+    inline bool isHeapAllocated() const noexcept  { return size > (int) sizeof (packedData); }
+    inline uint8* getData() const noexcept        { return isHeapAllocated() ? packedData.allocatedData : (uint8*) packedData.asBytes; }
+    uint8* allocateSpace (int);
 };
 
-#endif   // __JUCE_MIDIMESSAGE_JUCEHEADER__
+} // namespace juce

@@ -1,29 +1,28 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-//==============================================================================
+namespace juce
+{
+
 StringArray::StringArray() noexcept
 {
 }
@@ -33,54 +32,49 @@ StringArray::StringArray (const StringArray& other)
 {
 }
 
-#if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
 StringArray::StringArray (StringArray&& other) noexcept
-    : strings (static_cast <Array <String>&&> (other.strings))
+    : strings (std::move (other.strings))
 {
 }
-#endif
+
+StringArray::StringArray (Array<String>&& other) noexcept
+    : strings (std::move (other))
+{
+}
 
 StringArray::StringArray (const String& firstValue)
 {
     strings.add (firstValue);
 }
 
-namespace StringArrayHelpers
+StringArray::StringArray (const String* initialStrings, int numberOfStrings)
 {
-    template <typename CharType>
-    void addArray (Array<String>& dest, const CharType* const* strings)
-    {
-        if (strings != nullptr)
-            while (*strings != nullptr)
-                dest.add (*strings++);
-    }
-
-    template <typename CharType>
-    void addArray (Array<String>& dest, const CharType* const* const strings, const int numberOfStrings)
-    {
-        for (int i = 0; i < numberOfStrings; ++i)
-            dest.add (strings [i]);
-    }
+    strings.addArray (initialStrings, numberOfStrings);
 }
 
-StringArray::StringArray (const char* const* const initialStrings)
+StringArray::StringArray (const char* const* initialStrings)
 {
-    StringArrayHelpers::addArray (strings, initialStrings);
+    strings.addNullTerminatedArray (initialStrings);
 }
 
-StringArray::StringArray (const char* const* const initialStrings, const int numberOfStrings)
+StringArray::StringArray (const char* const* initialStrings, int numberOfStrings)
 {
-    StringArrayHelpers::addArray (strings, initialStrings, numberOfStrings);
+    strings.addArray (initialStrings, numberOfStrings);
 }
 
-StringArray::StringArray (const wchar_t* const* const initialStrings)
+StringArray::StringArray (const wchar_t* const* initialStrings)
 {
-    StringArrayHelpers::addArray (strings, initialStrings);
+    strings.addNullTerminatedArray (initialStrings);
 }
 
-StringArray::StringArray (const wchar_t* const* const initialStrings, const int numberOfStrings)
+StringArray::StringArray (const wchar_t* const* initialStrings, int numberOfStrings)
 {
-    StringArrayHelpers::addArray (strings, initialStrings, numberOfStrings);
+    strings.addArray (initialStrings, numberOfStrings);
+}
+
+StringArray::StringArray (const std::initializer_list<const char*>& stringList)
+{
+    strings.addArray (stringList);
 }
 
 StringArray& StringArray::operator= (const StringArray& other)
@@ -89,13 +83,11 @@ StringArray& StringArray::operator= (const StringArray& other)
     return *this;
 }
 
-#if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
 StringArray& StringArray::operator= (StringArray&& other) noexcept
 {
-    strings = static_cast <Array<String>&&> (other.strings);
+    strings = std::move (other.strings);
     return *this;
 }
-#endif
 
 StringArray::~StringArray()
 {
@@ -103,14 +95,7 @@ StringArray::~StringArray()
 
 bool StringArray::operator== (const StringArray& other) const noexcept
 {
-    if (other.size() != size())
-        return false;
-
-    for (int i = size(); --i >= 0;)
-        if (other.strings.getReference(i) != strings.getReference(i))
-            return false;
-
-    return true;
+    return strings == other.strings;
 }
 
 bool StringArray::operator!= (const StringArray& other) const noexcept
@@ -120,7 +105,7 @@ bool StringArray::operator!= (const StringArray& other) const noexcept
 
 void StringArray::swapWith (StringArray& other) noexcept
 {
-    strings.swapWithArray (other.strings);
+    strings.swapWith (other.strings);
 }
 
 void StringArray::clear()
@@ -128,38 +113,57 @@ void StringArray::clear()
     strings.clear();
 }
 
-const String& StringArray::operator[] (const int index) const noexcept
+void StringArray::clearQuick()
+{
+    strings.clearQuick();
+}
+
+const String& StringArray::operator[] (int index) const noexcept
 {
     if (isPositiveAndBelow (index, strings.size()))
         return strings.getReference (index);
 
-    return String::empty;
+    static String empty;
+    return empty;
 }
 
-String& StringArray::getReference (const int index) noexcept
+String& StringArray::getReference (int index) noexcept
 {
-    jassert (isPositiveAndBelow (index, strings.size()));
     return strings.getReference (index);
 }
 
-void StringArray::add (const String& newString)
+const String& StringArray::getReference (int index) const noexcept
 {
-    strings.add (newString);
+    return strings.getReference (index);
 }
 
-void StringArray::insert (const int index, const String& newString)
+void StringArray::add (String newString)
 {
-    strings.insert (index, newString);
+    // NB: the local temp copy is to avoid a dangling pointer if the
+    // argument being passed-in is a reference into this array.
+    strings.add (std::move (newString));
 }
 
-void StringArray::addIfNotAlreadyThere (const String& newString, const bool ignoreCase)
+void StringArray::insert (int index, String newString)
 {
-    if (! contains (newString, ignoreCase))
-        add (newString);
+    // NB: the local temp copy is to avoid a dangling pointer if the
+    // argument being passed-in is a reference into this array.
+    strings.insert (index, std::move (newString));
+}
+
+bool StringArray::addIfNotAlreadyThere (const String& newString, bool ignoreCase)
+{
+    if (contains (newString, ignoreCase))
+        return false;
+
+    add (newString);
+    return true;
 }
 
 void StringArray::addArray (const StringArray& otherArray, int startIndex, int numElementsToAdd)
 {
+    jassert (this != &otherArray); // can't add from our own elements!
+
     if (startIndex < 0)
     {
         jassertfalse;
@@ -173,68 +177,59 @@ void StringArray::addArray (const StringArray& otherArray, int startIndex, int n
         strings.add (otherArray.strings.getReference (startIndex++));
 }
 
-void StringArray::set (const int index, const String& newString)
+void StringArray::mergeArray (const StringArray& otherArray, bool ignoreCase)
 {
-    strings.set (index, newString);
+    jassert (this != &otherArray); // can't add from our own elements!
+
+    for (auto& s : otherArray)
+        addIfNotAlreadyThere (s, ignoreCase);
 }
 
-bool StringArray::contains (const String& stringToLookFor, const bool ignoreCase) const
+void StringArray::set (int index, String newString)
 {
-    if (ignoreCase)
-    {
-        for (int i = size(); --i >= 0;)
-            if (strings.getReference(i).equalsIgnoreCase (stringToLookFor))
-                return true;
-    }
-    else
-    {
-        for (int i = size(); --i >= 0;)
-            if (stringToLookFor == strings.getReference(i))
-                return true;
-    }
-
-    return false;
+    strings.set (index, std::move (newString));
 }
 
-int StringArray::indexOf (const String& stringToLookFor, const bool ignoreCase, int i) const
+bool StringArray::contains (StringRef stringToLookFor, bool ignoreCase) const
+{
+    return indexOf (stringToLookFor, ignoreCase) >= 0;
+}
+
+int StringArray::indexOf (StringRef stringToLookFor, bool ignoreCase, int i) const
 {
     if (i < 0)
         i = 0;
 
-    const int numElements = size();
+    auto numElements = size();
 
     if (ignoreCase)
     {
-        while (i < numElements)
-        {
+        for (; i < numElements; ++i)
             if (strings.getReference(i).equalsIgnoreCase (stringToLookFor))
                 return i;
-
-            ++i;
-        }
     }
     else
     {
-        while (i < numElements)
-        {
+        for (; i < numElements; ++i)
             if (stringToLookFor == strings.getReference (i))
                 return i;
-
-            ++i;
-        }
     }
 
     return -1;
 }
 
+void StringArray::move (int currentIndex, int newIndex) noexcept
+{
+    strings.move (currentIndex, newIndex);
+}
+
 //==============================================================================
-void StringArray::remove (const int index)
+void StringArray::remove (int index)
 {
     strings.remove (index);
 }
 
-void StringArray::removeString (const String& stringToRemove,
-                                const bool ignoreCase)
+void StringArray::removeString (StringRef stringToRemove, bool ignoreCase)
 {
     if (ignoreCase)
     {
@@ -256,7 +251,7 @@ void StringArray::removeRange (int startIndex, int numberToRemove)
 }
 
 //==============================================================================
-void StringArray::removeEmptyStrings (const bool removeWhitespaceStrings)
+void StringArray::removeEmptyStrings (bool removeWhitespaceStrings)
 {
     if (removeWhitespaceStrings)
     {
@@ -274,61 +269,43 @@ void StringArray::removeEmptyStrings (const bool removeWhitespaceStrings)
 
 void StringArray::trim()
 {
-    for (int i = size(); --i >= 0;)
-    {
-        String& s = strings.getReference(i);
+    for (auto& s : strings)
         s = s.trim();
-    }
 }
 
 //==============================================================================
-struct InternalStringArrayComparator_CaseSensitive
-{
-    static int compareElements (String& first, String& second)      { return first.compare (second); }
-};
-
-struct InternalStringArrayComparator_CaseInsensitive
-{
-    static int compareElements (String& first, String& second)      { return first.compareIgnoreCase (second); }
-};
-
-void StringArray::sort (const bool ignoreCase)
+void StringArray::sort (bool ignoreCase)
 {
     if (ignoreCase)
-    {
-        InternalStringArrayComparator_CaseInsensitive comp;
-        strings.sort (comp);
-    }
+        std::sort (strings.begin(), strings.end(),
+                   [] (const String& a, const String& b) { return a.compareIgnoreCase (b) < 0; });
     else
-    {
-        InternalStringArrayComparator_CaseSensitive comp;
-        strings.sort (comp);
-    }
+        std::sort (strings.begin(), strings.end());
 }
 
-void StringArray::move (const int currentIndex, int newIndex) noexcept
+void StringArray::sortNatural()
 {
-    strings.move (currentIndex, newIndex);
+    std::sort (strings.begin(), strings.end(),
+               [] (const String& a, const String& b) { return a.compareNatural (b) < 0; });
 }
-
 
 //==============================================================================
-String StringArray::joinIntoString (const String& separator, int start, int numberToJoin) const
+String StringArray::joinIntoString (StringRef separator, int start, int numberToJoin) const
 {
-    const int last = (numberToJoin < 0) ? size()
-                                        : jmin (size(), start + numberToJoin);
+    auto last = (numberToJoin < 0) ? size()
+                                   : jmin (size(), start + numberToJoin);
 
     if (start < 0)
         start = 0;
 
     if (start >= last)
-        return String::empty;
+        return {};
 
     if (start == last - 1)
         return strings.getReference (start);
 
-    const size_t separatorBytes = separator.getCharPointer().sizeInBytes() - sizeof (String::CharPointerType::CharType);
-    size_t bytesNeeded = separatorBytes * (size_t) (last - start - 1);
+    auto separatorBytes = separator.text.sizeInBytes() - sizeof (String::CharPointerType::CharType);
+    auto bytesNeeded = (size_t) (last - start - 1) * separatorBytes;
 
     for (int i = start; i < last; ++i)
         bytesNeeded += strings.getReference(i).getCharPointer().sizeInBytes() - sizeof (String::CharPointerType::CharType);
@@ -336,41 +313,39 @@ String StringArray::joinIntoString (const String& separator, int start, int numb
     String result;
     result.preallocateBytes (bytesNeeded);
 
-    String::CharPointerType dest (result.getCharPointer());
+    auto dest = result.getCharPointer();
 
     while (start < last)
     {
-        const String& s = strings.getReference (start);
+        auto& s = strings.getReference (start);
 
         if (! s.isEmpty())
             dest.writeAll (s.getCharPointer());
 
         if (++start < last && separatorBytes > 0)
-            dest.writeAll (separator.getCharPointer());
+            dest.writeAll (separator.text);
     }
 
     dest.writeNull();
-
     return result;
 }
 
-int StringArray::addTokens (const String& text, const bool preserveQuotedStrings)
+int StringArray::addTokens (StringRef text, const bool preserveQuotedStrings)
 {
     return addTokens (text, " \n\r\t", preserveQuotedStrings ? "\"" : "");
 }
 
-int StringArray::addTokens (const String& text, const String& breakCharacters, const String& quoteCharacters)
+int StringArray::addTokens (StringRef text, StringRef breakCharacters, StringRef quoteCharacters)
 {
     int num = 0;
-    String::CharPointerType t (text.getCharPointer());
 
-    if (! t.isEmpty())
+    if (text.isNotEmpty())
     {
-        for (;;)
+        for (auto t = text.text;;)
         {
-            String::CharPointerType tokenEnd (CharacterFunctions::findEndOfToken (t,
-                                                                                  breakCharacters.getCharPointer(),
-                                                                                  quoteCharacters.getCharPointer()));
+            auto tokenEnd = CharacterFunctions::findEndOfToken (t,
+                                                                breakCharacters.text,
+                                                                quoteCharacters.text);
             strings.add (String (t, tokenEnd));
             ++num;
 
@@ -384,17 +359,17 @@ int StringArray::addTokens (const String& text, const String& breakCharacters, c
     return num;
 }
 
-int StringArray::addLines (const String& sourceText)
+int StringArray::addLines (StringRef sourceText)
 {
     int numLines = 0;
-    String::CharPointerType text (sourceText.getCharPointer());
+    auto text = sourceText.text;
     bool finished = text.isEmpty();
 
     while (! finished)
     {
-        for (String::CharPointerType startOfLine (text);;)
+        for (auto startOfLine = text;;)
         {
-            const String::CharPointerType endOfLine (text);
+            auto endOfLine = text;
 
             switch (text.getAndAdvance())
             {
@@ -413,16 +388,37 @@ int StringArray::addLines (const String& sourceText)
     return numLines;
 }
 
+StringArray StringArray::fromTokens (StringRef stringToTokenise, bool preserveQuotedStrings)
+{
+    StringArray s;
+    s.addTokens (stringToTokenise, preserveQuotedStrings);
+    return s;
+}
+
+StringArray StringArray::fromTokens (StringRef stringToTokenise,
+                                     StringRef breakCharacters,
+                                     StringRef quoteCharacters)
+{
+    StringArray s;
+    s.addTokens (stringToTokenise, breakCharacters, quoteCharacters);
+    return s;
+}
+
+StringArray StringArray::fromLines (StringRef stringToBreakUp)
+{
+    StringArray s;
+    s.addLines (stringToBreakUp);
+    return s;
+}
+
 //==============================================================================
-void StringArray::removeDuplicates (const bool ignoreCase)
+void StringArray::removeDuplicates (bool ignoreCase)
 {
     for (int i = 0; i < size() - 1; ++i)
     {
-        const String s (strings.getReference(i));
+        auto s = strings.getReference(i);
 
-        int nextIndex = i + 1;
-
-        for (;;)
+        for (int nextIndex = i + 1;;)
         {
             nextIndex = indexOf (s, ignoreCase, nextIndex);
 
@@ -434,29 +430,25 @@ void StringArray::removeDuplicates (const bool ignoreCase)
     }
 }
 
-void StringArray::appendNumbersToDuplicates (const bool ignoreCase,
-                                             const bool appendNumberToFirstInstance,
+void StringArray::appendNumbersToDuplicates (bool ignoreCase,
+                                             bool appendNumberToFirstInstance,
                                              CharPointer_UTF8 preNumberString,
                                              CharPointer_UTF8 postNumberString)
 {
-    CharPointer_UTF8 defaultPre (" ("), defaultPost (")");
-
     if (preNumberString.getAddress() == nullptr)
-        preNumberString = defaultPre;
+        preNumberString = CharPointer_UTF8 (" (");
 
     if (postNumberString.getAddress() == nullptr)
-        postNumberString = defaultPost;
+        postNumberString = CharPointer_UTF8 (")");
 
     for (int i = 0; i < size() - 1; ++i)
     {
-        String& s = strings.getReference(i);
-
-        int nextIndex = indexOf (s, ignoreCase, i + 1);
+        auto& s = strings.getReference(i);
+        auto nextIndex = indexOf (s, ignoreCase, i + 1);
 
         if (nextIndex >= 0)
         {
-            const String original (s);
-
+            auto original = s;
             int number = 0;
 
             if (appendNumberToFirstInstance)
@@ -473,7 +465,14 @@ void StringArray::appendNumbersToDuplicates (const bool ignoreCase,
     }
 }
 
+void StringArray::ensureStorageAllocated (int minNumElements)
+{
+    strings.ensureStorageAllocated (minNumElements);
+}
+
 void StringArray::minimiseStorageOverheads()
 {
     strings.minimiseStorageOverheads();
 }
+
+} // namespace juce

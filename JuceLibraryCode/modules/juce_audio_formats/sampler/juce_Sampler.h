@@ -1,31 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_SAMPLER_JUCEHEADER__
-#define __JUCE_SAMPLER_JUCEHEADER__
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -38,6 +37,8 @@
     give it some SampledSound objects to play.
 
     @see SamplerVoice, Synthesiser, SynthesiserSound
+
+    @tags{Audio}
 */
 class JUCE_API  SamplerSound    : public SynthesiserSound
 {
@@ -70,33 +71,36 @@ public:
                   double maxSampleLengthSeconds);
 
     /** Destructor. */
-    ~SamplerSound();
+    ~SamplerSound() override;
 
     //==============================================================================
     /** Returns the sample's name */
-    const String& getName() const                           { return name; }
+    const String& getName() const noexcept                  { return name; }
 
     /** Returns the audio sample data.
-        This could be 0 if there was a problem loading it.
+        This could return nullptr if there was a problem loading the data.
     */
-    AudioSampleBuffer* getAudioData() const                 { return data; }
-
+    AudioBuffer<float>* getAudioData() const noexcept       { return data.get(); }
 
     //==============================================================================
-    bool appliesToNote (const int midiNoteNumber);
-    bool appliesToChannel (const int midiChannel);
+    /** Changes the parameters of the ADSR envelope which will be applied to the sample. */
+    void setEnvelopeParameters (ADSR::Parameters parametersToUse)    { params = parametersToUse; }
 
+    //==============================================================================
+    bool appliesToNote (int midiNoteNumber) override;
+    bool appliesToChannel (int midiChannel) override;
 
 private:
     //==============================================================================
     friend class SamplerVoice;
 
     String name;
-    ScopedPointer <AudioSampleBuffer> data;
+    std::unique_ptr<AudioBuffer<float>> data;
     double sourceSampleRate;
     BigInteger midiNotes;
-    int length, attackSamples, releaseSamples;
-    int midiRootNote;
+    int length = 0, midiRootNote = 0;
+
+    ADSR::Parameters params;
 
     JUCE_LEAK_DETECTOR (SamplerSound)
 };
@@ -110,45 +114,40 @@ private:
     give it some SampledSound objects to play.
 
     @see SamplerSound, Synthesiser, SynthesiserVoice
+
+    @tags{Audio}
 */
 class JUCE_API  SamplerVoice    : public SynthesiserVoice
 {
 public:
     //==============================================================================
-    /** Creates a SamplerVoice.
-    */
+    /** Creates a SamplerVoice. */
     SamplerVoice();
 
     /** Destructor. */
-    ~SamplerVoice();
-
+    ~SamplerVoice() override;
 
     //==============================================================================
-    bool canPlaySound (SynthesiserSound* sound);
+    bool canPlaySound (SynthesiserSound*) override;
 
-    void startNote (const int midiNoteNumber,
-                    const float velocity,
-                    SynthesiserSound* sound,
-                    const int currentPitchWheelPosition);
+    void startNote (int midiNoteNumber, float velocity, SynthesiserSound*, int pitchWheel) override;
+    void stopNote (float velocity, bool allowTailOff) override;
 
-    void stopNote (const bool allowTailOff);
+    void pitchWheelMoved (int newValue) override;
+    void controllerMoved (int controllerNumber, int newValue) override;
 
-    void pitchWheelMoved (const int newValue);
-    void controllerMoved (const int controllerNumber,
-                          const int newValue);
-
-    void renderNextBlock (AudioSampleBuffer& outputBuffer, int startSample, int numSamples);
-
+    void renderNextBlock (AudioBuffer<float>&, int startSample, int numSamples) override;
+    using SynthesiserVoice::renderNextBlock;
 
 private:
     //==============================================================================
-    double pitchRatio;
-    double sourceSamplePosition;
-    float lgain, rgain, attackReleaseLevel, attackDelta, releaseDelta;
-    bool isInAttack, isInRelease;
+    double pitchRatio = 0;
+    double sourceSamplePosition = 0;
+    float lgain = 0, rgain = 0;
+
+    ADSR adsr;
 
     JUCE_LEAK_DETECTOR (SamplerVoice)
 };
 
-
-#endif   // __JUCE_SAMPLER_JUCEHEADER__
+} // namespace juce

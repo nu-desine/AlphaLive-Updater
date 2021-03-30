@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_BUFFERINGAUDIOSOURCE_JUCEHEADER__
-#define __JUCE_BUFFERINGAUDIOSOURCE_JUCEHEADER__
-
-#include "juce_PositionableAudioSource.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -38,6 +32,8 @@
     directly, or use it indirectly using an AudioTransportSource.
 
     @see PositionableAudioSource, AudioTransportSource
+
+    @tags{Audio}
 */
 class JUCE_API  BufferingAudioSource  : public PositionableAudioSource,
                                         private TimeSliceClient
@@ -46,69 +42,78 @@ public:
     //==============================================================================
     /** Creates a BufferingAudioSource.
 
-        @param source                   the input source to read from
-        @param backgroundThread         a background thread that will be used for the
-                                        background read-ahead. This object must not be deleted
-                                        until after any BufferedAudioSources that are using it
-                                        have been deleted!
-        @param deleteSourceWhenDeleted  if true, then the input source object will
-                                        be deleted when this object is deleted
-        @param numberOfSamplesToBuffer  the size of buffer to use for reading ahead
-        @param numberOfChannels         the number of channels that will be played
+        @param source                       the input source to read from
+        @param backgroundThread             a background thread that will be used for the
+                                            background read-ahead. This object must not be deleted
+                                            until after any BufferingAudioSources that are using it
+                                            have been deleted!
+        @param deleteSourceWhenDeleted      if true, then the input source object will
+                                            be deleted when this object is deleted
+        @param numberOfSamplesToBuffer      the size of buffer to use for reading ahead
+        @param numberOfChannels             the number of channels that will be played
+        @param prefillBufferOnPrepareToPlay if true, then calling prepareToPlay on this object will
+                                            block until the buffer has been filled
     */
     BufferingAudioSource (PositionableAudioSource* source,
                           TimeSliceThread& backgroundThread,
                           bool deleteSourceWhenDeleted,
                           int numberOfSamplesToBuffer,
-                          int numberOfChannels = 2);
+                          int numberOfChannels = 2,
+                          bool prefillBufferOnPrepareToPlay = true);
 
     /** Destructor.
 
         The input source may be deleted depending on whether the deleteSourceWhenDeleted
         flag was set in the constructor.
     */
-    ~BufferingAudioSource();
+    ~BufferingAudioSource() override;
 
     //==============================================================================
     /** Implementation of the AudioSource method. */
-    void prepareToPlay (int samplesPerBlockExpected, double sampleRate);
+    void prepareToPlay (int samplesPerBlockExpected, double sampleRate) override;
 
     /** Implementation of the AudioSource method. */
-    void releaseResources();
+    void releaseResources() override;
 
     /** Implementation of the AudioSource method. */
-    void getNextAudioBlock (const AudioSourceChannelInfo& bufferToFill);
+    void getNextAudioBlock (const AudioSourceChannelInfo&) override;
 
     //==============================================================================
     /** Implements the PositionableAudioSource method. */
-    void setNextReadPosition (int64 newPosition);
+    void setNextReadPosition (int64 newPosition) override;
 
     /** Implements the PositionableAudioSource method. */
-    int64 getNextReadPosition() const;
+    int64 getNextReadPosition() const override;
 
     /** Implements the PositionableAudioSource method. */
-    int64 getTotalLength() const                { return source->getTotalLength(); }
+    int64 getTotalLength() const override       { return source->getTotalLength(); }
 
     /** Implements the PositionableAudioSource method. */
-    bool isLooping() const                      { return source->isLooping(); }
+    bool isLooping() const override             { return source->isLooping(); }
+
+    /** A useful function to block until the next the buffer info can be filled.
+
+        This is useful for offline rendering.
+    */
+    bool waitForNextAudioBlockReady (const AudioSourceChannelInfo& info, const uint32 timeout);
 
 private:
     //==============================================================================
     OptionalScopedPointer<PositionableAudioSource> source;
     TimeSliceThread& backgroundThread;
     int numberOfSamplesToBuffer, numberOfChannels;
-    AudioSampleBuffer buffer;
+    AudioBuffer<float> buffer;
     CriticalSection bufferStartPosLock;
-    int64 volatile bufferValidStart, bufferValidEnd, nextPlayPos;
-    double volatile sampleRate;
-    bool wasSourceLooping, isPrepared;
+    WaitableEvent bufferReadyEvent;
+    std::atomic<int64> bufferValidStart { 0 }, bufferValidEnd { 0 }, nextPlayPos { 0 };
+    double sampleRate = 0;
+    bool wasSourceLooping = false, isPrepared = false, prefillBuffer;
 
     bool readNextBufferChunk();
     void readBufferSection (int64 start, int length, int bufferOffset);
-    int useTimeSlice();
+    int useTimeSlice() override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BufferingAudioSource)
 };
 
-
-#endif   // __JUCE_BUFFERINGAUDIOSOURCE_JUCEHEADER__
+} // namespace juce

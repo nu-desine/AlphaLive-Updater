@@ -1,40 +1,38 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_DRAWABLETEXT_JUCEHEADER__
-#define __JUCE_DRAWABLETEXT_JUCEHEADER__
-
-#include "juce_Drawable.h"
-#include "../positioning/juce_RelativeParallelogram.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     A drawable object which renders a line of text.
 
     @see Drawable
+
+    @tags{GUI}
 */
 class JUCE_API  DrawableText  : public Drawable
 {
@@ -42,10 +40,10 @@ public:
     //==============================================================================
     /** Creates a DrawableText object. */
     DrawableText();
-    DrawableText (const DrawableText& other);
+    DrawableText (const DrawableText&);
 
     /** Destructor. */
-    ~DrawableText();
+    ~DrawableText() override;
 
     //==============================================================================
     /** Sets the text to display.*/
@@ -55,14 +53,14 @@ public:
     const String& getText() const noexcept                              { return text;}
 
     /** Sets the colour of the text. */
-    void setColour (const Colour& newColour);
+    void setColour (Colour newColour);
 
     /** Returns the current text colour. */
-    const Colour& getColour() const noexcept                            { return colour; }
+    Colour getColour() const noexcept                                   { return colour; }
 
     /** Sets the font to use.
-        Note that the font height and horizontal scale are set as RelativeCoordinates using
-        setFontHeight and setFontHorizontalScale. If applySizeAndScale is true, then these height
+        Note that the font height and horizontal scale are set using setFontHeight() and
+        setFontHorizontalScale(). If applySizeAndScale is true, then these height
         and scale values will be changed to match the dimensions of the font supplied;
         if it is false, then the new font object's height and scale are ignored.
     */
@@ -72,89 +70,50 @@ public:
     const Font& getFont() const noexcept                                { return font; }
 
     /** Changes the justification of the text within the bounding box. */
-    void setJustification (const Justification& newJustification);
+    void setJustification (Justification newJustification);
 
     /** Returns the current justification. */
-    const Justification& getJustification() const noexcept              { return justification; }
+    Justification getJustification() const noexcept                     { return justification; }
 
     /** Returns the parallelogram that defines the text bounding box. */
-    const RelativeParallelogram& getBoundingBox() const noexcept        { return bounds; }
+    Parallelogram<float> getBoundingBox() const noexcept                { return bounds; }
 
     /** Sets the bounding box that contains the text. */
-    void setBoundingBox (const RelativeParallelogram& newBounds);
+    void setBoundingBox (Parallelogram<float> newBounds);
 
-    const RelativeCoordinate& getFontHeight() const                     { return fontHeight; }
-    void setFontHeight (const RelativeCoordinate& newHeight);
+    float getFontHeight() const noexcept                                { return fontHeight; }
+    void setFontHeight (float newHeight);
 
-    const RelativeCoordinate& getFontHorizontalScale() const            { return fontHScale; }
-    void setFontHorizontalScale (const RelativeCoordinate& newScale);
-
-    //==============================================================================
-    /** @internal */
-    void paint (Graphics& g);
-    /** @internal */
-    Drawable* createCopy() const;
-    /** @internal */
-    void refreshFromValueTree (const ValueTree& tree, ComponentBuilder& builder);
-    /** @internal */
-    ValueTree createValueTree (ComponentBuilder::ImageProvider* imageProvider) const;
-    /** @internal */
-    static const Identifier valueTreeType;
-    /** @internal */
-    Rectangle<float> getDrawableBounds() const;
+    float getFontHorizontalScale() const noexcept                       { return fontHScale; }
+    void setFontHorizontalScale (float newScale);
 
     //==============================================================================
-    /** Internally-used class for wrapping a DrawableText's state into a ValueTree. */
-    class ValueTreeWrapper   : public Drawable::ValueTreeWrapperBase
-    {
-    public:
-        ValueTreeWrapper (const ValueTree& state);
-
-        String getText() const;
-        void setText (const String& newText, UndoManager* undoManager);
-        Value getTextValue (UndoManager* undoManager);
-
-        Colour getColour() const;
-        void setColour (const Colour& newColour, UndoManager* undoManager);
-
-        Justification getJustification() const;
-        void setJustification (const Justification& newJustification, UndoManager* undoManager);
-
-        Font getFont() const;
-        void setFont (const Font& newFont, UndoManager* undoManager);
-        Value getFontValue (UndoManager* undoManager);
-
-        RelativeParallelogram getBoundingBox() const;
-        void setBoundingBox (const RelativeParallelogram& newBounds, UndoManager* undoManager);
-
-        RelativeCoordinate getFontHeight() const;
-        void setFontHeight (const RelativeCoordinate& newHeight, UndoManager* undoManager);
-
-        RelativeCoordinate getFontHorizontalScale() const;
-        void setFontHorizontalScale (const RelativeCoordinate& newScale, UndoManager* undoManager);
-
-        static const Identifier text, colour, font, justification, topLeft, topRight, bottomLeft, fontHeight, fontHScale;
-    };
+    /** @internal */
+    void paint (Graphics&) override;
+    /** @internal */
+    std::unique_ptr<Drawable> createCopy() const override;
+    /** @internal */
+    Rectangle<float> getDrawableBounds() const override;
+    /** @internal */
+    Path getOutlineAsPath() const override;
+    /** @internal */
+    bool replaceColour (Colour originalColour, Colour replacementColour) override;
 
 private:
     //==============================================================================
-    RelativeParallelogram bounds;
-    RelativeCoordinate fontHeight, fontHScale;
-    Point<float> resolvedPoints[3];
+    Parallelogram<float> bounds;
+    float fontHeight, fontHScale;
     Font font, scaledFont;
     String text;
     Colour colour;
     Justification justification;
 
-    friend class Drawable::Positioner<DrawableText>;
-    bool registerCoordinates (RelativeCoordinatePositionerBase&);
-    void recalculateCoordinates (Expression::Scope*);
     void refreshBounds();
-    const AffineTransform getArrangementAndTransform (GlyphArrangement& glyphs) const;
+    Rectangle<int> getTextArea (float width, float height) const;
+    AffineTransform getTextTransform (float width, float height) const;
 
     DrawableText& operator= (const DrawableText&);
     JUCE_LEAK_DETECTOR (DrawableText)
 };
 
-
-#endif   // __JUCE_DRAWABLETEXT_JUCEHEADER__
+} // namespace juce

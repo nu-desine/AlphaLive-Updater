@@ -1,33 +1,34 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 #if JUCE_DEBUG
 
+//==============================================================================
 struct DanglingStreamChecker
 {
-    DanglingStreamChecker() {}
+    DanglingStreamChecker() = default;
 
     ~DanglingStreamChecker()
     {
@@ -38,12 +39,20 @@ struct DanglingStreamChecker
             nastiness..
         */
         jassert (activeStreams.size() == 0);
+
+        // We need to flag when this helper struct has been destroyed to prevent some
+        // nasty order-of-static-destruction issues
+        hasBeenDestroyed = true;
     }
 
     Array<void*, CriticalSection> activeStreams;
+
+    static bool hasBeenDestroyed;
 };
 
+bool DanglingStreamChecker::hasBeenDestroyed = false;
 static DanglingStreamChecker danglingStreamChecker;
+
 #endif
 
 //==============================================================================
@@ -51,63 +60,68 @@ OutputStream::OutputStream()
     : newLineString (NewLine::getDefault())
 {
    #if JUCE_DEBUG
-    danglingStreamChecker.activeStreams.add (this);
+    if (! DanglingStreamChecker::hasBeenDestroyed)
+        danglingStreamChecker.activeStreams.add (this);
    #endif
 }
 
 OutputStream::~OutputStream()
 {
    #if JUCE_DEBUG
-    danglingStreamChecker.activeStreams.removeFirstMatchingValue (this);
+    if (! DanglingStreamChecker::hasBeenDestroyed)
+        danglingStreamChecker.activeStreams.removeFirstMatchingValue (this);
    #endif
 }
 
 //==============================================================================
-void OutputStream::writeBool (const bool b)
+bool OutputStream::writeBool (bool b)
 {
-    writeByte (b ? (char) 1
-                 : (char) 0);
+    return writeByte (b ? (char) 1
+                        : (char) 0);
 }
 
-void OutputStream::writeByte (char byte)
+bool OutputStream::writeByte (char byte)
 {
-    write (&byte, 1);
+    return write (&byte, 1);
 }
 
-void OutputStream::writeRepeatedByte (uint8 byte, size_t numTimesToRepeat)
+bool OutputStream::writeRepeatedByte (uint8 byte, size_t numTimesToRepeat)
 {
     for (size_t i = 0; i < numTimesToRepeat; ++i)
-        writeByte ((char) byte);
+        if (! writeByte ((char) byte))
+            return false;
+
+    return true;
 }
 
-void OutputStream::writeShort (short value)
+bool OutputStream::writeShort (short value)
 {
-    const unsigned short v = ByteOrder::swapIfBigEndian ((unsigned short) value);
-    write (&v, 2);
+    auto v = ByteOrder::swapIfBigEndian ((uint16) value);
+    return write (&v, 2);
 }
 
-void OutputStream::writeShortBigEndian (short value)
+bool OutputStream::writeShortBigEndian (short value)
 {
-    const unsigned short v = ByteOrder::swapIfLittleEndian ((unsigned short) value);
-    write (&v, 2);
+    auto v = ByteOrder::swapIfLittleEndian ((uint16) value);
+    return write (&v, 2);
 }
 
-void OutputStream::writeInt (int value)
+bool OutputStream::writeInt (int value)
 {
-    const unsigned int v = ByteOrder::swapIfBigEndian ((unsigned int) value);
-    write (&v, 4);
+    auto v = ByteOrder::swapIfBigEndian ((uint32) value);
+    return write (&v, 4);
 }
 
-void OutputStream::writeIntBigEndian (int value)
+bool OutputStream::writeIntBigEndian (int value)
 {
-    const unsigned int v = ByteOrder::swapIfLittleEndian ((unsigned int) value);
-    write (&v, 4);
+    auto v = ByteOrder::swapIfLittleEndian ((uint32) value);
+    return write (&v, 4);
 }
 
-void OutputStream::writeCompressedInt (int value)
+bool OutputStream::writeCompressedInt (int value)
 {
-    unsigned int un = (value < 0) ? (unsigned int) -value
-                                  : (unsigned int) value;
+    auto un = (value < 0) ? (unsigned int) -value
+                          : (unsigned int) value;
 
     uint8 data[5];
     int num = 0;
@@ -123,133 +137,178 @@ void OutputStream::writeCompressedInt (int value)
     if (value < 0)
         data[0] |= 0x80;
 
-    write (data, num + 1);
+    return write (data, (size_t) num + 1);
 }
 
-void OutputStream::writeInt64 (int64 value)
+bool OutputStream::writeInt64 (int64 value)
 {
-    const uint64 v = ByteOrder::swapIfBigEndian ((uint64) value);
-    write (&v, 8);
+    auto v = ByteOrder::swapIfBigEndian ((uint64) value);
+    return write (&v, 8);
 }
 
-void OutputStream::writeInt64BigEndian (int64 value)
+bool OutputStream::writeInt64BigEndian (int64 value)
 {
-    const uint64 v = ByteOrder::swapIfLittleEndian ((uint64) value);
-    write (&v, 8);
+    auto v = ByteOrder::swapIfLittleEndian ((uint64) value);
+    return write (&v, 8);
 }
 
-void OutputStream::writeFloat (float value)
-{
-    union { int asInt; float asFloat; } n;
-    n.asFloat = value;
-    writeInt (n.asInt);
-}
-
-void OutputStream::writeFloatBigEndian (float value)
+bool OutputStream::writeFloat (float value)
 {
     union { int asInt; float asFloat; } n;
     n.asFloat = value;
-    writeIntBigEndian (n.asInt);
+    return writeInt (n.asInt);
 }
 
-void OutputStream::writeDouble (double value)
+bool OutputStream::writeFloatBigEndian (float value)
+{
+    union { int asInt; float asFloat; } n;
+    n.asFloat = value;
+    return writeIntBigEndian (n.asInt);
+}
+
+bool OutputStream::writeDouble (double value)
 {
     union { int64 asInt; double asDouble; } n;
     n.asDouble = value;
-    writeInt64 (n.asInt);
+    return writeInt64 (n.asInt);
 }
 
-void OutputStream::writeDoubleBigEndian (double value)
+bool OutputStream::writeDoubleBigEndian (double value)
 {
     union { int64 asInt; double asDouble; } n;
     n.asDouble = value;
-    writeInt64BigEndian (n.asInt);
+    return writeInt64BigEndian (n.asInt);
 }
 
-void OutputStream::writeString (const String& text)
+bool OutputStream::writeString (const String& text)
 {
+    auto numBytes = text.getNumBytesAsUTF8() + 1;
+
+   #if (JUCE_STRING_UTF_TYPE == 8)
+    return write (text.toRawUTF8(), numBytes);
+   #else
     // (This avoids using toUTF8() to prevent the memory bloat that it would leave behind
     // if lots of large, persistent strings were to be written to streams).
-    const size_t numBytes = text.getNumBytesAsUTF8() + 1;
     HeapBlock<char> temp (numBytes);
     text.copyToUTF8 (temp, numBytes);
-    write (temp, numBytes);
+    return write (temp, numBytes);
+   #endif
 }
 
-void OutputStream::writeText (const String& text, const bool asUTF16,
-                              const bool writeUTF16ByteOrderMark)
+bool OutputStream::writeText (const String& text, bool asUTF16, bool writeUTF16ByteOrderMark, const char* lf)
 {
+    bool replaceLineFeedWithUnix    = lf != nullptr && lf[0] == '\n' && lf[1] == 0;
+    bool replaceLineFeedWithWindows = lf != nullptr && lf[0] == '\r' && lf[1] == '\n' && lf[2] == 0;
+
+    // The line-feed passed in must be either nullptr, or "\n" or "\r\n"
+    jassert (lf == nullptr || replaceLineFeedWithWindows || replaceLineFeedWithUnix);
+
     if (asUTF16)
     {
         if (writeUTF16ByteOrderMark)
             write ("\x0ff\x0fe", 2);
 
-        String::CharPointerType src (text.getCharPointer());
+        auto src = text.getCharPointer();
         bool lastCharWasReturn = false;
 
         for (;;)
         {
-            const juce_wchar c = src.getAndAdvance();
+            auto c = src.getAndAdvance();
 
             if (c == 0)
                 break;
 
-            if (c == '\n' && ! lastCharWasReturn)
-                writeShort ((short) '\r');
+            if (replaceLineFeedWithWindows)
+            {
+                if (c == '\n' && ! lastCharWasReturn)
+                    writeShort ((short) '\r');
 
-            lastCharWasReturn = (c == L'\r');
-            writeShort ((short) c);
+                lastCharWasReturn = (c == L'\r');
+            }
+            else if (replaceLineFeedWithUnix && c == '\r')
+            {
+                continue;
+            }
+
+            if (! writeShort ((short) c))
+                return false;
         }
     }
     else
     {
-        const char* src = text.toUTF8();
-        const char* t = src;
+        const char* src = text.toRawUTF8();
 
-        for (;;)
+        if (replaceLineFeedWithWindows)
         {
-            if (*t == '\n')
+            for (auto t = src;;)
             {
-                if (t > src)
-                    write (src, (int) (t - src));
+                if (*t == '\n')
+                {
+                    if (t > src)
+                        if (! write (src, (size_t) (t - src)))
+                            return false;
 
-                write ("\r\n", 2);
-                src = t + 1;
+                    if (! write ("\r\n", 2))
+                        return false;
+
+                    src = t + 1;
+                }
+                else if (*t == '\r')
+                {
+                    if (t[1] == '\n')
+                        ++t;
+                }
+                else if (*t == 0)
+                {
+                    if (t > src)
+                        if (! write (src, (size_t) (t - src)))
+                            return false;
+
+                    break;
+                }
+
+                ++t;
             }
-            else if (*t == '\r')
+        }
+        else if (replaceLineFeedWithUnix)
+        {
+            for (;;)
             {
-                if (t[1] == '\n')
-                    ++t;
-            }
-            else if (*t == 0)
-            {
-                if (t > src)
-                    write (src, (int) (t - src));
+                auto c = *src++;
 
-                break;
-            }
+                if (c == 0)
+                    break;
 
-            ++t;
+                if (c != '\r')
+                    if (! writeByte (c))
+                        return false;
+            }
+        }
+        else
+        {
+            return write (src, text.getNumBytesAsUTF8());
         }
     }
+
+    return true;
 }
 
-int OutputStream::writeFromInputStream (InputStream& source, int64 numBytesToWrite)
+int64 OutputStream::writeFromInputStream (InputStream& source, int64 numBytesToWrite)
 {
     if (numBytesToWrite < 0)
         numBytesToWrite = std::numeric_limits<int64>::max();
 
-    int numWritten = 0;
+    int64 numWritten = 0;
 
     while (numBytesToWrite > 0)
     {
-        char buffer [8192];
-        const int num = source.read (buffer, (int) jmin (numBytesToWrite, (int64) sizeof (buffer)));
+        char buffer[8192];
+        auto num = source.read (buffer, (int) jmin (numBytesToWrite, (int64) sizeof (buffer)));
 
         if (num <= 0)
             break;
 
-        write (buffer, num);
+        write (buffer, (size_t) num);
 
         numBytesToWrite -= num;
         numWritten += num;
@@ -259,20 +318,31 @@ int OutputStream::writeFromInputStream (InputStream& source, int64 numBytesToWri
 }
 
 //==============================================================================
-void OutputStream::setNewLineString (const String& newLineString_)
+void OutputStream::setNewLineString (const String& newLineStringToUse)
 {
-    newLineString = newLineString_;
+    newLineString = newLineStringToUse;
 }
 
 //==============================================================================
+template <typename IntegerType>
+static void writeIntToStream (OutputStream& stream, IntegerType number)
+{
+    char buffer[NumberToStringConverters::charsNeededForInt];
+    char* end = buffer + numElementsInArray (buffer);
+    const char* start = NumberToStringConverters::numberToString (end, number);
+    stream.write (start, (size_t) (end - start - 1));
+}
+
 JUCE_API OutputStream& JUCE_CALLTYPE operator<< (OutputStream& stream, const int number)
 {
-    return stream << String (number);
+    writeIntToStream (stream, number);
+    return stream;
 }
 
 JUCE_API OutputStream& JUCE_CALLTYPE operator<< (OutputStream& stream, const int64 number)
 {
-    return stream << String (number);
+    writeIntToStream (stream, number);
+    return stream;
 }
 
 JUCE_API OutputStream& JUCE_CALLTYPE operator<< (OutputStream& stream, const double number)
@@ -320,3 +390,5 @@ JUCE_API OutputStream& JUCE_CALLTYPE operator<< (OutputStream& stream, const New
 {
     return stream << stream.getNewLineString();
 }
+
+} // namespace juce

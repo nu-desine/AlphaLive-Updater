@@ -1,34 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_INPUTSTREAM_JUCEHEADER__
-#define __JUCE_INPUTSTREAM_JUCEHEADER__
-
-#include "../text/juce_String.h"
-class MemoryBlock;
-
+namespace juce
+{
 
 //==============================================================================
 /** The base class for streams that read data.
@@ -37,12 +30,14 @@ class MemoryBlock;
     some or all of the virtual functions to implement their behaviour.
 
     @see OutputStream, MemoryInputStream, BufferedInputStream, FileInputStream
+
+    @tags{Core}
 */
 class JUCE_API  InputStream
 {
 public:
     /** Destructor. */
-    virtual ~InputStream()  {}
+    virtual ~InputStream() = default;
 
     //==============================================================================
     /** Returns the total number of bytes available for reading in this stream.
@@ -82,42 +77,31 @@ public:
     */
     virtual int read (void* destBuffer, int maxBytesToRead) = 0;
 
+    ssize_t read (void* destBuffer, size_t maxBytesToRead);
+
     /** Reads a byte from the stream.
-
         If the stream is exhausted, this will return zero.
-
         @see OutputStream::writeByte
     */
     virtual char readByte();
 
     /** Reads a boolean from the stream.
-
-        The bool is encoded as a single byte - 1 for true, 0 for false.
-
+        The bool is encoded as a single byte - non-zero for true, 0 for false.
         If the stream is exhausted, this will return false.
-
         @see OutputStream::writeBool
     */
     virtual bool readBool();
 
     /** Reads two bytes from the stream as a little-endian 16-bit value.
-
-        If the next two bytes read are byte1 and byte2, this returns
-        (byte1 | (byte2 << 8)).
-
+        If the next two bytes read are byte1 and byte2, this returns (byte1 | (byte2 << 8)).
         If the stream is exhausted partway through reading the bytes, this will return zero.
-
         @see OutputStream::writeShort, readShortBigEndian
     */
     virtual short readShort();
 
     /** Reads two bytes from the stream as a little-endian 16-bit value.
-
-        If the next two bytes read are byte1 and byte2, this returns
-        (byte2 | (byte1 << 8)).
-
+        If the next two bytes read are byte1 and byte2, this returns (byte2 | (byte1 << 8)).
         If the stream is exhausted partway through reading the bytes, this will return zero.
-
         @see OutputStream::writeShortBigEndian, readShort
     */
     virtual short readShortBigEndian();
@@ -167,51 +151,36 @@ public:
     virtual int64 readInt64BigEndian();
 
     /** Reads four bytes as a 32-bit floating point value.
-
         The raw 32-bit encoding of the float is read from the stream as a little-endian int.
-
         If the stream is exhausted partway through reading the bytes, this will return zero.
-
         @see OutputStream::writeFloat, readDouble
     */
     virtual float readFloat();
 
     /** Reads four bytes as a 32-bit floating point value.
-
         The raw 32-bit encoding of the float is read from the stream as a big-endian int.
-
         If the stream is exhausted partway through reading the bytes, this will return zero.
-
         @see OutputStream::writeFloatBigEndian, readDoubleBigEndian
     */
     virtual float readFloatBigEndian();
 
     /** Reads eight bytes as a 64-bit floating point value.
-
         The raw 64-bit encoding of the double is read from the stream as a little-endian int64.
-
         If the stream is exhausted partway through reading the bytes, this will return zero.
-
         @see OutputStream::writeDouble, readFloat
     */
     virtual double readDouble();
 
     /** Reads eight bytes as a 64-bit floating point value.
-
         The raw 64-bit encoding of the double is read from the stream as a big-endian int64.
-
         If the stream is exhausted partway through reading the bytes, this will return zero.
-
         @see OutputStream::writeDoubleBigEndian, readFloatBigEndian
     */
     virtual double readDoubleBigEndian();
 
     /** Reads an encoded 32-bit number from the stream using a space-saving compressed format.
-
         For small values, this is more space-efficient than using readInt() and OutputStream::writeInt()
-
         The format used is: number of significant bytes + up to 4 bytes in little-endian order.
-
         @see OutputStream::writeCompressedInt()
     */
     virtual int readCompressedInt();
@@ -239,7 +208,7 @@ public:
     /** Tries to read the whole stream and turn it into a string.
 
         This will read from the stream's current position until the end-of-stream.
-        It can read from either UTF-16 or UTF-8 formats.
+        It can read from UTF-8 data, or UTF-16 if it detects suitable header-bytes.
     */
     virtual String readEntireStreamAsString();
 
@@ -251,12 +220,11 @@ public:
                                     will be read until the stream is exhausted.
         @returns the number of bytes that were added to the memory block
     */
-    virtual int readIntoMemoryBlock (MemoryBlock& destBlock,
-                                     ssize_t maxNumBytesToRead = -1);
+    virtual size_t readIntoMemoryBlock (MemoryBlock& destBlock,
+                                        ssize_t maxNumBytesToRead = -1);
 
     //==============================================================================
     /** Returns the offset of the next byte that will be read from the stream.
-
         @see setPosition
     */
     virtual int64 getPosition() = 0;
@@ -277,19 +245,20 @@ public:
 
     /** Reads and discards a number of bytes from the stream.
 
-        Some input streams might implement this efficiently, but the base
+        Some input streams might implement this more efficiently, but the base
         class will just keep reading data until the requisite number of bytes
-        have been done.
+        have been done. For large skips it may be quicker to call setPosition()
+        with the required position.
     */
     virtual void skipNextBytes (int64 numBytesToSkip);
 
 
 protected:
     //==============================================================================
-    InputStream() noexcept {}
+    InputStream() = default;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (InputStream)
 };
 
-#endif   // __JUCE_INPUTSTREAM_JUCEHEADER__
+} // namespace juce

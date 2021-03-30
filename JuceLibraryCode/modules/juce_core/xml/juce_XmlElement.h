@@ -1,91 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_XMLELEMENT_JUCEHEADER__
-#define __JUCE_XMLELEMENT_JUCEHEADER__
-
-#include "../text/juce_String.h"
-#include "../streams/juce_OutputStream.h"
-#include "../files/juce_File.h"
-#include "../containers/juce_LinkedListPointer.h"
-
-
-//==============================================================================
-/** A handy macro to make it easy to iterate all the child elements in an XmlElement.
-
-    The parentXmlElement should be a reference to the parent XML, and the childElementVariableName
-    will be the name of a pointer to each child element.
-
-    E.g. @code
-    XmlElement* myParentXml = createSomeKindOfXmlDocument();
-
-    forEachXmlChildElement (*myParentXml, child)
-    {
-        if (child->hasTagName ("FOO"))
-            doSomethingWithXmlElement (child);
-    }
-
-    @endcode
-
-    @see forEachXmlChildElementWithTagName
-*/
-#define forEachXmlChildElement(parentXmlElement, childElementVariableName) \
-\
-    for (juce::XmlElement* childElementVariableName = (parentXmlElement).getFirstChildElement(); \
-         childElementVariableName != nullptr; \
-         childElementVariableName = childElementVariableName->getNextElement())
-
-/** A macro that makes it easy to iterate all the child elements of an XmlElement
-    which have a specified tag.
-
-    This does the same job as the forEachXmlChildElement macro, but only for those
-    elements that have a particular tag name.
-
-    The parentXmlElement should be a reference to the parent XML, and the childElementVariableName
-    will be the name of a pointer to each child element. The requiredTagName is the
-    tag name to match.
-
-    E.g. @code
-    XmlElement* myParentXml = createSomeKindOfXmlDocument();
-
-    forEachXmlChildElementWithTagName (*myParentXml, child, "MYTAG")
-    {
-        // the child object is now guaranteed to be a <MYTAG> element..
-        doSomethingWithMYTAGElement (child);
-    }
-
-    @endcode
-
-    @see forEachXmlChildElement
-*/
-#define forEachXmlChildElementWithTagName(parentXmlElement, childElementVariableName, requiredTagName) \
-\
-    for (juce::XmlElement* childElementVariableName = (parentXmlElement).getChildByName (requiredTagName); \
-         childElementVariableName != nullptr; \
-         childElementVariableName = childElementVariableName->getNextElementWithTagName (requiredTagName))
-
+namespace juce
+{
 
 //==============================================================================
 /** Used to build a tree of elements representing an XML document.
@@ -135,37 +71,52 @@
         animalsList.addChildElement (giraffe);
     }
 
-    // now we can turn the whole thing into a text document..
-    String myXmlDoc = animalsList.createDocument (String::empty);
+    // now we can turn the whole thing into textual XML
+    auto xmlString = animalsList.toString();
     @endcode
 
-    @see XmlDocument
+    @see parseXML, parseXMLIfTagMatches, XmlDocument
+
+    @tags{Core}
 */
 class JUCE_API  XmlElement
 {
 public:
     //==============================================================================
     /** Creates an XmlElement with this tag name. */
-    explicit XmlElement (const String& tagName) noexcept;
+    explicit XmlElement (const String& tagName);
+
+    /** Creates an XmlElement with this tag name. */
+    explicit XmlElement (const char* tagName);
+
+    /** Creates an XmlElement with this tag name. */
+    explicit XmlElement (const Identifier& tagName);
+
+    /** Creates an XmlElement with this tag name. */
+    explicit XmlElement (StringRef tagName);
+
+    /** Creates an XmlElement with this tag name. */
+    XmlElement (String::CharPointerType tagNameBegin, String::CharPointerType tagNameEnd);
 
     /** Creates a (deep) copy of another element. */
-    XmlElement (const XmlElement& other);
+    XmlElement (const XmlElement&);
 
     /** Creates a (deep) copy of another element. */
-    XmlElement& operator= (const XmlElement& other);
+    XmlElement& operator= (const XmlElement&);
 
-   #if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
-    XmlElement (XmlElement&& other) noexcept;
-    XmlElement& operator= (XmlElement&& other) noexcept;
-   #endif
+    /** Move assignment operator */
+    XmlElement& operator= (XmlElement&&) noexcept;
 
-    /** Deleting an XmlElement will also delete all its child elements. */
+    /** Move constructor */
+    XmlElement (XmlElement&&) noexcept;
+
+    /** Deleting an XmlElement will also delete all of its child elements. */
     ~XmlElement() noexcept;
 
     //==============================================================================
-    /** Compares two XmlElements to see if they contain the same text and attiributes.
+    /** Compares two XmlElements to see if they contain the same text and attributes.
 
-        The elements are only considered equivalent if they contain the same attiributes
+        The elements are only considered equivalent if they contain the same attributes
         with the same values, and have the same sub-nodes.
 
         @param other                    the other element to compare to
@@ -178,92 +129,71 @@ public:
                          bool ignoreOrderOfAttributes) const noexcept;
 
     //==============================================================================
-    /** Returns an XML text document that represents this element.
-
-        The string returned can be parsed to recreate the same XmlElement that
-        was used to create it.
-
-        @param dtdToUse         the DTD to add to the document
-        @param allOnOneLine     if true, this means that the document will not contain any
-                                linefeeds, so it'll be smaller but not very easy to read.
-        @param includeXmlHeader whether to add the "<?xml version..etc" line at the start of the
-                                document
-        @param encodingType     the character encoding format string to put into the xml
-                                header
-        @param lineWrapLength   the line length that will be used before items get placed on
-                                a new line. This isn't an absolute maximum length, it just
-                                determines how lists of attributes get broken up
-        @see writeToStream, writeToFile
+    /** A struct containing options for formatting the text when representing an
+        XML element as a string.
     */
-    String createDocument (const String& dtdToUse,
-                           bool allOnOneLine = false,
-                           bool includeXmlHeader = true,
-                           const String& encodingType = "UTF-8",
-                           int lineWrapLength = 60) const;
+    struct TextFormat
+    {
+        /** Default constructor. */
+        TextFormat();
+
+        String dtd;                        /**< If supplied, this DTD will be added to the document. */
+        String customHeader;               /**< If supplied, this header will be used (and customEncoding & addDefaultHeader will be ignored). */
+        String customEncoding;             /**< If not empty and addDefaultHeader is true, this will be set as the encoding. Otherwise, a default of "UTF-8" will be used */
+        bool addDefaultHeader = true;      /**< If true, a default header will be generated; otherwise just bare XML will be emitted. */
+        int lineWrapLength = 60;           /**< A maximum line length before wrapping is done. (If newLineChars is nullptr, this is ignored) */
+        const char* newLineChars = "\r\n"; /**< Allows the newline characters to be set. If you set this to nullptr, then the whole XML document will be placed on a single line. */
+
+        TextFormat singleLine() const;     /**< returns a copy of this format with newLineChars set to nullptr. */
+        TextFormat withoutHeader() const;  /**< returns a copy of this format with the addDefaultHeader flag set to false. */
+    };
+
+    /** Returns a text version of this XML element.
+        If your intention is to write the XML to a file or stream, it's probably more efficient to
+        use writeTo() instead of creating an intermediate string.
+        @see writeTo
+    */
+    String toString (const TextFormat& format = {}) const;
 
     /** Writes the document to a stream as UTF-8.
-
-        @param output           the stream to write to
-        @param dtdToUse         the DTD to add to the document
-        @param allOnOneLine     if true, this means that the document will not contain any
-                                linefeeds, so it'll be smaller but not very easy to read.
-        @param includeXmlHeader whether to add the "<?xml version..etc" line at the start of the
-                                document
-        @param encodingType     the character encoding format string to put into the xml
-                                header
-        @param lineWrapLength   the line length that will be used before items get placed on
-                                a new line. This isn't an absolute maximum length, it just
-                                determines how lists of attributes get broken up
-        @see writeToFile, createDocument
+        @see writeTo, toString
     */
-    void writeToStream (OutputStream& output,
-                        const String& dtdToUse,
-                        bool allOnOneLine = false,
-                        bool includeXmlHeader = true,
-                        const String& encodingType = "UTF-8",
-                        int lineWrapLength = 60) const;
+    void writeTo (OutputStream& output, const TextFormat& format = {}) const;
 
-    /** Writes the element to a file as an XML document.
-
-        To improve safety in case something goes wrong while writing the file, this
-        will actually write the document to a new temporary file in the same
-        directory as the destination file, and if this succeeds, it will rename this
-        new file as the destination file (overwriting any existing file that was there).
-
-        @param destinationFile  the file to write to. If this already exists, it will be
-                                overwritten.
-        @param dtdToUse         the DTD to add to the document
-        @param encodingType     the character encoding format string to put into the xml
-                                header
-        @param lineWrapLength   the line length that will be used before items get placed on
-                                a new line. This isn't an absolute maximum length, it just
-                                determines how lists of attributes get broken up
-        @returns    true if the file is written successfully; false if something goes wrong
-                    in the process
-        @see createDocument
+    /** Writes the document to a file as UTF-8.
+        @see writeTo, toString
     */
-    bool writeToFile (const File& destinationFile,
-                      const String& dtdToUse,
-                      const String& encodingType = "UTF-8",
-                      int lineWrapLength = 60) const;
+    bool writeTo (const File& destinationFile, const TextFormat& format = {}) const;
 
     //==============================================================================
     /** Returns this element's tag type name.
-
-        E.g. for an element such as \<MOOSE legs="4" antlers="2">, this would return
-        "MOOSE".
-
+        E.g. for an element such as \<MOOSE legs="4" antlers="2">, this would return "MOOSE".
         @see hasTagName
     */
-    inline const String& getTagName() const noexcept            { return tagName; }
+    const String& getTagName() const noexcept            { return tagName; }
+
+    /** Returns the namespace portion of the tag-name, or an empty string if none is specified. */
+    String getNamespace() const;
+
+    /** Returns the part of the tag-name that follows any namespace declaration. */
+    String getTagNameWithoutNamespace() const;
 
     /** Tests whether this element has a particular tag name.
-
         @param possibleTagName  the tag name you're comparing it with
-
         @see getTagName
     */
-    bool hasTagName (const String& possibleTagName) const noexcept;
+    bool hasTagName (StringRef possibleTagName) const noexcept;
+
+    /** Tests whether this element has a particular tag name, ignoring any XML namespace prefix.
+        So a test for e.g. "xyz" will return true for "xyz" and also "foo:xyz", "bar::xyz", etc.
+        @see getTagName
+    */
+    bool hasTagNameIgnoringNamespace (StringRef possibleTagName) const;
+
+    /** Changes this elements tag name.
+        @see getTagName
+     */
+    void setTagName (StringRef newTagName);
 
     //==============================================================================
     /** Returns the number of XML attributes this element contains.
@@ -295,22 +225,19 @@ public:
     // Attribute-handling methods..
 
     /** Checks whether the element contains an attribute with a certain name. */
-    bool hasAttribute (const String& attributeName) const noexcept;
+    bool hasAttribute (StringRef attributeName) const noexcept;
 
     /** Returns the value of a named attribute.
-
         @param attributeName        the name of the attribute to look up
     */
-    const String& getStringAttribute (const String& attributeName) const noexcept;
+    const String& getStringAttribute (StringRef attributeName) const noexcept;
 
     /** Returns the value of a named attribute.
-
         @param attributeName        the name of the attribute to look up
         @param defaultReturnValue   a value to return if the element doesn't have an attribute
                                     with this name
     */
-    String getStringAttribute (const String& attributeName,
-                               const String& defaultReturnValue) const;
+    String getStringAttribute (StringRef attributeName, const String& defaultReturnValue) const;
 
     /** Compares the value of a named attribute with a value passed-in.
 
@@ -320,8 +247,8 @@ public:
         @returns    true if the value of the attribute is the same as the string passed-in;
                     false if it's different (or if no such attribute exists)
     */
-    bool compareAttribute (const String& attributeName,
-                           const String& stringToCompareAgainst,
+    bool compareAttribute (StringRef attributeName,
+                           StringRef stringToCompareAgainst,
                            bool ignoreCase = false) const noexcept;
 
     /** Returns the value of a named attribute as an integer.
@@ -334,12 +261,11 @@ public:
                                     with this name
         @see setAttribute
     */
-    int getIntAttribute (const String& attributeName,
-                         int defaultReturnValue = 0) const;
+    int getIntAttribute (StringRef attributeName, int defaultReturnValue = 0) const;
 
     /** Returns the value of a named attribute as floating-point.
 
-        This will try to find the attribute and convert it to an integer (using
+        This will try to find the attribute and convert it to a double (using
         the String::getDoubleValue() method).
 
         @param attributeName        the name of the attribute to look up
@@ -347,8 +273,7 @@ public:
                                     with this name
         @see setAttribute
     */
-    double getDoubleAttribute (const String& attributeName,
-                               double defaultReturnValue = 0.0) const;
+    double getDoubleAttribute (StringRef attributeName, double defaultReturnValue = 0.0) const;
 
     /** Returns the value of a named attribute as a boolean.
 
@@ -360,8 +285,7 @@ public:
         @param defaultReturnValue   a value to return if the element doesn't have an attribute
                                     with this name
     */
-    bool getBoolAttribute (const String& attributeName,
-                           bool defaultReturnValue = false) const;
+    bool getBoolAttribute (StringRef attributeName, bool defaultReturnValue = false) const;
 
     /** Adds a named attribute to the element.
 
@@ -376,8 +300,7 @@ public:
         @param newValue             the value to set it to
         @see removeAttribute
     */
-    void setAttribute (const String& attributeName,
-                       const String& newValue);
+    void setAttribute (const Identifier& attributeName, const String& newValue);
 
     /** Adds a named attribute to the element, setting it to an integer value.
 
@@ -391,8 +314,7 @@ public:
         @param attributeName        the name of the attribute to set
         @param newValue             the value to set it to
     */
-    void setAttribute (const String& attributeName,
-                       int newValue);
+    void setAttribute (const Identifier& attributeName, int newValue);
 
     /** Adds a named attribute to the element, setting it to a floating-point value.
 
@@ -406,27 +328,23 @@ public:
         @param attributeName        the name of the attribute to set
         @param newValue             the value to set it to
     */
-    void setAttribute (const String& attributeName,
-                       double newValue);
+    void setAttribute (const Identifier& attributeName, double newValue);
 
     /** Removes a named attribute from the element.
 
         @param attributeName    the name of the attribute to remove
         @see removeAllAttributes
     */
-    void removeAttribute (const String& attributeName) noexcept;
+    void removeAttribute (const Identifier& attributeName) noexcept;
 
-    /** Removes all attributes from this element.
-    */
+    /** Removes all attributes from this element. */
     void removeAllAttributes() noexcept;
 
     //==============================================================================
     // Child element methods..
 
     /** Returns the first of this element's sub-elements.
-
         see getNextElement() for an example of how to iterate the sub-elements.
-
         @see forEachXmlChildElement
     */
     XmlElement* getFirstChildElement() const noexcept       { return firstChildElement; }
@@ -452,8 +370,8 @@ public:
         Also, it's much easier and neater to use this method indirectly via the
         forEachXmlChildElement macro.
 
-        @returns    the sibling element that follows this one, or zero if this is the last
-                    element in its parent
+        @returns    the sibling element that follows this one, or a nullptr if
+                    this is the last element in its parent
 
         @see getNextElement, isTextElement, forEachXmlChildElement
     */
@@ -467,10 +385,9 @@ public:
 
         @see getNextElement, forEachXmlChildElementWithTagName
     */
-    XmlElement* getNextElementWithTagName (const String& requiredTagName) const;
+    XmlElement* getNextElementWithTagName (StringRef requiredTagName) const;
 
     /** Returns the number of sub-elements in this element.
-
         @see getChildElement
     */
     int getNumChildElements() const noexcept;
@@ -489,9 +406,19 @@ public:
 
         @param tagNameToLookFor     the tag name of the element you want to find
         @returns the first element with this tag name, or nullptr if none is found
-        @see getNextElement, isTextElement, getChildElement
+        @see getNextElement, isTextElement, getChildElement, getChildByAttribute
     */
-    XmlElement* getChildByName (const String& tagNameToLookFor) const noexcept;
+    XmlElement* getChildByName (StringRef tagNameToLookFor) const noexcept;
+
+    /** Returns the first sub-element which has an attribute that matches the given value.
+
+        @param attributeName     the name of the attribute to check
+        @param attributeValue    the target value of the attribute
+        @returns the first element with this attribute value, or nullptr if none is found
+        @see getChildByName
+    */
+    XmlElement* getChildByAttribute (StringRef attributeName,
+                                     StringRef attributeValue) const noexcept;
 
     //==============================================================================
     /** Appends an element to this element's list of children.
@@ -499,6 +426,10 @@ public:
         Child elements are deleted automatically when their parent is deleted, so
         make sure the object that you pass in will not be deleted by anything else,
         and make sure it's not already the child of another element.
+
+        Note that due to the XmlElement using a singly-linked-list, prependChildElement()
+        is an O(1) operation, but addChildElement() is an O(N) operation - so if
+        you're adding large number of elements, you may prefer to do so in reverse order!
 
         @see getFirstChildElement, getNextElement, getNumChildElements,
              getChildElement, removeChildElement
@@ -511,13 +442,27 @@ public:
         make sure the object that you pass in will not be deleted by anything else,
         and make sure it's not already the child of another element.
 
-        @param newChildNode     the element to add
+        @param newChildElement  the element to add
         @param indexToInsertAt  the index at which to insert the new element - if this is
                                 below zero, it will be added to the end of the list
         @see addChildElement, insertChildElement
     */
-    void insertChildElement (XmlElement* newChildNode,
+    void insertChildElement (XmlElement* newChildElement,
                              int indexToInsertAt) noexcept;
+
+    /** Inserts an element at the beginning of this element's list of children.
+
+        Child elements are deleted automatically when their parent is deleted, so
+        make sure the object that you pass in will not be deleted by anything else,
+        and make sure it's not already the child of another element.
+
+        Note that due to the XmlElement using a singly-linked-list, prependChildElement()
+        is an O(1) operation, but addChildElement() is an O(N) operation - so if
+        you're adding large number of elements, you may prefer to do so in reverse order!
+
+        @see addChildElement, insertChildElement
+    */
+    void prependChildElement (XmlElement* newChildElement) noexcept;
 
     /** Creates a new element with the given name and returns it, after adding it
         as a child element.
@@ -533,7 +478,7 @@ public:
         XmlElement* newElement = myParentElement->createNewChildElement ("foobar");
         @endcode
     */
-    XmlElement* createNewChildElement (const String& tagName);
+    XmlElement* createNewChildElement (StringRef tagName);
 
     /** Replaces one of this element's children with another node.
 
@@ -555,24 +500,29 @@ public:
                              bool shouldDeleteTheChild) noexcept;
 
     /** Deletes all the child elements in the element.
-
         @see removeChildElement, deleteAllChildElementsWithTagName
     */
     void deleteAllChildElements() noexcept;
 
     /** Deletes all the child elements with a given tag name.
-
         @see removeChildElement
     */
-    void deleteAllChildElementsWithTagName (const String& tagName) noexcept;
+    void deleteAllChildElementsWithTagName (StringRef tagName) noexcept;
 
     /** Returns true if the given element is a child of this one. */
     bool containsChildElement (const XmlElement* possibleChild) const noexcept;
 
-    /** Recursively searches all sub-elements to find one that contains the specified
-        child element.
+    /** Recursively searches all sub-elements of this one, looking for an element
+        which is the direct parent of the specified element.
+
+        Because elements don't store a pointer to their parent, if you have one
+        and need to find its parent, the only way to do so is to exhaustively
+        search the whole tree for it.
+
+        If the given child is found somewhere in this element's hierarchy, then
+        this method will return its parent. If not, it will return nullptr.
     */
-    XmlElement* findParentElementOf (const XmlElement* elementToLookFor) noexcept;
+    XmlElement* findParentElementOf (const XmlElement* childToSearchFor) noexcept;
 
     //==============================================================================
     /** Sorts the child elements using a comparator.
@@ -601,11 +551,11 @@ public:
     void sortChildElements (ElementComparator& comparator,
                             bool retainOrderOfEquivalentItems = false)
     {
-        const int num = getNumChildElements();
+        auto num = getNumChildElements();
 
         if (num > 1)
         {
-            HeapBlock <XmlElement*> elems ((size_t) num);
+            HeapBlock<XmlElement*> elems (num);
             getChildElementsAsArray (elems);
             sortArray (comparator, (XmlElement**) elems, 0, num - 1, retainOrderOfEquivalentItems);
             reorderChildElements (elems, num);
@@ -615,7 +565,7 @@ public:
     //==============================================================================
     /** Returns true if this element is a section of text.
 
-        Elements can either be an XML tag element or a secton of text, so this
+        Elements can either be an XML tag element or a section of text, so this
         is used to find out what kind of element this one is.
 
         @see getAllText, addTextElement, deleteAllTextElements
@@ -671,59 +621,234 @@ public:
 
         @see getAllSubText
     */
-    String getChildElementAllSubText (const String& childTagName,
+    String getChildElementAllSubText (StringRef childTagName,
                                       const String& defaultReturnValue) const;
 
     /** Appends a section of text to this element.
-
         @see isTextElement, getText, getAllSubText
     */
     void addTextElement (const String& text);
 
     /** Removes all the text elements from this element.
-
         @see isTextElement, getText, getAllSubText, addTextElement
     */
     void deleteAllTextElements() noexcept;
 
-    /** Creates a text element that can be added to a parent element.
-    */
+    /** Creates a text element that can be added to a parent element. */
     static XmlElement* createTextElement (const String& text);
 
-    //==============================================================================
+    /** Checks if a given string is a valid XML name */
+    static bool isValidXmlName (StringRef possibleName) noexcept;
+
 private:
+    //==============================================================================
+    struct GetNextElement
+    {
+        XmlElement* getNext (const XmlElement& e) const { return e.getNextElement(); }
+    };
+
+    struct GetNextElementWithTagName
+    {
+        GetNextElementWithTagName() = default;
+        explicit GetNextElementWithTagName (String n) : name (std::move (n)) {}
+        XmlElement* getNext (const XmlElement& e) const { return e.getNextElementWithTagName (name); }
+
+        String name;
+    };
+
+    //==============================================================================
+    template <typename Traits>
+    class Iterator : private Traits
+    {
+    public:
+        using difference_type   = ptrdiff_t;
+        using value_type        = XmlElement*;
+        using pointer           = const value_type*;
+        using reference         = value_type;
+        using iterator_category = std::input_iterator_tag;
+
+        Iterator() = default;
+
+        template <typename... Args>
+        Iterator (XmlElement* e, Args&&... args)
+            : Traits (std::forward<Args> (args)...), element (e) {}
+
+        Iterator begin()    const { return *this; }
+        Iterator end()      const { return Iterator{}; }
+
+        bool operator== (const Iterator& other) const { return element == other.element; }
+        bool operator!= (const Iterator& other) const { return ! operator== (other); }
+
+        reference operator*()  const { return  element; }
+        pointer   operator->() const { return &element; }
+
+        Iterator& operator++()
+        {
+            element = Traits::getNext (*element);
+            return *this;
+        }
+
+        Iterator operator++(int)
+        {
+            auto copy = *this;
+            ++(*this);
+            return copy;
+        }
+
+    private:
+        value_type element = nullptr;
+    };
+
+public:
+    //==============================================================================
+    /** Allows iterating the children of an XmlElement using range-for syntax.
+
+        @code
+        void doSomethingWithXmlChildren (const XmlElement& myParentXml)
+        {
+            for (auto* element : myParentXml.getChildIterator())
+                doSomethingWithXmlElement (element);
+        }
+        @endcode
+    */
+    Iterator<GetNextElement> getChildIterator() const
+    {
+        return Iterator<GetNextElement> { getFirstChildElement() };
+    }
+
+    /** Allows iterating children of an XmlElement with a specific tag using range-for syntax.
+
+        @code
+        void doSomethingWithXmlChildren (const XmlElement& myParentXml)
+        {
+            for (auto* element : myParentXml.getChildWithTagNameIterator ("MYTAG"))
+                doSomethingWithXmlElement (element);
+        }
+        @endcode
+    */
+    Iterator<GetNextElementWithTagName> getChildWithTagNameIterator (StringRef name) const
+    {
+        return Iterator<GetNextElementWithTagName> { getChildByName (name), name };
+    }
+
+    /** This allows us to trigger a warning inside deprecated macros. */
+   #ifndef DOXYGEN
+    JUCE_DEPRECATED_WITH_BODY (void macroBasedForLoop() const noexcept, {})
+   #endif
+
+    //==============================================================================
+    /** This has been deprecated in favour of the toString() method. */
+    JUCE_DEPRECATED (String createDocument (StringRef dtdToUse,
+                                            bool allOnOneLine = false,
+                                            bool includeXmlHeader = true,
+                                            StringRef encodingType = "UTF-8",
+                                            int lineWrapLength = 60) const);
+
+    /** This has been deprecated in favour of the writeTo() method. */
+    JUCE_DEPRECATED (void writeToStream (OutputStream& output,
+                                         StringRef dtdToUse,
+                                         bool allOnOneLine = false,
+                                         bool includeXmlHeader = true,
+                                         StringRef encodingType = "UTF-8",
+                                         int lineWrapLength = 60) const);
+
+    /** This has been deprecated in favour of the writeTo() method. */
+    JUCE_DEPRECATED (bool writeToFile (const File& destinationFile,
+                                       StringRef dtdToUse,
+                                       StringRef encodingType = "UTF-8",
+                                       int lineWrapLength = 60) const);
+
+private:
+    //==============================================================================
     struct XmlAttributeNode
     {
         XmlAttributeNode (const XmlAttributeNode&) noexcept;
-        XmlAttributeNode (const String& name, const String& value) noexcept;
+        XmlAttributeNode (const Identifier&, const String&) noexcept;
+        XmlAttributeNode (String::CharPointerType, String::CharPointerType);
 
         LinkedListPointer<XmlAttributeNode> nextListItem;
-        String name, value;
-
-        bool hasName (const String&) const noexcept;
+        Identifier name;
+        String value;
 
     private:
-        XmlAttributeNode& operator= (const XmlAttributeNode&);
+        XmlAttributeNode& operator= (const XmlAttributeNode&) = delete;
     };
 
     friend class XmlDocument;
-    friend class LinkedListPointer <XmlAttributeNode>;
-    friend class LinkedListPointer <XmlElement>;
-    friend class LinkedListPointer <XmlElement>::Appender;
+    friend class LinkedListPointer<XmlAttributeNode>;
+    friend class LinkedListPointer<XmlElement>;
+    friend class LinkedListPointer<XmlElement>::Appender;
+    friend class NamedValueSet;
 
-    LinkedListPointer <XmlElement> nextListItem;
-    LinkedListPointer <XmlElement> firstChildElement;
-    LinkedListPointer <XmlAttributeNode> attributes;
+    LinkedListPointer<XmlElement> nextListItem, firstChildElement;
+    LinkedListPointer<XmlAttributeNode> attributes;
     String tagName;
 
     XmlElement (int) noexcept;
     void copyChildrenAndAttributesFrom (const XmlElement&);
-    void writeElementAsText (OutputStream&, int indentationLevel, int lineWrapLength) const;
+    void writeElementAsText (OutputStream&, int, int, const char*) const;
     void getChildElementsAsArray (XmlElement**) const noexcept;
     void reorderChildElements (XmlElement**, int) noexcept;
+    XmlAttributeNode* getAttribute (StringRef) const noexcept;
+
+    // Sigh.. L"" or _T("") string literals are problematic in general, and really inappropriate
+    // for XML tags. Use a UTF-8 encoded literal instead, or if you're really determined to use
+    // UTF-16, cast it to a String and use the other constructor.
+    XmlElement (const wchar_t*) = delete;
 
     JUCE_LEAK_DETECTOR (XmlElement)
 };
 
+//==============================================================================
+/** DEPRECATED: A handy macro to make it easy to iterate all the child elements in an XmlElement.
 
-#endif   // __JUCE_XMLELEMENT_JUCEHEADER__
+    New code should avoid this macro, and instead use getChildIterator directly.
+
+    The parentXmlElement should be a reference to the parent XML, and the childElementVariableName
+    will be the name of a pointer to each child element.
+
+    E.g. @code
+    XmlElement* myParentXml = createSomeKindOfXmlDocument();
+
+    forEachXmlChildElement (*myParentXml, child)
+    {
+        if (child->hasTagName ("FOO"))
+            doSomethingWithXmlElement (child);
+    }
+
+    @endcode
+
+    @see forEachXmlChildElementWithTagName
+*/
+#define forEachXmlChildElement(parentXmlElement, childElementVariableName) \
+    for (auto* (childElementVariableName) : ((parentXmlElement).macroBasedForLoop(), (parentXmlElement).getChildIterator()))
+
+/** DEPRECATED: A macro that makes it easy to iterate all the child elements of an XmlElement
+    which have a specified tag.
+
+    New code should avoid this macro, and instead use getChildWithTagNameIterator directly.
+
+    This does the same job as the forEachXmlChildElement macro, but only for those
+    elements that have a particular tag name.
+
+    The parentXmlElement should be a reference to the parent XML, and the childElementVariableName
+    will be the name of a pointer to each child element. The requiredTagName is the
+    tag name to match.
+
+    E.g. @code
+    XmlElement* myParentXml = createSomeKindOfXmlDocument();
+
+    forEachXmlChildElementWithTagName (*myParentXml, child, "MYTAG")
+    {
+        // the child object is now guaranteed to be a <MYTAG> element..
+        doSomethingWithMYTAGElement (child);
+    }
+
+    @endcode
+
+    @see forEachXmlChildElement
+*/
+#define forEachXmlChildElementWithTagName(parentXmlElement, childElementVariableName, requiredTagName) \
+    for (auto* (childElementVariableName) : ((parentXmlElement).macroBasedForLoop(), (parentXmlElement).getChildWithTagNameIterator ((requiredTagName))))
+
+} // namespace juce

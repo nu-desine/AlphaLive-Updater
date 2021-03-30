@@ -1,34 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_FILLTYPE_JUCEHEADER__
-#define __JUCE_FILLTYPE_JUCEHEADER__
-
-#include "../colour/juce_ColourGradient.h"
-#include "../images/juce_Image.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -38,8 +34,10 @@
     a brush type. It can either be a solid colour, a gradient, or a tiled image.
 
     @see Graphics::setFillType, DrawablePath::setFill
+
+    @tags{Graphics}
 */
-class JUCE_API  FillType
+class JUCE_API  FillType  final
 {
 public:
     //==============================================================================
@@ -49,12 +47,17 @@ public:
     /** Creates a fill type of a solid colour.
         @see setColour
     */
-    FillType (const Colour& colour) noexcept;
+    FillType (Colour colour) noexcept;
 
     /** Creates a gradient fill type.
         @see setGradient
     */
     FillType (const ColourGradient& gradient);
+
+    /** Creates a gradient fill type.
+        @see setGradient
+    */
+    FillType (ColourGradient&& gradient);
 
     /** Creates a tiled image fill type. The transform allows you to set the scaling, offset
         and rotation of the pattern.
@@ -63,15 +66,16 @@ public:
     FillType (const Image& image, const AffineTransform& transform) noexcept;
 
     /** Creates a copy of another FillType. */
-    FillType (const FillType& other);
+    FillType (const FillType&);
 
     /** Makes a copy of another FillType. */
-    FillType& operator= (const FillType& other);
+    FillType& operator= (const FillType&);
 
-   #if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
-    FillType (FillType&& other) noexcept;
-    FillType& operator= (FillType&& other) noexcept;
-   #endif
+    /** Move constructor */
+    FillType (FillType&&) noexcept;
+
+    /** Move assignment operator */
+    FillType& operator= (FillType&&) noexcept;
 
     /** Destructor. */
     ~FillType() noexcept;
@@ -88,7 +92,7 @@ public:
 
     /** Turns this object into a solid colour fill.
         If the object was an image or gradient, those fields will no longer be valid. */
-    void setColour (const Colour& newColour) noexcept;
+    void setColour (Colour newColour) noexcept;
 
     /** Turns this object into a gradient fill. */
     void setGradient (const ColourGradient& newGradient);
@@ -126,11 +130,11 @@ public:
     Colour colour;
 
     /** Returns the gradient that should be used for filling.
-        This will be zero if the object is some other type of fill.
+        This will be nullptr if the object is some other type of fill.
         If a gradient is active, the overall opacity with which it should be applied
         is indicated by the alpha channel of the colour variable.
     */
-    ScopedPointer <ColourGradient> gradient;
+    std::unique_ptr<ColourGradient> gradient;
 
     /** The image that should be used for tiling.
         If an image fill is active, the overall opacity with which it should be applied
@@ -142,12 +146,11 @@ public:
     AffineTransform transform;
 
     //==============================================================================
-    bool operator== (const FillType& other) const;
-    bool operator!= (const FillType& other) const;
+    bool operator== (const FillType&) const;
+    bool operator!= (const FillType&) const;
 
 private:
     JUCE_LEAK_DETECTOR (FillType)
 };
 
-
-#endif   // __JUCE_FILLTYPE_JUCEHEADER__
+} // namespace juce

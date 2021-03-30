@@ -1,39 +1,38 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_GROUPCOMPONENT_JUCEHEADER__
-#define __JUCE_GROUPCOMPONENT_JUCEHEADER__
-
-#include "../components/juce_Component.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     A component that draws an outline around itself and has an optional title at
     the top, for drawing an outline around a group of controls.
 
+
+    @tags{GUI}
 */
 class JUCE_API  GroupComponent    : public Component
 {
@@ -44,11 +43,11 @@ public:
         @param componentName    the name to give the component
         @param labelText        the text to show at the top of the outline
     */
-    GroupComponent (const String& componentName = String::empty,
-                    const String& labelText = String::empty);
+    GroupComponent (const String& componentName = {},
+                    const String& labelText = {});
 
     /** Destructor. */
-    ~GroupComponent();
+    ~GroupComponent() override;
 
     //==============================================================================
     /** Changes the text that's shown at the top of the component. */
@@ -58,18 +57,15 @@ public:
     String getText() const;
 
     /** Sets the positioning of the text label.
-
         (The default is Justification::left)
-
         @see getTextLabelPosition
     */
-    void setTextLabelPosition (const Justification& justification);
+    void setTextLabelPosition (Justification justification);
 
     /** Returns the current text label position.
-
         @see setTextLabelPosition
     */
-    const Justification getTextLabelPosition() const noexcept           { return justification; }
+    Justification getTextLabelPosition() const noexcept           { return justification; }
 
     //==============================================================================
     /** A set of colour IDs to use to change the colour of various aspects of the component.
@@ -86,12 +82,22 @@ public:
     };
 
     //==============================================================================
+    /** This abstract base class is implemented by LookAndFeel classes. */
+    struct JUCE_API  LookAndFeelMethods
+    {
+        virtual ~LookAndFeelMethods() = default;
+
+        virtual void drawGroupComponentOutline (Graphics&, int w, int h, const String& text,
+                                                const Justification&, GroupComponent&) = 0;
+    };
+
+    //==============================================================================
     /** @internal */
-    void paint (Graphics& g);
+    void paint (Graphics&) override;
     /** @internal */
-    void enablementChanged();
+    void enablementChanged() override;
     /** @internal */
-    void colourChanged();
+    void colourChanged() override;
 
 private:
     String text;
@@ -100,5 +106,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (GroupComponent)
 };
 
-
-#endif   // __JUCE_GROUPCOMPONENT_JUCEHEADER__
+} // namespace juce

@@ -1,33 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_DIRECTORYCONTENTSLIST_JUCEHEADER__
-#define __JUCE_DIRECTORYCONTENTSLIST_JUCEHEADER__
-
-#include "juce_FileFilter.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -38,6 +35,8 @@
     to tell any listeners.
 
     @see FileListComponent, FileBrowserComponent
+
+    @tags{GUI}
 */
 class JUCE_API  DirectoryContentsList   : public ChangeBroadcaster,
                                           private TimeSliceClient
@@ -54,10 +53,9 @@ public:
         listeners and update them when the list changes.
 
         @param fileFilter       an optional filter to select which files are
-                                included in the list. If this is 0, then all files
-                                and directories are included. Make sure that the
-                                filter doesn't get deleted during the lifetime of this
-                                object
+                                included in the list. If this is nullptr, then all files
+                                and directories are included. Make sure that the filter
+                                doesn't get deleted during the lifetime of this object
         @param threadToUse      a thread object that this list can use
                                 to scan for files as a background task. Make sure
                                 that the thread you give it has been started, or you
@@ -67,10 +65,13 @@ public:
                            TimeSliceThread& threadToUse);
 
     /** Destructor. */
-    ~DirectoryContentsList();
+    ~DirectoryContentsList() override;
 
 
     //==============================================================================
+    /** Returns the directory that's currently being used. */
+    const File& getDirectory() const noexcept               { return root; }
+
     /** Sets the directory to look in for files.
 
         If the directory that's passed in is different to the current one, this will
@@ -80,8 +81,15 @@ public:
                        bool includeDirectories,
                        bool includeFiles);
 
-    /** Returns the directory that's currently being used. */
-    const File& getDirectory() const;
+    /** Returns true if this list contains directories.
+        @see setDirectory
+    */
+    bool isFindingDirectories() const noexcept              { return (fileTypeFlags & File::findDirectories) != 0; }
+
+    /** Returns true if this list contains files.
+        @see setDirectory
+    */
+    bool isFindingFiles() const noexcept                    { return (fileTypeFlags & File::findFiles) != 0; }
 
     /** Clears the list, and stops the thread scanning for files. */
     void clear();
@@ -93,7 +101,6 @@ public:
     bool isStillLoading() const;
 
     /** Tells the list whether or not to ignore hidden files.
-
         By default these are ignored.
     */
     void setIgnoresHiddenFiles (bool shouldIgnoreHiddenFiles);
@@ -102,6 +109,15 @@ public:
         @see setIgnoresHiddenFiles
     */
     bool ignoresHiddenFiles() const;
+
+    /** Replaces the current FileFilter.
+        This can be nullptr to have no filter. The DirectoryContentList does not take
+        ownership of this object - it just keeps a pointer to it, so you must manage its
+        lifetime.
+        Note that this only replaces the filter, it doesn't refresh the list - you'll
+        probably want to call refresh() after calling this.
+    */
+    void setFileFilter (const FileFilter* newFileFilter);
 
     //==============================================================================
     /** Contains cached information about one of the files in a DirectoryContentsList.
@@ -122,13 +138,11 @@ public:
         int64 fileSize;
 
         /** File modification time.
-
             As supplied by File::getLastModificationTime().
         */
         Time modificationTime;
 
         /** File creation time.
-
             As supplied by File::getCreationTime().
         */
         Time creationTime;
@@ -143,15 +157,14 @@ public:
     //==============================================================================
     /** Returns the number of files currently available in the list.
 
-        The info about one of these files can be retrieved with getFileInfo() or
-        getFile().
+        The info about one of these files can be retrieved with getFileInfo() or getFile().
 
         Obviously as the background thread runs and scans the directory for files, this
         number will change.
 
         @see getFileInfo, getFile
     */
-    int getNumFiles() const;
+    int getNumFiles() const noexcept;
 
     /** Returns the cached information about one of the files in the list.
 
@@ -168,50 +181,46 @@ public:
     /** Returns one of the files in the list.
 
         @param index    should be less than getNumFiles(). If this is out-of-range, the
-                        return value will be File::nonexistent
+                        return value will be a default File() object
         @see getNumFiles, getFileInfo
     */
     File getFile (int index) const;
 
     /** Returns the file filter being used.
-
         The filter is specified in the constructor.
     */
-    const FileFilter* getFilter() const                     { return fileFilter; }
+    const FileFilter* getFilter() const noexcept            { return fileFilter; }
 
     /** Returns true if the list contains the specified file. */
     bool contains (const File&) const;
 
     //==============================================================================
     /** @internal */
-    TimeSliceThread& getTimeSliceThread()                   { return thread; }
-    /** @internal */
-    static int compareElements (const DirectoryContentsList::FileInfo* first,
-                                const DirectoryContentsList::FileInfo* second);
+    TimeSliceThread& getTimeSliceThread() const noexcept    { return thread; }
 
 private:
     File root;
-    const FileFilter* fileFilter;
+    const FileFilter* fileFilter = nullptr;
     TimeSliceThread& thread;
-    int fileTypeFlags;
+    int fileTypeFlags = File::ignoreHiddenFiles | File::findFiles;
 
     CriticalSection fileListLock;
-    OwnedArray <FileInfo> files;
+    OwnedArray<FileInfo> files;
 
-    ScopedPointer <DirectoryIterator> fileFindHandle;
-    bool volatile shouldStop;
+    std::unique_ptr<RangedDirectoryIterator> fileFindHandle;
+    std::atomic<bool> shouldStop { true };
 
-    int useTimeSlice();
+    bool wasEmpty = true;
+
+    int useTimeSlice() override;
     void stopSearching();
     void changed();
     bool checkNextFile (bool& hasChanged);
-    bool addFile (const File& file, bool isDir,
-                  const int64 fileSize, const Time& modTime,
-                  const Time& creationTime, bool isReadOnly);
-    void setTypeFlags (int newFlags);
+    bool addFile (const File&, bool isDir, int64 fileSize, Time modTime,
+                  Time creationTime, bool isReadOnly);
+    void setTypeFlags (int);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DirectoryContentsList)
 };
 
-
-#endif   // __JUCE_DIRECTORYCONTENTSLIST_JUCEHEADER__
+} // namespace juce

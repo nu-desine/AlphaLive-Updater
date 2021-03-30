@@ -1,30 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 static File createTempFile (const File& parentDirectory, String name,
-                            const String& suffix, const int optionFlags)
+                            const String& suffix, int optionFlags)
 {
     if ((optionFlags & TemporaryFile::useHiddenFile) != 0)
         name = "." + name;
@@ -35,7 +35,8 @@ static File createTempFile (const File& parentDirectory, String name,
 TemporaryFile::TemporaryFile (const String& suffix, const int optionFlags)
     : temporaryFile (createTempFile (File::getSpecialLocation (File::tempDirectory),
                                      "temp_" + String::toHexString (Random::getSystemRandom().nextInt()),
-                                     suffix, optionFlags))
+                                     suffix, optionFlags)),
+      targetFile()
 {
 }
 
@@ -47,7 +48,7 @@ TemporaryFile::TemporaryFile (const File& target, const int optionFlags)
       targetFile (target)
 {
     // If you use this constructor, you need to give it a valid target file!
-    jassert (targetFile != File::nonexistent);
+    jassert (targetFile != File());
 }
 
 TemporaryFile::TemporaryFile (const File& target, const File& temporary)
@@ -76,14 +77,14 @@ bool TemporaryFile::overwriteTargetFileWithTemporary() const
 {
     // This method only works if you created this object with the constructor
     // that takes a target file!
-    jassert (targetFile != File::nonexistent);
+    jassert (targetFile != File());
 
     if (temporaryFile.exists())
     {
         // Have a few attempts at overwriting the file before giving up..
         for (int i = 5; --i >= 0;)
         {
-            if (temporaryFile.moveFileTo (targetFile))
+            if (temporaryFile.replaceFileIn (targetFile))
                 return true;
 
             Thread::sleep (100);
@@ -112,3 +113,5 @@ bool TemporaryFile::deleteTemporaryFile() const
 
     return false;
 }
+
+} // namespace juce

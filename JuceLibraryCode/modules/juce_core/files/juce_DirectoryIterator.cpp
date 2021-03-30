@@ -1,48 +1,62 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-DirectoryIterator::DirectoryIterator (const File& directory,
-                                      bool isRecursive_,
-                                      const String& wildCard_,
-                                      const int whatToLookFor_)
-  : fileFinder (directory, isRecursive_ ? "*" : wildCard_),
-    wildCard (wildCard_),
+namespace juce
+{
+
+DirectoryIterator::DirectoryIterator (const File& directory, bool recursive,
+                                      const String& pattern, int type)
+  : wildCards (parseWildcards (pattern)),
+    fileFinder (directory, (recursive || wildCards.size() > 1) ? "*" : pattern),
+    wildCard (pattern),
     path (File::addTrailingSeparator (directory.getFullPathName())),
-    index (-1),
-    totalNumFiles (-1),
-    whatToLookFor (whatToLookFor_),
-    isRecursive (isRecursive_),
-    hasBeenAdvanced (false)
+    whatToLookFor (type),
+    isRecursive (recursive)
 {
     // you have to specify the type of files you're looking for!
-    jassert ((whatToLookFor_ & (File::findFiles | File::findDirectories)) != 0);
-    jassert (whatToLookFor_ > 0 && whatToLookFor_ <= 7);
+    jassert ((type & (File::findFiles | File::findDirectories)) != 0);
+    jassert (type > 0 && type <= 7);
 }
 
 DirectoryIterator::~DirectoryIterator()
 {
+}
+
+StringArray DirectoryIterator::parseWildcards (const String& pattern)
+{
+    StringArray s;
+    s.addTokens (pattern, ";,", "\"'");
+    s.trim();
+    s.removeEmptyStrings();
+    return s;
+}
+
+bool DirectoryIterator::fileMatches (const StringArray& wildcards, const String& filename)
+{
+    for (auto& w : wildcards)
+        if (filename.matchesWildcard (w, ! File::areFileNamesCaseSensitive()))
+            return true;
+
+    return false;
 }
 
 bool DirectoryIterator::next()
@@ -50,68 +64,81 @@ bool DirectoryIterator::next()
     return next (nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
 }
 
-bool DirectoryIterator::next (bool* const isDirResult, bool* const isHiddenResult, int64* const fileSize,
-                              Time* const modTime, Time* const creationTime, bool* const isReadOnly)
+JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wdeprecated-declarations")
+JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4996)
+
+bool DirectoryIterator::next (bool* isDirResult, bool* isHiddenResult, int64* fileSize,
+                              Time* modTime, Time* creationTime, bool* isReadOnly)
 {
-    hasBeenAdvanced = true;
-
-    if (subIterator != nullptr)
+    for (;;)
     {
-        if (subIterator->next (isDirResult, isHiddenResult, fileSize, modTime, creationTime, isReadOnly))
-            return true;
+        hasBeenAdvanced = true;
 
-        subIterator = nullptr;
-    }
-
-    String filename;
-    bool isDirectory, isHidden = false;
-
-    while (fileFinder.next (filename, &isDirectory,
-                            (isHiddenResult != nullptr || (whatToLookFor & File::ignoreHiddenFiles) != 0) ? &isHidden : nullptr,
-                            fileSize, modTime, creationTime, isReadOnly))
-    {
-        ++index;
-
-        if (! filename.containsOnly ("."))
+        if (subIterator != nullptr)
         {
-            bool matches = false;
-
-            if (isDirectory)
-            {
-                if (isRecursive && ((whatToLookFor & File::ignoreHiddenFiles) == 0 || ! isHidden))
-                    subIterator = new DirectoryIterator (File::createFileWithoutCheckingPath (path + filename),
-                                                         true, wildCard, whatToLookFor);
-
-                matches = (whatToLookFor & File::findDirectories) != 0;
-            }
-            else
-            {
-                matches = (whatToLookFor & File::findFiles) != 0;
-            }
-
-            // if recursive, we're not relying on the OS iterator to do the wildcard match, so do it now..
-            if (matches && isRecursive)
-                matches = filename.matchesWildcard (wildCard, ! File::areFileNamesCaseSensitive());
-
-            if (matches && (whatToLookFor & File::ignoreHiddenFiles) != 0)
-                matches = ! isHidden;
-
-            if (matches)
-            {
-                currentFile = File::createFileWithoutCheckingPath (path + filename);
-                if (isHiddenResult != nullptr)     *isHiddenResult = isHidden;
-                if (isDirResult != nullptr)        *isDirResult = isDirectory;
-
+            if (subIterator->next (isDirResult, isHiddenResult, fileSize, modTime, creationTime, isReadOnly))
                 return true;
-            }
 
-            if (subIterator != nullptr)
-                return next (isDirResult, isHiddenResult, fileSize, modTime, creationTime, isReadOnly);
+            subIterator.reset();
         }
-    }
 
-    return false;
+        String filename;
+        bool isDirectory, isHidden = false, shouldContinue = false;
+
+        while (fileFinder.next (filename, &isDirectory,
+                                (isHiddenResult != nullptr || (whatToLookFor & File::ignoreHiddenFiles) != 0) ? &isHidden : nullptr,
+                                fileSize, modTime, creationTime, isReadOnly))
+        {
+            ++index;
+
+            if (! filename.containsOnly ("."))
+            {
+                bool matches = false;
+
+                if (isDirectory)
+                {
+                    if (isRecursive && ((whatToLookFor & File::ignoreHiddenFiles) == 0 || ! isHidden))
+                        subIterator.reset (new DirectoryIterator (File::createFileWithoutCheckingPath (path + filename),
+                                                                  true, wildCard, whatToLookFor));
+
+                    matches = (whatToLookFor & File::findDirectories) != 0;
+                }
+                else
+                {
+                    matches = (whatToLookFor & File::findFiles) != 0;
+                }
+
+                // if we're not relying on the OS iterator to do the wildcard match, do it now..
+                if (matches && (isRecursive || wildCards.size() > 1))
+                    matches = fileMatches (wildCards, filename);
+
+                if (matches && (whatToLookFor & File::ignoreHiddenFiles) != 0)
+                    matches = ! isHidden;
+
+                if (matches)
+                {
+                    currentFile = File::createFileWithoutCheckingPath (path + filename);
+                    if (isHiddenResult != nullptr)     *isHiddenResult = isHidden;
+                    if (isDirResult != nullptr)        *isDirResult = isDirectory;
+
+                    return true;
+                }
+
+                if (subIterator != nullptr)
+                {
+                    shouldContinue = true;
+                    break;
+                }
+            }
+        }
+
+        if (! shouldContinue)
+            return false;
+    }
 }
+
+JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+JUCE_END_IGNORE_WARNINGS_MSVC
 
 const File& DirectoryIterator::getFile() const
 {
@@ -132,8 +159,10 @@ float DirectoryIterator::getEstimatedProgress() const
     if (totalNumFiles <= 0)
         return 0.0f;
 
-    const float detailedIndex = (subIterator != nullptr) ? index + subIterator->getEstimatedProgress()
-                                                         : (float) index;
+    auto detailedIndex = (subIterator != nullptr) ? (float) index + subIterator->getEstimatedProgress()
+                                                  : (float) index;
 
-    return detailedIndex / totalNumFiles;
+    return jlimit (0.0f, 1.0f, detailedIndex / (float) totalNumFiles);
 }
+
+} // namespace juce

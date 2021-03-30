@@ -1,33 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_HYPERLINKBUTTON_JUCEHEADER__
-#define __JUCE_HYPERLINKBUTTON_JUCEHEADER__
-
-#include "juce_Button.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -35,6 +32,8 @@
     when it's clicked.
 
     @see Button
+
+    @tags{GUI}
 */
 class JUCE_API  HyperlinkButton  : public Button
 {
@@ -44,7 +43,7 @@ public:
 
         @param linkText     the text that will be displayed in the button - this is
                             also set as the Component's name, but the text can be
-                            changed later with the Button::getButtonText() method
+                            changed later with the Button::setButtonText() method
         @param linkURL      the URL to launch when the user clicks the button
     */
     HyperlinkButton (const String& linkText,
@@ -54,7 +53,7 @@ public:
     HyperlinkButton();
 
     /** Destructor. */
-    ~HyperlinkButton();
+    ~HyperlinkButton() override;
 
     //==============================================================================
     /** Changes the font to use for the text.
@@ -64,7 +63,7 @@ public:
     */
     void setFont (const Font& newFont,
                   bool resizeToMatchComponentHeight,
-                  const Justification& justificationType = Justification::horizontallyCentred);
+                  Justification justificationType = Justification::horizontallyCentred);
 
     //==============================================================================
     /** A set of colour IDs to use to change the colour of various aspects of the link.
@@ -93,27 +92,36 @@ public:
     */
     void changeWidthToFitText();
 
+    //==============================================================================
+    /** Sets the style of justification to be used for positioning the text.
+        (The default is Justification::centred)
+    */
+    void setJustificationType (Justification justification);
+
+    /** Returns the type of justification, as set in setJustificationType(). */
+    Justification getJustificationType() const noexcept         { return justification; }
+
 protected:
     //==============================================================================
     /** @internal */
-    void clicked();
+    void clicked() override;
     /** @internal */
-    void colourChanged();
+    void colourChanged() override;
     /** @internal */
-    void paintButton (Graphics& g,
-                      bool isMouseOverButton,
-                      bool isButtonDown);
+    void paintButton (Graphics&, bool, bool) override;
 
 private:
+    //==============================================================================
+    using Button::clicked;
+    Font getFontToUse() const;
+
     //==============================================================================
     URL url;
     Font font;
     bool resizeFont;
     Justification justification;
 
-    Font getFontToUse() const;
-
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HyperlinkButton)
 };
 
-#endif   // __JUCE_HYPERLINKBUTTON_JUCEHEADER__
+} // namespace juce

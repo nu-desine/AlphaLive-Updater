@@ -1,38 +1,29 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_THREADPOOL_JUCEHEADER__
-#define __JUCE_THREADPOOL_JUCEHEADER__
+namespace juce
+{
 
-#include "juce_Thread.h"
-#include "../text/juce_StringArray.h"
-#include "../containers/juce_Array.h"
-#include "../containers/juce_OwnedArray.h"
 class ThreadPool;
-class ThreadPoolThread;
-
 
 //==============================================================================
 /**
@@ -47,6 +38,8 @@ class ThreadPoolThread;
     true, the runJob() method must return immediately.
 
     @see ThreadPool, Thread
+
+    @tags{Core}
 */
 class JUCE_API  ThreadPoolJob
 {
@@ -83,7 +76,7 @@ public:
                                      again when a thread is free. */
     };
 
-    /** Peforms the actual work that this job needs to do.
+    /** Performs the actual work that this job needs to do.
 
         Your subclass must implement this method, in which is does its work.
 
@@ -120,13 +113,29 @@ public:
     */
     void signalJobShouldExit();
 
+    /** Add a listener to this thread job which will receive a callback when
+        signalJobShouldExit was called on this thread job.
+
+        @see signalJobShouldExit, removeListener
+    */
+    void addListener (Thread::Listener*);
+
+    /** Removes a listener added with addListener. */
+    void removeListener (Thread::Listener*);
+
+    //==============================================================================
+    /** If the calling thread is being invoked inside a runJob() method, this will
+        return the ThreadPoolJob that it belongs to.
+    */
+    static ThreadPoolJob* getCurrentThreadPoolJob();
+
     //==============================================================================
 private:
     friend class ThreadPool;
-    friend class ThreadPoolThread;
     String jobName;
-    ThreadPool* pool;
-    bool shouldStop, isActive, shouldBeDeleted;
+    ThreadPool* pool = nullptr;
+    std::atomic<bool> shouldStop { false }, isActive { false }, shouldBeDeleted { false };
+    ListenerList<Thread::Listener, Array<Thread::Listener*, CriticalSection>> listeners;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ThreadPoolJob)
 };
@@ -140,6 +149,8 @@ private:
     will be called by the next pooled thread that becomes free.
 
     @see ThreadPoolJob, Thread
+
+    @tags{Core}
 */
 class JUCE_API  ThreadPool
 {
@@ -147,10 +158,14 @@ public:
     //==============================================================================
     /** Creates a thread pool.
         Once you've created a pool, you can give it some jobs by calling addJob().
+
         @param numberOfThreads  the number of threads to run. These will be started
                                 immediately, and will run until the pool is deleted.
+        @param threadStackSize  the size of the stack of each thread. If this value
+                                is zero then the default stack size of the OS will
+                                be used.
     */
-    ThreadPool (int numberOfThreads);
+    ThreadPool (int numberOfThreads, size_t threadStackSize = 0);
 
     /** Creates a thread pool with one thread per CPU core.
         Once you've created a pool, you can give it some jobs by calling addJob().
@@ -176,7 +191,7 @@ public:
     class JUCE_API  JobSelector
     {
     public:
-        virtual ~JobSelector() {}
+        virtual ~JobSelector() = default;
 
         /** Should return true if the specified thread matches your criteria for whatever
             operation that this object is being used for.
@@ -205,13 +220,23 @@ public:
     void addJob (ThreadPoolJob* job,
                  bool deleteJobWhenFinished);
 
+    /** Adds a lambda function to be called as a job.
+        This will create an internal ThreadPoolJob object to encapsulate and call the lambda.
+    */
+    void addJob (std::function<ThreadPoolJob::JobStatus()> job);
+
+    /** Adds a lambda function to be called as a job.
+        This will create an internal ThreadPoolJob object to encapsulate and call the lambda.
+    */
+    void addJob (std::function<void()> job);
+
     /** Tries to remove a job from the pool.
 
         If the job isn't yet running, this will simply remove it. If it is running, it
         will wait for it to finish.
 
         If the timeout period expires before the job finishes running, then the job will be
-        left in the pool and this will return false. It returns true if the job is sucessfully
+        left in the pool and this will return false. It returns true if the job is successfully
         stopped and removed.
 
         @param job                  the job to remove
@@ -232,8 +257,8 @@ public:
                                     methods called to try to interrupt them
         @param timeOutMilliseconds  the length of time this method should wait for all the jobs to finish
                                     before giving up and returning false
-        @param selectedJobsToRemove if this is non-zero, the JobSelector object is asked to decide which
-                                    jobs should be removed. If it is zero, all jobs are removed
+        @param selectedJobsToRemove if this is not a nullptr, the JobSelector object is asked to decide
+                                    which jobs should be removed. If it is a nullptr, all jobs are removed
         @returns    true if all jobs are successfully stopped and removed; false if the timeout period
                     expires while waiting for one or more jobs to stop
     */
@@ -241,26 +266,27 @@ public:
                         int timeOutMilliseconds,
                         JobSelector* selectedJobsToRemove = nullptr);
 
-    /** Returns the number of jobs currently running or queued.
-    */
-    int getNumJobs() const;
+    /** Returns the number of jobs currently running or queued. */
+    int getNumJobs() const noexcept;
+
+    /** Returns the number of threads assigned to this thread pool. */
+    int getNumThreads() const noexcept;
 
     /** Returns one of the jobs in the queue.
 
         Note that this can be a very volatile list as jobs might be continuously getting shifted
-        around in the list, and this method may return 0 if the index is currently out-of-range.
+        around in the list, and this method may return nullptr if the index is currently out-of-range.
     */
-    ThreadPoolJob* getJob (int index) const;
+    ThreadPoolJob* getJob (int index) const noexcept;
 
     /** Returns true if the given job is currently queued or running.
 
         @see isJobRunning()
     */
-    bool contains (const ThreadPoolJob* job) const;
+    bool contains (const ThreadPoolJob* job) const noexcept;
 
-    /** Returns true if the given job is currently being run by a thread.
-    */
-    bool isJobRunning (const ThreadPoolJob* job) const;
+    /** Returns true if the given job is currently being run by a thread. */
+    bool isJobRunning (const ThreadPoolJob* job) const noexcept;
 
     /** Waits until a job has finished running and has been removed from the pool.
 
@@ -273,13 +299,17 @@ public:
     bool waitForJobToFinish (const ThreadPoolJob* job,
                              int timeOutMilliseconds) const;
 
+    /** If the given job is in the queue, this will move it to the front so that it
+        is the next one to be executed.
+    */
+    void moveJobToFront (const ThreadPoolJob* jobToMove) noexcept;
+
     /** Returns a list of the names of all the jobs currently running or queued.
         If onlyReturnActiveJobs is true, only the ones currently running are returned.
     */
     StringArray getNamesOfAllJobs (bool onlyReturnActiveJobs) const;
 
     /** Changes the priority of all the threads.
-
         This will call Thread::setPriority() for each thread in the pool.
         May return false if for some reason the priority can't be changed.
     */
@@ -288,20 +318,19 @@ public:
 
 private:
     //==============================================================================
-    Array <ThreadPoolJob*> jobs;
+    Array<ThreadPoolJob*> jobs;
 
-    class ThreadPoolThread;
-    friend class ThreadPoolThread;
-    friend class OwnedArray <ThreadPoolThread>;
-    OwnedArray <ThreadPoolThread> threads;
+    struct ThreadPoolThread;
+    friend class ThreadPoolJob;
+    OwnedArray<ThreadPoolThread> threads;
 
     CriticalSection lock;
     WaitableEvent jobFinishedSignal;
 
-    bool runNextJob();
+    bool runNextJob (ThreadPoolThread&);
     ThreadPoolJob* pickNextJobToRun();
     void addToDeleteList (OwnedArray<ThreadPoolJob>&, ThreadPoolJob*) const;
-    void createThreads (int numThreads);
+    void createThreads (int numThreads, size_t threadStackSize = 0);
     void stopThreads();
 
     // Note that this method has changed, and no longer has a parameter to indicate
@@ -311,5 +340,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ThreadPool)
 };
 
-
-#endif   // __JUCE_THREADPOOL_JUCEHEADER__
+} // namespace juce

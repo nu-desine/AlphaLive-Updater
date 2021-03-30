@@ -1,59 +1,71 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-ShapeButton::ShapeButton (const String& text_,
-                          const Colour& normalColour_,
-                          const Colour& overColour_,
-                          const Colour& downColour_)
-  : Button (text_),
-    normalColour (normalColour_),
-    overColour (overColour_),
-    downColour (downColour_),
+namespace juce
+{
+
+ShapeButton::ShapeButton (const String& t, Colour n, Colour o, Colour d)
+  : Button (t),
+    normalColour   (n), overColour   (o), downColour   (d),
+    normalColourOn (n), overColourOn (o), downColourOn (d),
+    useOnColours(false),
     maintainShapeProportions (false),
     outlineWidth (0.0f)
 {
 }
 
-ShapeButton::~ShapeButton()
-{
-}
+ShapeButton::~ShapeButton() {}
 
-void ShapeButton::setColours (const Colour& newNormalColour,
-                              const Colour& newOverColour,
-                              const Colour& newDownColour)
+void ShapeButton::setColours (Colour newNormalColour, Colour newOverColour, Colour newDownColour)
 {
     normalColour = newNormalColour;
-    overColour = newOverColour;
-    downColour = newDownColour;
+    overColour   = newOverColour;
+    downColour   = newDownColour;
 }
 
-void ShapeButton::setOutline (const Colour& newOutlineColour,
-                              const float newOutlineWidth)
+void ShapeButton::setOnColours (Colour newNormalColourOn, Colour newOverColourOn, Colour newDownColourOn)
+{
+    normalColourOn = newNormalColourOn;
+    overColourOn   = newOverColourOn;
+    downColourOn   = newDownColourOn;
+}
+
+void ShapeButton::shouldUseOnColours (bool shouldUse)
+{
+    useOnColours = shouldUse;
+}
+
+void ShapeButton::setOutline (Colour newOutlineColour, const float newOutlineWidth)
 {
     outlineColour = newOutlineColour;
     outlineWidth = newOutlineWidth;
+}
+
+void ShapeButton::setBorderSize (BorderSize<int> newBorder)
+{
+    border = newBorder;
 }
 
 void ShapeButton::setShape (const Path& newShape,
@@ -69,45 +81,50 @@ void ShapeButton::setShape (const Path& newShape,
 
     if (resizeNowToFitThisShape)
     {
-        Rectangle<float> newBounds (shape.getBounds());
+        auto newBounds = shape.getBounds();
 
         if (hasShadow)
-            newBounds.expand (4.0f, 4.0f);
+            newBounds = newBounds.expanded (4.0f);
 
-        shape.applyTransform (AffineTransform::translation (-newBounds.getX(), -newBounds.getY()));
+        shape.applyTransform (AffineTransform::translation (-newBounds.getX(),
+                                                            -newBounds.getY()));
 
-        setSize (1 + (int) (newBounds.getWidth() + outlineWidth),
-                 1 + (int) (newBounds.getHeight() + outlineWidth));
+        setSize (1 + (int) (newBounds.getWidth()  + outlineWidth) + border.getLeftAndRight(),
+                 1 + (int) (newBounds.getHeight() + outlineWidth) + border.getTopAndBottom());
     }
+
+    repaint();
 }
 
-void ShapeButton::paintButton (Graphics& g, bool isMouseOverButton, bool isButtonDown)
+void ShapeButton::paintButton (Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
 {
     if (! isEnabled())
     {
-        isMouseOverButton = false;
-        isButtonDown = false;
+        shouldDrawButtonAsHighlighted = false;
+        shouldDrawButtonAsDown = false;
     }
 
-    g.setColour (isButtonDown ? downColour
-                              : isMouseOverButton ? overColour
-                                                  : normalColour);
-
-    int w = getWidth();
-    int h = getHeight();
+    auto r = border.subtractedFrom (getLocalBounds())
+                   .toFloat()
+                   .reduced (outlineWidth * 0.5f);
 
     if (getComponentEffect() != nullptr)
+        r = r.reduced (2.0f);
+
+    if (shouldDrawButtonAsDown)
     {
-        w -= 4;
-        h -= 4;
+        const float sizeReductionWhenPressed = 0.04f;
+
+        r = r.reduced (sizeReductionWhenPressed * r.getWidth(),
+                       sizeReductionWhenPressed * r.getHeight());
     }
 
-    const float offset = (outlineWidth * 0.5f) + (isButtonDown ? 1.5f : 0.0f);
+    auto trans = shape.getTransformToScaleToFit (r, maintainShapeProportions);
 
-    const AffineTransform trans (shape.getTransformToScaleToFit (offset, offset,
-                                                                 w - offset - outlineWidth,
-                                                                 h - offset - outlineWidth,
-                                                                 maintainShapeProportions));
+    if      (shouldDrawButtonAsDown)        g.setColour (getToggleState() && useOnColours ? downColourOn   : downColour);
+    else if (shouldDrawButtonAsHighlighted) g.setColour (getToggleState() && useOnColours ? overColourOn   : overColour);
+    else                                    g.setColour (getToggleState() && useOnColours ? normalColourOn : normalColour);
+
     g.fillPath (shape, trans);
 
     if (outlineWidth > 0.0f)
@@ -116,3 +133,5 @@ void ShapeButton::paintButton (Graphics& g, bool isMouseOverButton, bool isButto
         g.strokePath (shape, PathStrokeType (outlineWidth), trans);
     }
 }
+
+} // namespace juce

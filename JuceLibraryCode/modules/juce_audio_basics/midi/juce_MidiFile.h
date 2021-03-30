@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MIDIFILE_JUCEHEADER__
-#define __JUCE_MIDIFILE_JUCEHEADER__
-
-#include "juce_MidiMessageSequence.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -41,42 +35,50 @@
     it out.
 
     @see MidiMessageSequence
+
+    @tags{Audio}
 */
 class JUCE_API  MidiFile
 {
 public:
     //==============================================================================
-    /** Creates an empty MidiFile object.
-    */
+    /** Creates an empty MidiFile object. */
     MidiFile();
 
     /** Destructor. */
     ~MidiFile();
 
+    /** Creates a copy of another MidiFile. */
+    MidiFile (const MidiFile&);
+
+    /** Copies from another MidiFile object */
+    MidiFile& operator= (const MidiFile&);
+
+    /** Creates a copy of another MidiFile. */
+    MidiFile (MidiFile&&);
+
+    /** Copies from another MidiFile object */
+    MidiFile& operator= (MidiFile&&);
+
     //==============================================================================
     /** Returns the number of tracks in the file.
-
         @see getTrack, addTrack
     */
     int getNumTracks() const noexcept;
 
     /** Returns a pointer to one of the tracks in the file.
-
         @returns a pointer to the track, or nullptr if the index is out-of-range
         @see getNumTracks, addTrack
     */
     const MidiMessageSequence* getTrack (int index) const noexcept;
 
     /** Adds a midi track to the file.
-
         This will make its own internal copy of the sequence that is passed-in.
-
         @see getNumTracks, getTrack
     */
     void addTrack (const MidiMessageSequence& trackSequence);
 
     /** Removes all midi tracks from the file.
-
         @see getNumTracks
     */
     void clear();
@@ -123,23 +125,23 @@ public:
 
     //==============================================================================
     /** Makes a list of all the tempo-change meta-events from all tracks in the midi file.
-
         Useful for finding the positions of all the tempo changes in a file.
-
         @param tempoChangeEvents    a list to which all the events will be added
     */
     void findAllTempoEvents (MidiMessageSequence& tempoChangeEvents) const;
 
     /** Makes a list of all the time-signature meta-events from all tracks in the midi file.
-
         Useful for finding the positions of all the tempo changes in a file.
-
         @param timeSigEvents        a list to which all the events will be added
     */
     void findAllTimeSigEvents (MidiMessageSequence& timeSigEvents) const;
 
-    /** Returns the latest timestamp in any of the tracks.
+    /** Makes a list of all the time-signature meta-events from all tracks in the midi file.
+        @param keySigEvents         a list to which all the events will be added
+    */
+    void findAllKeySigEvents (MidiMessageSequence& keySigEvents) const;
 
+    /** Returns the latest timestamp in any of the tracks.
         (Useful for finding the length of the file).
     */
     double getLastTimestamp() const;
@@ -154,15 +156,25 @@ public:
         terms of midi ticks. To convert them to seconds, use the convertTimestampTicksToSeconds()
         method.
 
+        @param sourceStream              the source stream
+        @param createMatchingNoteOffs    if true, any missing note-offs for previous note-ons will
+                                         be automatically added at the end of the file by calling
+                                         MidiMessageSequence::updateMatchedPairs on each track.
+
         @returns true if the stream was read successfully
     */
-    bool readFrom (InputStream& sourceStream);
+    bool readFrom (InputStream& sourceStream, bool createMatchingNoteOffs = true);
 
     /** Writes the midi tracks as a standard midi file.
+        The midiFileType value is written as the file's format type, which can be 0, 1
+        or 2 - see the midi file spec for more info about that.
+
+        @param destStream        the destination stream
+        @param midiFileType      the type of midi file
 
         @returns true if the operation succeeded.
     */
-    bool writeTo (OutputStream& destStream);
+    bool writeTo (OutputStream& destStream, int midiFileType = 1) const;
 
     /** Converts the timestamp of all the midi events from midi ticks to seconds.
 
@@ -171,17 +183,15 @@ public:
     */
     void convertTimestampTicksToSeconds();
 
-
 private:
     //==============================================================================
-    OwnedArray <MidiMessageSequence> tracks;
+    OwnedArray<MidiMessageSequence> tracks;
     short timeFormat;
 
-    void readNextTrack (const uint8* data, int size);
-    void writeTrack (OutputStream& mainOut, int trackNum);
+    void readNextTrack (const uint8*, int, bool);
+    bool writeTrack (OutputStream&, const MidiMessageSequence&) const;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiFile)
+    JUCE_LEAK_DETECTOR (MidiFile)
 };
 
-
-#endif   // __JUCE_MIDIFILE_JUCEHEADER__
+} // namespace juce

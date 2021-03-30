@@ -1,34 +1,36 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
 
 BufferingAudioReader::BufferingAudioReader (AudioFormatReader* sourceReader,
                                             TimeSliceThread& timeSliceThread,
                                             int samplesToBuffer)
     : AudioFormatReader (nullptr, sourceReader->getFormatName()),
       source (sourceReader), thread (timeSliceThread),
-      nextReadPosition (0),
       numBlocks (1 + (samplesToBuffer / samplesPerBlock))
 {
     sampleRate            = source->sampleRate;
@@ -57,7 +59,7 @@ void BufferingAudioReader::setReadTimeout (int timeoutMilliseconds) noexcept
 bool BufferingAudioReader::readSamples (int** destSamples, int numDestChannels, int startOffsetInDestBuffer,
                                         int64 startSampleInFile, int numSamples)
 {
-    const uint32 startTime = Time::getMillisecondCounter();
+    auto startTime = Time::getMillisecondCounter();
     clearSamplesBeyondAvailableLength (destSamples, numDestChannels, startOffsetInDestBuffer,
                                        startSampleInFile, numSamples, lengthInSamples);
 
@@ -66,19 +68,19 @@ bool BufferingAudioReader::readSamples (int** destSamples, int numDestChannels, 
 
     while (numSamples > 0)
     {
-        if (const BufferedBlock* const block = getBlockContaining (startSampleInFile))
+        if (auto block = getBlockContaining (startSampleInFile))
         {
-            const int offset = (int) (startSampleInFile - block->range.getStart());
-            const int numToDo = jmin (numSamples, (int) (block->range.getEnd() - startSampleInFile));
+            auto offset = (int) (startSampleInFile - block->range.getStart());
+            auto numToDo = jmin (numSamples, (int) (block->range.getEnd() - startSampleInFile));
 
             for (int j = 0; j < numDestChannels; ++j)
             {
-                if (float* dest = (float*) destSamples[j])
+                if (auto dest = (float*) destSamples[j])
                 {
                     dest += startOffsetInDestBuffer;
 
                     if (j < (int) numChannels)
-                        FloatVectorOperations::copy (dest, block->buffer.getSampleData (j, offset), numToDo);
+                        FloatVectorOperations::copy (dest, block->buffer.getReadPointer (j, offset), numToDo);
                     else
                         FloatVectorOperations::clear (dest, numToDo);
                 }
@@ -90,10 +92,10 @@ bool BufferingAudioReader::readSamples (int** destSamples, int numDestChannels, 
         }
         else
         {
-            if (timeoutMs >= 0 && Time::getMillisecondCounter() >= startTime + timeoutMs)
+            if (timeoutMs >= 0 && Time::getMillisecondCounter() >= startTime + (uint32) timeoutMs)
             {
                 for (int j = 0; j < numDestChannels; ++j)
-                    if (float* dest = (float*) destSamples[j])
+                    if (auto dest = (float*) destSamples[j])
                         FloatVectorOperations::clear (dest + startOffsetInDestBuffer, numSamples);
 
                 break;
@@ -111,20 +113,16 @@ bool BufferingAudioReader::readSamples (int** destSamples, int numDestChannels, 
 
 BufferingAudioReader::BufferedBlock::BufferedBlock (AudioFormatReader& reader, int64 pos, int numSamples)
     : range (pos, pos + numSamples),
-      buffer (reader.numChannels, numSamples)
+      buffer ((int) reader.numChannels, numSamples)
 {
     reader.read (&buffer, 0, numSamples, pos, true, true);
 }
 
 BufferingAudioReader::BufferedBlock* BufferingAudioReader::getBlockContaining (int64 pos) const noexcept
 {
-    for (int i = blocks.size(); --i >= 0;)
-    {
-        BufferedBlock* const b = blocks.getUnchecked(i);
-
+    for (auto* b : blocks)
         if (b->range.contains (pos))
             return b;
-    }
 
     return nullptr;
 }
@@ -136,9 +134,9 @@ int BufferingAudioReader::useTimeSlice()
 
 bool BufferingAudioReader::readNextBufferChunk()
 {
-    const int64 pos = nextReadPosition;
-    const int64 startPos = ((pos - 1024) / samplesPerBlock) * samplesPerBlock;
-    const int64 endPos = startPos + numBlocks * samplesPerBlock;
+    auto pos = nextReadPosition.load();
+    auto startPos = ((pos - 1024) / samplesPerBlock) * samplesPerBlock;
+    auto endPos = startPos + numBlocks * samplesPerBlock;
 
     OwnedArray<BufferedBlock> newBlocks;
 
@@ -152,7 +150,7 @@ bool BufferingAudioReader::readNextBufferChunk()
         return false;
     }
 
-    for (int64 p = startPos; p < endPos; p += samplesPerBlock)
+    for (auto p = startPos; p < endPos; p += samplesPerBlock)
     {
         if (getBlockContaining (p) == nullptr)
         {
@@ -163,7 +161,7 @@ bool BufferingAudioReader::readNextBufferChunk()
 
     {
         const ScopedLock sl (lock);
-        newBlocks.swapWithArray (blocks);
+        newBlocks.swapWith (blocks);
     }
 
     for (int i = blocks.size(); --i >= 0;)
@@ -171,3 +169,5 @@ bool BufferingAudioReader::readNextBufferChunk()
 
     return true;
 }
+
+} // namespace juce

@@ -1,30 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_UIVIEWCOMPONENT_JUCEHEADER__
-#define __JUCE_UIVIEWCOMPONENT_JUCEHEADER__
+namespace juce
+{
 
 #if JUCE_IOS || DOXYGEN
 
@@ -33,11 +33,13 @@
     An iOS-specific class that can create and embed an UIView inside itself.
 
     To use it, create one of these, put it in place and make sure it's visible in a
-    window, then use setView() to assign an NSView to it. The view will then be
+    window, then use setView() to assign a UIView to it. The view will then be
     moved and resized to follow the movements of this component.
 
     Of course, since the view is a native object, it'll obliterate any
-    juce components that may overlap this component, but that's life.
+    JUCE components that may overlap this component, but that's life.
+
+    @tags{GUI}
 */
 class JUCE_API  UIViewComponent   : public Component
 {
@@ -47,41 +49,40 @@ public:
     UIViewComponent();
 
     /** Destructor. */
-    ~UIViewComponent();
+    ~UIViewComponent() override;
 
     /** Assigns an UIView to this peer.
 
         The view will be retained and released by this component for as long as
         it is needed. To remove the current view, just call setView (nullptr).
 
-        Note: a void* is used here to avoid including the cocoa headers as
-        part of the juce.h, but the method expects an UIView*.
+        Note: A void* is used here to avoid including the cocoa headers as
+        part of JuceHeader.h, but the method expects an UIView*.
     */
     void setView (void* uiView);
 
     /** Returns the current UIView.
 
-        Note: a void* is returned here to avoid the needing to include the cocoa
+        Note: A void* is returned here to avoid the needing to include the cocoa
         headers, so you should just cast the return value to an UIView*.
     */
     void* getView() const;
-
 
     /** Resizes this component to fit the view that it contains. */
     void resizeToFitView();
 
     //==============================================================================
     /** @internal */
-    void paint (Graphics& g);
+    void paint (Graphics&) override;
 
 
 private:
     class Pimpl;
-    friend class Pimpl;
-    ScopedPointer<Pimpl> pimpl;
+    std::unique_ptr<Pimpl> pimpl;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (UIViewComponent)
 };
 
 #endif
-#endif   // __JUCE_UIVIEWCOMPONENT_JUCEHEADER__
+
+} // namespace juce

@@ -1,43 +1,38 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_EDGETABLE_JUCEHEADER__
-#define __JUCE_EDGETABLE_JUCEHEADER__
-
-#include "../geometry/juce_AffineTransform.h"
-#include "../geometry/juce_Rectangle.h"
-#include "../geometry/juce_RectangleList.h"
-class Path;
-class Image;
-
+namespace juce
+{
 
 //==============================================================================
 /**
     A table of horizontal scan-line segments - used for rasterising Paths.
 
     @see Path, Graphics
+
+    @tags{Graphics}
 */
 class JUCE_API  EdgeTable
 {
@@ -52,36 +47,42 @@ public:
         @param pathToAdd                the path to add to the table
         @param transform                a transform to apply to the path being added
     */
-    EdgeTable (const Rectangle<int>& clipLimits,
+    EdgeTable (Rectangle<int> clipLimits,
                const Path& pathToAdd,
                const AffineTransform& transform);
 
     /** Creates an edge table containing a rectangle. */
-    explicit EdgeTable (const Rectangle<int>& rectangleToAdd);
-
-    /** Creates an edge table containing a rectangle list. */
-    explicit EdgeTable (const RectangleList& rectanglesToAdd);
+    explicit EdgeTable (Rectangle<int> rectangleToAdd);
 
     /** Creates an edge table containing a rectangle. */
-    explicit EdgeTable (const Rectangle<float>& rectangleToAdd);
+    explicit EdgeTable (Rectangle<float> rectangleToAdd);
+
+    /** Creates an edge table containing a rectangle list. */
+    explicit EdgeTable (const RectangleList<int>& rectanglesToAdd);
+
+    /** Creates an edge table containing a rectangle list. */
+    explicit EdgeTable (const RectangleList<float>& rectanglesToAdd);
 
     /** Creates a copy of another edge table. */
-    EdgeTable (const EdgeTable& other);
+    EdgeTable (const EdgeTable&);
 
     /** Copies from another edge table. */
-    EdgeTable& operator= (const EdgeTable& other);
+    EdgeTable& operator= (const EdgeTable&);
 
     /** Destructor. */
     ~EdgeTable();
 
     //==============================================================================
-    void clipToRectangle (const Rectangle<int>& r);
-    void excludeRectangle (const Rectangle<int>& r);
-    void clipToEdgeTable (const EdgeTable& other);
+    void clipToRectangle (Rectangle<int> r);
+    void excludeRectangle (Rectangle<int> r);
+    void clipToEdgeTable (const EdgeTable&);
     void clipLineToMask (int x, int y, const uint8* mask, int maskStride, int numPixels);
     bool isEmpty() noexcept;
     const Rectangle<int>& getMaximumBounds() const noexcept      { return bounds; }
     void translate (float dx, int dy) noexcept;
+
+    /** Scales all the alpha-levels in the table by the given multiplier. */
+    void multiplyLevels (float factor);
 
     /** Reduces the amount of space the table has allocated.
 
@@ -129,7 +130,7 @@ public:
                 while (--numPoints >= 0)
                 {
                     const int level = *++line;
-                    jassert (isPositiveAndBelow (level, (int) 256));
+                    jassert (isPositiveAndBelow (level, 256));
                     const int endX = *++line;
                     jassert (endX >= x);
                     const int endOfRun = (endX >> 8);
@@ -192,13 +193,24 @@ public:
 private:
     //==============================================================================
     // table line format: number of points; point0 x, point0 levelDelta, point1 x, point1 levelDelta, etc
+    struct LineItem
+    {
+        int x, level;
+
+        bool operator< (const LineItem& other) const noexcept   { return x < other.x; }
+    };
+
     HeapBlock<int> table;
     Rectangle<int> bounds;
     int maxEdgesPerLine, lineStrideElements;
-    bool needToCheckEmptinesss;
+    bool needToCheckEmptiness = true;
 
+    void allocate();
+    void clearLineSizes() noexcept;
     void addEdgePoint (int x, int y, int winding);
+    void addEdgePointPair (int x1, int x2, int y, int winding);
     void remapTableForNumEdges (int newNumEdgesPerLine);
+    void remapWithExtraSpace (int numPointsNeeded);
     void intersectWithEdgeTableLine (int y, const int* otherLine);
     void clipEdgeTableLineToRange (int* line, int x1, int x2) noexcept;
     void sanitiseLevels (bool useNonZeroWinding) noexcept;
@@ -207,5 +219,4 @@ private:
     JUCE_LEAK_DETECTOR (EdgeTable)
 };
 
-
-#endif   // __JUCE_EDGETABLE_JUCEHEADER__
+} // namespace juce

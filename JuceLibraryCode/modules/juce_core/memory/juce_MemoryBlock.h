@@ -1,39 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MEMORYBLOCK_JUCEHEADER__
-#define __JUCE_MEMORYBLOCK_JUCEHEADER__
-
-#include "../text/juce_String.h"
-#include "../memory/juce_HeapBlock.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     A class to hold a resizable block of raw data.
 
+    @tags{Core}
 */
 class JUCE_API  MemoryBlock
 {
@@ -51,7 +45,7 @@ public:
                  bool initialiseToZero = false);
 
     /** Creates a copy of another memory block. */
-    MemoryBlock (const MemoryBlock& other);
+    MemoryBlock (const MemoryBlock&);
 
     /** Creates a memory block using a copy of a block of data.
 
@@ -64,31 +58,28 @@ public:
     ~MemoryBlock() noexcept;
 
     /** Copies another memory block onto this one.
-
         This block will be resized and copied to exactly match the other one.
     */
-    MemoryBlock& operator= (const MemoryBlock& other);
+    MemoryBlock& operator= (const MemoryBlock&);
 
-   #if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
-    MemoryBlock (MemoryBlock&& other) noexcept;
-    MemoryBlock& operator= (MemoryBlock&& other) noexcept;
-   #endif
+    /** Move constructor */
+    MemoryBlock (MemoryBlock&&) noexcept;
+
+    /** Move assignment operator */
+    MemoryBlock& operator= (MemoryBlock&&) noexcept;
 
     //==============================================================================
     /** Compares two memory blocks.
-
         @returns true only if the two blocks are the same size and have identical contents.
     */
     bool operator== (const MemoryBlock& other) const noexcept;
 
     /** Compares two memory blocks.
-
         @returns true if the two blocks are different sizes or have different contents.
     */
     bool operator!= (const MemoryBlock& other) const noexcept;
 
-    /** Returns true if the data in this MemoryBlock matches the raw bytes passed-in.
-    */
+    /** Returns true if the data in this MemoryBlock matches the raw bytes passed-in. */
     bool matches (const void* data, size_t dataSize) const noexcept;
 
     //==============================================================================
@@ -97,15 +88,36 @@ public:
         Note that the pointer returned will probably become invalid when the
         block is resized.
     */
-    void* getData() const noexcept                                  { return data; }
+    void* getData() noexcept                                        { return data; }
+
+    /** Returns a void pointer to the data.
+
+        Note that the pointer returned will probably become invalid when the
+        block is resized.
+    */
+    const void* getData() const noexcept                            { return data; }
 
     /** Returns a byte from the memory block.
-
         This returns a reference, so you can also use it to set a byte.
     */
     template <typename Type>
-    char& operator[] (const Type offset) const noexcept             { return data [offset]; }
+    char& operator[] (const Type offset) noexcept                   { return data [offset]; }
 
+    /** Returns a byte from the memory block. */
+    template <typename Type>
+    const char& operator[] (const Type offset) const noexcept       { return data [offset]; }
+
+    /** Returns an iterator for the data. */
+    char* begin() noexcept                                          { return data; }
+
+    /** Returns an iterator for the data. */
+    const char* begin() const noexcept                              { return data; }
+
+    /** Returns an end-iterator for the data. */
+    char* end() noexcept                                            { return begin() + getSize(); }
+
+    /** Returns an end-iterator for the data. */
+    const char* end() const noexcept                                { return begin() + getSize(); }
 
     //==============================================================================
     /** Returns the block's current allocated size, in bytes. */
@@ -113,9 +125,9 @@ public:
 
     /** Resizes the memory block.
 
-        This will try to keep as much of the block's current content as it can,
-        and can optionally be made to clear any new space that gets allocated at
-        the end of the block.
+        Any data that is present in both the old and new sizes will be retained.
+        When enlarging the block, the new space that is allocated at the end can either be
+        cleared, or left uninitialised.
 
         @param newSize                      the new desired size for the block
         @param initialiseNewSpaceToZero     if the block gets enlarged, this determines
@@ -138,9 +150,11 @@ public:
     void ensureSize (const size_t minimumSize,
                      bool initialiseNewSpaceToZero = false);
 
+    /** Frees all the blocks data, setting its size to 0. */
+    void reset();
+
     //==============================================================================
     /** Fills the entire memory block with a repeated byte value.
-
         This is handy for clearing a block of memory to zero.
     */
     void fillWith (uint8 valueToUse) noexcept;
@@ -212,7 +226,7 @@ public:
 
         @see String::toHexString()
     */
-    void loadFromHexString (const String& sourceHexString);
+    void loadFromHexString (StringRef sourceHexString);
 
     //==============================================================================
     /** Sets a number of bits in the memory block, treating it as a long binary sequence. */
@@ -225,33 +239,40 @@ public:
                      size_t numBitsToRead) const noexcept;
 
     //==============================================================================
-    /** Returns a string of characters that represent the binary contents of this block.
+    /** Returns a string of characters in a JUCE-specific text encoding that represents the
+        binary contents of this block.
 
-        Uses a 64-bit encoding system to allow binary data to be turned into a string
-        of simple non-extended characters, e.g. for storage in XML.
+        This uses a JUCE-specific (i.e. not standard!) 64-bit encoding system to convert binary
+        data into a string of ASCII characters for purposes like storage in XML.
+        Note that this proprietary format is mainly kept here for backwards-compatibility, and
+        you may prefer to use the Base64::toBase64() method if you want to use the standard
+        base-64 encoding.
 
-        @see fromBase64Encoding
+        @see fromBase64Encoding, Base64::toBase64, Base64::convertToBase64
     */
     String toBase64Encoding() const;
 
-    /** Takes a string of encoded characters and turns it into binary data.
+    /** Takes a string created by MemoryBlock::toBase64Encoding() and extracts the original data.
 
         The string passed in must have been created by to64BitEncoding(), and this
         block will be resized to recreate the original data block.
 
-        @see toBase64Encoding
+        Note that these methods use a JUCE-specific (i.e. not standard!) 64-bit encoding system.
+        You may prefer to use the Base64::convertFromBase64() method if you want to use the
+        standard base-64 encoding.
+
+        @see toBase64Encoding, Base64::convertFromBase64
     */
-    bool fromBase64Encoding  (const String& encodedString);
+    bool fromBase64Encoding  (StringRef encodedString);
 
 
 private:
     //==============================================================================
-    HeapBlock <char> data;
-    size_t size;
-    static const char* const encodingTable;
+    using HeapBlockType = HeapBlock<char, true>;
+    HeapBlockType data;
+    size_t size = 0;
 
     JUCE_LEAK_DETECTOR (MemoryBlock)
 };
 
-
-#endif   // __JUCE_MEMORYBLOCK_JUCEHEADER__
+} // namespace juce

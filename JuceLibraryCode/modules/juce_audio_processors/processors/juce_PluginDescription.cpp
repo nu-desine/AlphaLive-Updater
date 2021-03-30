@@ -1,92 +1,59 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-PluginDescription::PluginDescription()
-    : uid (0),
-      isInstrument (false),
-      numInputChannels (0),
-      numOutputChannels (0)
+namespace juce
 {
-}
 
-PluginDescription::~PluginDescription()
-{
-}
-
-PluginDescription::PluginDescription (const PluginDescription& other)
-    : name (other.name),
-      descriptiveName (other.descriptiveName),
-      pluginFormatName (other.pluginFormatName),
-      category (other.category),
-      manufacturerName (other.manufacturerName),
-      version (other.version),
-      fileOrIdentifier (other.fileOrIdentifier),
-      lastFileModTime (other.lastFileModTime),
-      uid (other.uid),
-      isInstrument (other.isInstrument),
-      numInputChannels (other.numInputChannels),
-      numOutputChannels (other.numOutputChannels)
-{
-}
-
-PluginDescription& PluginDescription::operator= (const PluginDescription& other)
-{
-    name = other.name;
-    descriptiveName = other.descriptiveName;
-    pluginFormatName = other.pluginFormatName;
-    category = other.category;
-    manufacturerName = other.manufacturerName;
-    version = other.version;
-    fileOrIdentifier = other.fileOrIdentifier;
-    uid = other.uid;
-    isInstrument = other.isInstrument;
-    lastFileModTime = other.lastFileModTime;
-    numInputChannels = other.numInputChannels;
-    numOutputChannels = other.numOutputChannels;
-
-    return *this;
-}
-
-bool PluginDescription::isDuplicateOf (const PluginDescription& other) const
+bool PluginDescription::isDuplicateOf (const PluginDescription& other) const noexcept
 {
     return fileOrIdentifier == other.fileOrIdentifier
             && uid == other.uid;
 }
 
-String PluginDescription::createIdentifierString() const
+static String getPluginDescSuffix (const PluginDescription& d)
 {
-    return pluginFormatName
-            + "-" + name
-            + "-" + String::toHexString (fileOrIdentifier.hashCode())
-            + "-" + String::toHexString (uid);
+    return "-" + String::toHexString (d.fileOrIdentifier.hashCode())
+         + "-" + String::toHexString (d.uid);
 }
 
-XmlElement* PluginDescription::createXml() const
+bool PluginDescription::matchesIdentifierString (const String& identifierString) const
 {
-    XmlElement* const e = new XmlElement ("PLUGIN");
+    return identifierString.endsWithIgnoreCase (getPluginDescSuffix (*this));
+}
+
+String PluginDescription::createIdentifierString() const
+{
+    return pluginFormatName + "-" + name + getPluginDescSuffix (*this);
+}
+
+std::unique_ptr<XmlElement> PluginDescription::createXml() const
+{
+    auto e = std::make_unique<XmlElement> ("PLUGIN");
+
     e->setAttribute ("name", name);
+
     if (descriptiveName != name)
         e->setAttribute ("descriptiveName", descriptiveName);
 
@@ -98,8 +65,10 @@ XmlElement* PluginDescription::createXml() const
     e->setAttribute ("uid", String::toHexString (uid));
     e->setAttribute ("isInstrument", isInstrument);
     e->setAttribute ("fileTime", String::toHexString (lastFileModTime.toMilliseconds()));
+    e->setAttribute ("infoUpdateTime", String::toHexString (lastInfoUpdateTime.toMilliseconds()));
     e->setAttribute ("numInputs", numInputChannels);
     e->setAttribute ("numOutputs", numOutputChannels);
+    e->setAttribute ("isShell", hasSharedContainer);
 
     return e;
 }
@@ -118,11 +87,15 @@ bool PluginDescription::loadFromXml (const XmlElement& xml)
         uid                 = xml.getStringAttribute ("uid").getHexValue32();
         isInstrument        = xml.getBoolAttribute ("isInstrument", false);
         lastFileModTime     = Time (xml.getStringAttribute ("fileTime").getHexValue64());
+        lastInfoUpdateTime  = Time (xml.getStringAttribute ("infoUpdateTime").getHexValue64());
         numInputChannels    = xml.getIntAttribute ("numInputs");
         numOutputChannels   = xml.getIntAttribute ("numOutputs");
+        hasSharedContainer  = xml.getBoolAttribute ("isShell", false);
 
         return true;
     }
 
     return false;
 }
+
+} // namespace juce

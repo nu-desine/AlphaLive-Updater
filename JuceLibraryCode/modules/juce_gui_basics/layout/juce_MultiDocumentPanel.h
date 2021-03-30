@@ -1,33 +1,31 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MULTIDOCUMENTPANEL_JUCEHEADER__
-#define __JUCE_MULTIDOCUMENTPANEL_JUCEHEADER__
+namespace juce
+{
 
-#include "juce_TabbedComponent.h"
-#include "../windows/juce_DocumentWindow.h"
 class MultiDocumentPanel;
 
 
@@ -40,6 +38,8 @@ class MultiDocumentPanel;
     everything works nicely inside a MultiDocumentPanel.
 
     @see MultiDocumentPanel
+
+    @tags{GUI}
 */
 class JUCE_API  MultiDocumentPanelWindow  : public DocumentWindow
 {
@@ -47,20 +47,20 @@ public:
     //==============================================================================
     /**
     */
-    MultiDocumentPanelWindow (const Colour& backgroundColour);
+    MultiDocumentPanelWindow (Colour backgroundColour);
 
     /** Destructor. */
-    ~MultiDocumentPanelWindow();
+    ~MultiDocumentPanelWindow() override;
 
     //==============================================================================
     /** @internal */
-    void maximiseButtonPressed();
+    void maximiseButtonPressed() override;
     /** @internal */
-    void closeButtonPressed();
+    void closeButtonPressed() override;
     /** @internal */
-    void activeWindowStatusChanged();
+    void activeWindowStatusChanged() override;
     /** @internal */
-    void broughtToFront();
+    void broughtToFront() override;
 
 private:
     //==============================================================================
@@ -82,6 +82,8 @@ private:
     Use addDocument() and closeDocument() to add or remove components from the
     panel - never use any of the Component methods to access the panel's child
     components directly, as these are managed internally.
+
+    @tags{GUI}
 */
 class JUCE_API  MultiDocumentPanel  : public Component,
                                       private ComponentListener
@@ -103,7 +105,7 @@ public:
         before closing, then you should call closeAllDocuments (true) and check that
         it returns true before deleting the panel.
     */
-    ~MultiDocumentPanel();
+    ~MultiDocumentPanel() override;
 
     //==============================================================================
     /** Tries to close all the documents.
@@ -137,7 +139,7 @@ public:
                                     the caller must handle the component's deletion
     */
     bool addDocument (Component* component,
-                      const Colour& backgroundColour,
+                      Colour backgroundColour,
                       bool deleteWhenRemoved);
 
     /** Closes one of the documents.
@@ -234,16 +236,16 @@ public:
         Each document has its own background colour, but this is the one used to fill the areas
         behind them.
     */
-    void setBackgroundColour (const Colour& newBackgroundColour);
+    void setBackgroundColour (Colour newBackgroundColour);
 
     /** Returns the current background colour.
 
         @see setBackgroundColour
     */
-    const Colour& getBackgroundColour() const noexcept                  { return backgroundColour; }
+    Colour getBackgroundColour() const noexcept                         { return backgroundColour; }
 
     /** If the panel is being used in tabbed mode, this returns the TabbedComponent that's involved. */
-    TabbedComponent* getCurrentTabbedComponent() const noexcept         { return tabComponent; }
+    TabbedComponent* getCurrentTabbedComponent() const noexcept         { return tabComponent.get(); }
 
     //==============================================================================
     /** A subclass must override this to say whether its currently ok for a document
@@ -278,31 +280,28 @@ public:
 
     //==============================================================================
     /** @internal */
-    void paint (Graphics& g);
+    void paint (Graphics&) override;
     /** @internal */
-    void resized();
+    void resized() override;
     /** @internal */
-    void componentNameChanged (Component&);
+    void componentNameChanged (Component&) override;
 
 private:
     //==============================================================================
-    LayoutMode mode;
-    Array <Component*> components;
-    ScopedPointer<TabbedComponent> tabComponent;
-    Colour backgroundColour;
-    int maximumNumDocuments, numDocsBeforeTabsUsed;
+    LayoutMode mode = MaximisedWindowsWithTabs;
+    Array<Component*> components;
+    std::unique_ptr<TabbedComponent> tabComponent;
+    Colour backgroundColour { Colours::lightblue };
+    int maximumNumDocuments = 0, numDocsBeforeTabsUsed = 0;
 
-    class TabbedComponentInternal;
+    struct TabbedComponentInternal;
     friend class MultiDocumentPanelWindow;
-    friend class TabbedComponentInternal;
 
-    Component* getContainerComp (Component* c) const;
+    Component* getContainerComp (Component*) const;
     void updateOrder();
-
-    void addWindow (Component* component);
+    void addWindow (Component*);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MultiDocumentPanel)
 };
 
-
-#endif   // __JUCE_MULTIDOCUMENTPANEL_JUCEHEADER__
+} // namespace juce

@@ -1,35 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-Random::Random (const int64 seedValue) noexcept
-    : seed (seedValue)
+namespace juce
+{
+
+Random::Random (int64 seedValue) noexcept  : seed (seedValue)
 {
 }
 
-Random::Random()
-    : seed (1)
+Random::Random()  : seed (1)
 {
     setSeedRandomly();
 }
@@ -40,6 +38,16 @@ Random::~Random() noexcept
 
 void Random::setSeed (const int64 newSeed) noexcept
 {
+    if (this == &getSystemRandom())
+    {
+        // Resetting the system Random risks messing up
+        // JUCE's internal state. If you need a predictable
+        // stream of random numbers you should use a local
+        // Random object.
+        jassertfalse;
+        return;
+    }
+
     seed = newSeed;
 }
 
@@ -50,7 +58,7 @@ void Random::combineSeed (const int64 seedValue) noexcept
 
 void Random::setSeedRandomly()
 {
-    static int64 globalSeed = 0;
+    static std::atomic<int64> globalSeed { 0 };
 
     combineSeed (globalSeed ^ (int64) (pointer_sized_int) this);
     combineSeed (Time::getMillisecondCounter());
@@ -69,7 +77,7 @@ Random& Random::getSystemRandom() noexcept
 //==============================================================================
 int Random::nextInt() noexcept
 {
-    seed = (seed * literal64bit (0x5deece66d) + 11) & literal64bit (0xffffffffffff);
+    seed = (int64) (((((uint64) seed) * 0x5deece66dLL) + 11) & 0xffffffffffffLL);
 
     return (int) (seed >> 16);
 }
@@ -80,9 +88,14 @@ int Random::nextInt (const int maxValue) noexcept
     return (int) ((((unsigned int) nextInt()) * (uint64) maxValue) >> 32);
 }
 
+int Random::nextInt (Range<int> range) noexcept
+{
+    return range.getStart() + nextInt (range.getLength());
+}
+
 int64 Random::nextInt64() noexcept
 {
-    return (((int64) nextInt()) << 32) | (int64) (uint64) (uint32) nextInt();
+    return (int64) ((((uint64) (unsigned int) nextInt()) << 32) | (uint64) (unsigned int) nextInt());
 }
 
 bool Random::nextBool() noexcept
@@ -92,12 +105,14 @@ bool Random::nextBool() noexcept
 
 float Random::nextFloat() noexcept
 {
-    return static_cast <uint32> (nextInt()) / (float) 0xffffffff;
+    auto result = static_cast<float> (static_cast<uint32> (nextInt()))
+                  / (static_cast<float> (std::numeric_limits<uint32>::max()) + 1.0f);
+    return result == 1.0f ? 1.0f - std::numeric_limits<float>::epsilon() : result;
 }
 
 double Random::nextDouble() noexcept
 {
-    return static_cast <uint32> (nextInt()) / (double) 0xffffffff;
+    return static_cast<uint32> (nextInt()) / (std::numeric_limits<uint32>::max() + 1.0);
 }
 
 BigInteger Random::nextLargeNumber (const BigInteger& maximumValue)
@@ -111,6 +126,20 @@ BigInteger Random::nextLargeNumber (const BigInteger& maximumValue)
     while (n >= maximumValue);
 
     return n;
+}
+
+void Random::fillBitsRandomly (void* const buffer, size_t bytes)
+{
+    int* d = static_cast<int*> (buffer);
+
+    for (; bytes >= sizeof (int); bytes -= sizeof (int))
+        *d++ = nextInt();
+
+    if (bytes > 0)
+    {
+        const int lastBytes = nextInt();
+        memcpy (d, &lastBytes, bytes);
+    }
 }
 
 void Random::fillBitsRandomly (BigInteger& arrayToChange, int startBit, int numBits)
@@ -134,36 +163,36 @@ void Random::fillBitsRandomly (BigInteger& arrayToChange, int startBit, int numB
         arrayToChange.setBit (startBit + numBits, nextBool());
 }
 
+
+//==============================================================================
 //==============================================================================
 #if JUCE_UNIT_TESTS
 
 class RandomTests  : public UnitTest
 {
 public:
-    RandomTests() : UnitTest ("Random") {}
+    RandomTests()
+        : UnitTest ("Random", UnitTestCategories::maths)
+    {}
 
-    void runTest()
+    void runTest() override
     {
         beginTest ("Random");
 
-        for (int j = 10; --j >= 0;)
+        Random r = getRandom();
+
+        for (int i = 2000; --i >= 0;)
         {
-            Random r;
-            r.setSeedRandomly();
+            expect (r.nextDouble() >= 0.0 && r.nextDouble() < 1.0);
+            expect (r.nextFloat() >= 0.0f && r.nextFloat() < 1.0f);
+            expect (r.nextInt (5) >= 0 && r.nextInt (5) < 5);
+            expect (r.nextInt (1) == 0);
 
-            for (int i = 20; --i >= 0;)
-            {
-                expect (r.nextDouble() >= 0.0 && r.nextDouble() < 1.0);
-                expect (r.nextFloat() >= 0.0f && r.nextFloat() < 1.0f);
-                expect (r.nextInt (5) >= 0 && r.nextInt (5) < 5);
-                expect (r.nextInt (1) == 0);
+            int n = r.nextInt (50) + 1;
+            expect (r.nextInt (n) >= 0 && r.nextInt (n) < n);
 
-                int n = r.nextInt (50) + 1;
-                expect (r.nextInt (n) >= 0 && r.nextInt (n) < n);
-
-                n = r.nextInt (0x7ffffffe) + 1;
-                expect (r.nextInt (n) >= 0 && r.nextInt (n) < n);
-            }
+            n = r.nextInt (0x7ffffffe) + 1;
+            expect (r.nextInt (n) >= 0 && r.nextInt (n) < n);
         }
     }
 };
@@ -171,3 +200,5 @@ public:
 static RandomTests randomTests;
 
 #endif
+
+} // namespace juce

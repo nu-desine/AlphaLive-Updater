@@ -1,36 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_FILECHOOSERDIALOGBOX_JUCEHEADER__
-#define __JUCE_FILECHOOSERDIALOGBOX_JUCEHEADER__
-
-#include "juce_FileBrowserComponent.h"
-#include "../windows/juce_ResizableWindow.h"
-#include "../buttons/juce_TextButton.h"
-#include "../windows/juce_AlertWindow.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -43,10 +37,10 @@
 
     @code
     {
-        WildcardFileFilter wildcardFilter ("*.foo", String::empty, "Foo files");
+        WildcardFileFilter wildcardFilter ("*.foo", String(), "Foo files");
 
         FileBrowserComponent browser (FileBrowserComponent::canSelectFiles,
-                                      File::nonexistent,
+                                      File(),
                                       &wildcardFilter,
                                       nullptr);
 
@@ -66,9 +60,10 @@
     @endcode
 
     @see FileChooser
+
+    @tags{GUI}
 */
 class JUCE_API  FileChooserDialogBox : public ResizableWindow,
-                                       private ButtonListener,  // (can't use Button::Listener due to idiotic VC2005 bug)
                                        private FileBrowserListener
 {
 public:
@@ -85,6 +80,11 @@ public:
                                 if they try to select a file that already exists. (This
                                 flag is only used when saving files)
         @param backgroundColour the background colour for the top level window
+        @param parentComponent  an optional component which should be the parent
+                                for the file chooser. If this is a nullptr then the
+                                dialog box will be a top-level window. AUv3s on iOS
+                                must specify this parameter as opening a top-level window
+                                in an AUv3 is forbidden due to sandbox restrictions.
 
         @see FileBrowserComponent, FilePreviewComponent
     */
@@ -92,13 +92,14 @@ public:
                           const String& instructions,
                           FileBrowserComponent& browserComponent,
                           bool warnAboutOverwritingExistingFiles,
-                          const Colour& backgroundColour);
+                          Colour backgroundColour,
+                          Component* parentComponent = nullptr);
 
     /** Destructor. */
-    ~FileChooserDialogBox();
+    ~FileChooserDialogBox() override;
 
     //==============================================================================
-   #if JUCE_MODAL_LOOPS_PERMITTED
+   #if JUCE_MODAL_LOOPS_PERMITTED || DOXYGEN
     /** Displays and runs the dialog box modally.
 
         This will show the box with the specified size, returning true if the user
@@ -141,12 +142,12 @@ private:
     ContentComponent* content;
     const bool warnAboutOverwritingExistingFiles;
 
-    void buttonClicked (Button*);
     void closeButtonPressed();
-    void selectionChanged();
-    void fileClicked (const File&, const MouseEvent&);
-    void fileDoubleClicked (const File&);
-    void browserRootChanged (const File&);
+    void selectionChanged() override;
+    void fileClicked (const File&, const MouseEvent&) override;
+    void fileDoubleClicked (const File&) override;
+    void browserRootChanged (const File&) override;
+    int getDefaultWidth() const;
 
     void okButtonPressed();
     void createNewFolder();
@@ -158,5 +159,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FileChooserDialogBox)
 };
 
-
-#endif   // __JUCE_FILECHOOSERDIALOGBOX_JUCEHEADER__
+} // namespace juce

@@ -1,36 +1,51 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-LocalisedStrings::LocalisedStrings (const String& fileContents)
+namespace juce
 {
-    loadFromText (fileContents);
+
+LocalisedStrings::LocalisedStrings (const String& fileContents, bool ignoreCase)
+{
+    loadFromText (fileContents, ignoreCase);
 }
 
-LocalisedStrings::LocalisedStrings (const File& fileToLoad)
+LocalisedStrings::LocalisedStrings (const File& fileToLoad, bool ignoreCase)
 {
-    loadFromText (fileToLoad.loadFileAsString());
+    loadFromText (fileToLoad.loadFileAsString(), ignoreCase);
+}
+
+LocalisedStrings::LocalisedStrings (const LocalisedStrings& other)
+    : languageName (other.languageName), countryCodes (other.countryCodes),
+      translations (other.translations), fallback (createCopyIfNotNull (other.fallback.get()))
+{
+}
+
+LocalisedStrings& LocalisedStrings::operator= (const LocalisedStrings& other)
+{
+    languageName = other.languageName;
+    countryCodes = other.countryCodes;
+    translations = other.translations;
+    fallback.reset (createCopyIfNotNull (other.fallback.get()));
+    return *this;
 }
 
 LocalisedStrings::~LocalisedStrings()
@@ -40,11 +55,17 @@ LocalisedStrings::~LocalisedStrings()
 //==============================================================================
 String LocalisedStrings::translate (const String& text) const
 {
+    if (fallback != nullptr && ! translations.containsKey (text))
+        return fallback->translate (text);
+
     return translations.getValue (text, text);
 }
 
 String LocalisedStrings::translate (const String& text, const String& resultIfNotFound) const
 {
+    if (fallback != nullptr && ! translations.containsKey (text))
+        return fallback->translate (text, resultIfNotFound);
+
     return translations.getValue (text, resultIfNotFound);
 }
 
@@ -60,7 +81,7 @@ namespace
     {
         LeakAvoidanceTrick()
         {
-            const ScopedPointer<LocalisedStrings> dummy (new LocalisedStrings (String()));
+            const std::unique_ptr<LocalisedStrings> dummy (new LocalisedStrings (String(), false));
         }
     };
 
@@ -68,16 +89,16 @@ namespace
    #endif
 
     SpinLock currentMappingsLock;
-    ScopedPointer<LocalisedStrings> currentMappings;
+    std::unique_ptr<LocalisedStrings> currentMappings;
 
-    int findCloseQuote (const String& text, int startPos)
+    static int findCloseQuote (const String& text, int startPos)
     {
         juce_wchar lastChar = 0;
-        String::CharPointerType t (text.getCharPointer() + startPos);
+        auto t = text.getCharPointer() + startPos;
 
         for (;;)
         {
-            const juce_wchar c = t.getAndAdvance();
+            auto c = t.getAndAdvance();
 
             if (c == 0 || (c == '"' && lastChar != '\\'))
                 break;
@@ -89,7 +110,7 @@ namespace
         return startPos;
     }
 
-    String unescapeString (const String& s)
+    static String unescapeString (const String& s)
     {
         return s.replace ("\\\"", "\"")
                 .replace ("\\\'", "\'")
@@ -99,27 +120,27 @@ namespace
     }
 }
 
-void LocalisedStrings::loadFromText (const String& fileContents)
+void LocalisedStrings::loadFromText (const String& fileContents, bool ignoreCase)
 {
+    translations.setIgnoresCase (ignoreCase);
+
     StringArray lines;
     lines.addLines (fileContents);
 
-    for (int i = 0; i < lines.size(); ++i)
+    for (auto& l : lines)
     {
-        String line (lines[i].trim());
+        auto line = l.trim();
 
         if (line.startsWithChar ('"'))
         {
-            int closeQuote = findCloseQuote (line, 1);
-
-            const String originalText (unescapeString (line.substring (1, closeQuote)));
+            auto closeQuote = findCloseQuote (line, 1);
+            auto originalText = unescapeString (line.substring (1, closeQuote));
 
             if (originalText.isNotEmpty())
             {
-                const int openingQuote = findCloseQuote (line, closeQuote + 1);
+                auto openingQuote = findCloseQuote (line, closeQuote + 1);
                 closeQuote = findCloseQuote (line, openingQuote + 1);
-
-                const String newText (unescapeString (line.substring (openingQuote + 1, closeQuote)));
+                auto newText = unescapeString (line.substring (openingQuote + 1, closeQuote));
 
                 if (newText.isNotEmpty())
                     translations.set (originalText, newText);
@@ -136,52 +157,50 @@ void LocalisedStrings::loadFromText (const String& fileContents)
             countryCodes.removeEmptyStrings();
         }
     }
+
+    translations.minimiseStorageOverheads();
 }
 
-void LocalisedStrings::setIgnoresCase (const bool shouldIgnoreCase)
+void LocalisedStrings::addStrings (const LocalisedStrings& other)
 {
-    translations.setIgnoresCase (shouldIgnoreCase);
+    jassert (languageName == other.languageName);
+    jassert (countryCodes == other.countryCodes);
+
+    translations.addArray (other.translations);
+}
+
+void LocalisedStrings::setFallback (LocalisedStrings* f)
+{
+    fallback.reset (f);
 }
 
 //==============================================================================
 void LocalisedStrings::setCurrentMappings (LocalisedStrings* newTranslations)
 {
     const SpinLock::ScopedLockType sl (currentMappingsLock);
-    currentMappings = newTranslations;
+    currentMappings.reset (newTranslations);
 }
 
 LocalisedStrings* LocalisedStrings::getCurrentMappings()
 {
-    return currentMappings;
+    return currentMappings.get();
 }
 
-String LocalisedStrings::translateWithCurrentMappings (const String& text)
-{
-    return juce::translate (text);
-}
+String LocalisedStrings::translateWithCurrentMappings (const String& text)  { return juce::translate (text); }
+String LocalisedStrings::translateWithCurrentMappings (const char* text)    { return juce::translate (text); }
 
-String LocalisedStrings::translateWithCurrentMappings (const char* text)
-{
-    return juce::translate (String (text));
-}
+JUCE_API String translate (const String& text)       { return juce::translate (text, text); }
+JUCE_API String translate (const char* text)         { return juce::translate (String (text)); }
+JUCE_API String translate (CharPointer_UTF8 text)    { return juce::translate (String (text)); }
 
-String translate (const String& text)
-{
-    return translate (text, text);
-}
-
-String translate (const char* const literal)
-{
-    const String text (literal);
-    return translate (text, text);
-}
-
-String translate (const String& text, const String& resultIfNotFound)
+JUCE_API String translate (const String& text, const String& resultIfNotFound)
 {
     const SpinLock::ScopedLockType sl (currentMappingsLock);
 
-    if (const LocalisedStrings* const mappings = LocalisedStrings::getCurrentMappings())
+    if (auto* mappings = LocalisedStrings::getCurrentMappings())
         return mappings->translate (text, resultIfNotFound);
 
     return resultIfNotFound;
 }
+
+} // namespace juce

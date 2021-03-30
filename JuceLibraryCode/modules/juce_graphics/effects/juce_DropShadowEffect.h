@@ -1,45 +1,44 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_DROPSHADOWEFFECT_JUCEHEADER__
-#define __JUCE_DROPSHADOWEFFECT_JUCEHEADER__
-
-#include "juce_ImageEffectFilter.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     Defines a drop-shadow effect.
+
+    @tags{Graphics}
 */
 struct JUCE_API  DropShadow
 {
     /** Creates a default drop-shadow effect. */
-    DropShadow() noexcept;
+    DropShadow() = default;
 
     /** Creates a drop-shadow object with the given parameters. */
-    DropShadow (const Colour& shadowColour, int radius, const Point<int>& offset) noexcept;
+    DropShadow (Colour shadowColour, int radius, Point<int> offset) noexcept;
 
     /** Renders a drop-shadow based on the alpha-channel of the given image. */
     void drawForImage (Graphics& g, const Image& srcImage) const;
@@ -56,10 +55,10 @@ struct JUCE_API  DropShadow
         In most cases you'll probably want to leave this as black with an alpha
         value of around 0.5
     */
-    Colour colour;
+    Colour colour { 0x90000000 };
 
     /** The approximate spread of the shadow. */
-    int radius;
+    int radius { 4 };
 
     /** The offset of the shadow. */
     Point<int> offset;
@@ -80,6 +79,8 @@ struct JUCE_API  DropShadow
     shadow, check out ImageConvolutionKernel::createGaussianBlur()
 
     @see Component::setComponentEffect
+
+    @tags{Graphics}
 */
 class JUCE_API  DropShadowEffect  : public ImageEffectFilter
 {
@@ -91,7 +92,7 @@ public:
     DropShadowEffect();
 
     /** Destructor. */
-    ~DropShadowEffect();
+    ~DropShadowEffect() override;
 
     //==============================================================================
     /** Sets up parameters affecting the shadow's appearance. */
@@ -99,7 +100,7 @@ public:
 
     //==============================================================================
     /** @internal */
-    void applyEffect (Image& sourceImage, Graphics& destContext, float scaleFactor, float alpha);
+    void applyEffect (Image& sourceImage, Graphics& destContext, float scaleFactor, float alpha) override;
 
 
 private:
@@ -109,5 +110,4 @@ private:
     JUCE_LEAK_DETECTOR (DropShadowEffect)
 };
 
-
-#endif   // __JUCE_DROPSHADOWEFFECT_JUCEHEADER__
+} // namespace juce

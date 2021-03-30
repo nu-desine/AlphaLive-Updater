@@ -1,43 +1,38 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_DRAWABLE_JUCEHEADER__
-#define __JUCE_DRAWABLE_JUCEHEADER__
-
-#include "../components/juce_Component.h"
-#include "../positioning/juce_RelativeCoordinate.h"
-#include "../positioning/juce_RelativeCoordinatePositioner.h"
-#include "../layout/juce_ComponentBuilder.h"
-class DrawableComposite;
-
+namespace juce
+{
 
 //==============================================================================
 /**
     The base class for objects which can draw themselves, e.g. polygons, images, etc.
 
     @see DrawableComposite, DrawableImage, DrawablePath, DrawableText
+
+    @tags{GUI}
 */
 class JUCE_API  Drawable  : public Component
 {
@@ -51,14 +46,17 @@ protected:
 
 public:
     /** Destructor. */
-    virtual ~Drawable();
+    ~Drawable() override;
 
     //==============================================================================
     /** Creates a deep copy of this Drawable object.
 
         Use this to create a new copy of this and any sub-objects in the tree.
     */
-    virtual Drawable* createCopy() const = 0;
+    virtual std::unique_ptr<Drawable> createCopy() const = 0;
+
+    /** Creates a path that describes the outline of this drawable. */
+    virtual Path getOutlineAsPath() const = 0;
 
     //==============================================================================
     /** Renders this Drawable object.
@@ -70,11 +68,11 @@ public:
         @see drawWithin
     */
     void draw (Graphics& g, float opacity,
-               const AffineTransform& transform = AffineTransform::identity) const;
+               const AffineTransform& transform = AffineTransform()) const;
 
     /** Renders the Drawable at a given offset within the Graphics context.
 
-        The co-ordinates passed-in are used to translate the object relative to its own
+        The coordinates passed-in are used to translate the object relative to its own
         origin before drawing it - this is basically a quick way of saying:
 
         @code
@@ -104,8 +102,8 @@ public:
         @param opacity                  the opacity to use, in the range 0 to 1.0
     */
     void drawWithin (Graphics& g,
-                     const Rectangle<float>& destArea,
-                     const RectanglePlacement& placement,
+                     Rectangle<float> destArea,
+                     RectanglePlacement placement,
                      float opacity) const;
 
 
@@ -113,15 +111,20 @@ public:
     /** Resets any transformations on this drawable, and positions its origin within
         its parent component.
     */
-    void setOriginWithOriginalSize (const Point<float>& originWithinParent);
+    void setOriginWithOriginalSize (Point<float> originWithinParent);
 
     /** Sets a transform for this drawable that will position it within the specified
         area of its parent component.
     */
-    void setTransformToFit (const Rectangle<float>& areaInParent, const RectanglePlacement& placement);
+    void setTransformToFit (const Rectangle<float>& areaInParent, RectanglePlacement placement);
 
     /** Returns the DrawableComposite that contains this object, if there is one. */
     DrawableComposite* getParent() const;
+
+    /** Sets a the clipping region of this drawable using another drawable.
+        The drawable passed in will be deleted when no longer needed.
+    */
+    void setClipPath (std::unique_ptr<Drawable> drawableClipPath);
 
     //==============================================================================
     /** Tries to turn some kind of image file into a drawable.
@@ -129,77 +132,59 @@ public:
         The data could be an image that the ImageFileFormat class understands, or it
         could be SVG.
     */
-    static Drawable* createFromImageData (const void* data, size_t numBytes);
+    static std::unique_ptr<Drawable> createFromImageData (const void* data, size_t numBytes);
 
     /** Tries to turn a stream containing some kind of image data into a drawable.
 
         The data could be an image that the ImageFileFormat class understands, or it
         could be SVG.
     */
-    static Drawable* createFromImageDataStream (InputStream& dataSource);
+    static std::unique_ptr<Drawable> createFromImageDataStream (InputStream& dataSource);
 
     /** Tries to turn a file containing some kind of image data into a drawable.
 
         The data could be an image that the ImageFileFormat class understands, or it
         could be SVG.
     */
-    static Drawable* createFromImageFile (const File& file);
+    static std::unique_ptr<Drawable> createFromImageFile (const File& file);
 
     /** Attempts to parse an SVG (Scalable Vector Graphics) document, and to turn this
         into a Drawable tree.
 
-        The object returned must be deleted by the caller. If something goes wrong
-        while parsing, it may return 0.
+        If something goes wrong while parsing, it may return nullptr.
 
         SVG is a pretty large and complex spec, and this doesn't aim to be a full
         implementation, but it can return the basic vector objects.
     */
-    static Drawable* createFromSVG (const XmlElement& svgDocument);
+    static std::unique_ptr<Drawable> createFromSVG (const XmlElement& svgDocument);
+
+    /** Attempts to parse an SVG (Scalable Vector Graphics) document from a file,
+        and to turn this into a Drawable tree.
+
+        If something goes wrong while parsing, it may return nullptr.
+
+        SVG is a pretty large and complex spec, and this doesn't aim to be a full
+        implementation, but it can return the basic vector objects.
+
+        Any references to references to external image files will be relative to
+        the parent directory of the file passed.
+    */
+    static std::unique_ptr<Drawable> createFromSVGFile (const File& svgFile);
+
+    /** Parses an SVG path string and returns it. */
+    static Path parseSVGPath (const String& svgPath);
 
     //==============================================================================
-    /** Tries to create a Drawable from a previously-saved ValueTree.
-        The ValueTree must have been created by the createValueTree() method.
-        If there are any images used within the drawable, you'll need to provide a valid
-        ImageProvider object that can be used to retrieve these images from whatever type
-        of identifier is used to represent them.
-        Internally, this uses a ComponentBuilder, and registerDrawableTypeHandlers().
-    */
-    static Drawable* createFromValueTree (const ValueTree& tree, ComponentBuilder::ImageProvider* imageProvider);
-
-    /** Creates a ValueTree to represent this Drawable.
-        The ValueTree that is returned can be turned back into a Drawable with createFromValueTree().
-        If there are any images used in this drawable, you'll need to provide a valid ImageProvider
-        object that can be used to create storable representations of them.
-    */
-    virtual ValueTree createValueTree (ComponentBuilder::ImageProvider* imageProvider) const = 0;
-
-    /** Returns the area that this drawble covers.
+    /** Returns the area that this drawable covers.
         The result is expressed in this drawable's own coordinate space, and does not take
         into account any transforms that may be applied to the component.
     */
     virtual Rectangle<float> getDrawableBounds() const = 0;
 
-    //==============================================================================
-    /** Internal class used to manage ValueTrees that represent Drawables. */
-    class ValueTreeWrapperBase
-    {
-    public:
-        ValueTreeWrapperBase (const ValueTree& state);
-
-        ValueTree& getState() noexcept          { return state; }
-
-        String getID() const;
-        void setID (const String& newID);
-
-        ValueTree state;
-    };
-
-    //==============================================================================
-    /** Registers a set of ComponentBuilder::TypeHandler objects that can be used to
-        load all the different Drawable types from a saved state.
-        @see ComponentBuilder::registerTypeHandler()
+    /** Recursively replaces a colour that might be used for filling or stroking.
+        return true if any instances of this colour were found.
     */
-    static void registerDrawableTypeHandlers (ComponentBuilder& componentBuilder);
+    virtual bool replaceColour (Colour originalColour, Colour replacementColour);
 
 protected:
     //==============================================================================
@@ -209,50 +194,20 @@ protected:
     /** @internal */
     void transformContextToCorrectOrigin (Graphics&);
     /** @internal */
-    void parentHierarchyChanged();
+    void parentHierarchyChanged() override;
     /** @internal */
-    void setBoundsToEnclose (const Rectangle<float>&);
+    void setBoundsToEnclose (Rectangle<float>);
+    /** @internal */
+    void applyDrawableClipPath (Graphics&);
 
     Point<int> originRelativeToComponent;
+    std::unique_ptr<Drawable> drawableClipPath;
 
-  #ifndef DOXYGEN
-    /** Internal utility class used by Drawables. */
-    template <class DrawableType>
-    class Positioner  : public RelativeCoordinatePositionerBase
-    {
-    public:
-        Positioner (DrawableType& c)
-            : RelativeCoordinatePositionerBase (c),
-              owner (c)
-        {}
-
-        bool registerCoordinates()      { return owner.registerCoordinates (*this); }
-        void applyToComponentBounds()
-        {
-            ComponentScope scope (getComponent());
-            owner.recalculateCoordinates (&scope);
-        }
-
-        void applyNewBounds (const Rectangle<int>&)
-        {
-            jassertfalse; // drawables can't be resized directly!
-        }
-
-    private:
-        DrawableType& owner;
-
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Positioner)
-    };
+    void nonConstDraw (Graphics&, float opacity, const AffineTransform&);
 
     Drawable (const Drawable&);
-  #endif
-
-private:
-    void nonConstDraw (Graphics& g, float opacity, const AffineTransform& transform);
-
     Drawable& operator= (const Drawable&);
     JUCE_LEAK_DETECTOR (Drawable)
 };
 
-
-#endif   // __JUCE_DRAWABLE_JUCEHEADER__
+} // namespace juce

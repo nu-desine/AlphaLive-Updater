@@ -1,33 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_TOOLBARBUTTON_JUCEHEADER__
-#define __JUCE_TOOLBARBUTTON_JUCEHEADER__
-
-#include "../widgets/juce_ToolbarItemComponent.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -38,6 +35,8 @@
     toggle button.
 
     @see Toolbar, ToolbarItemFactory, ToolbarItemComponent, Drawable, Button
+
+    @tags{GUI}
 */
 class JUCE_API  ToolbarButton   : public ToolbarItemComponent
 {
@@ -55,39 +54,39 @@ public:
                             deleted when no longer needed or when this button is deleted.
         @param toggledOnImage  a drawable object that the button can use as its icon if the button
                             is in a toggled-on state (see the Button::getToggleState() method). If
-                            0 is passed-in here, then the normal image will be used instead, regardless
-                            of the toggle state. The object that is passed-in here will be kept by
-                            this object and will be deleted when no longer needed or when this button
-                            is deleted.
+                            nullptr is passed-in here, then the normal image will be used instead,
+                            regardless of the toggle state. The object that is passed-in here will be
+                            owned by this object and will be deleted when no longer needed or when
+                            this button is deleted.
     */
     ToolbarButton (int itemId,
                    const String& labelText,
-                   Drawable* normalImage,
-                   Drawable* toggledOnImage);
+                   std::unique_ptr<Drawable> normalImage,
+                   std::unique_ptr<Drawable> toggledOnImage);
 
     /** Destructor. */
-    ~ToolbarButton();
+    ~ToolbarButton() override;
 
 
     //==============================================================================
     /** @internal */
     bool getToolbarItemSizes (int toolbarDepth, bool isToolbarVertical, int& preferredSize,
-                              int& minSize, int& maxSize);
+                              int& minSize, int& maxSize) override;
     /** @internal */
-    void paintButtonArea (Graphics&, int width, int height, bool isMouseOver, bool isMouseDown);
+    void paintButtonArea (Graphics&, int width, int height, bool isMouseOver, bool isMouseDown) override;
     /** @internal */
-    void contentAreaChanged (const Rectangle<int>&);
+    void contentAreaChanged (const Rectangle<int>&) override;
     /** @internal */
-    void buttonStateChanged();
+    void buttonStateChanged() override;
     /** @internal */
-    void resized();
+    void resized() override;
     /** @internal */
-    void enablementChanged();
+    void enablementChanged() override;
 
 private:
     //==============================================================================
-    ScopedPointer<Drawable> normalImage, toggledOnImage;
-    Drawable* currentImage;
+    std::unique_ptr<Drawable> normalImage, toggledOnImage;
+    Drawable* currentImage = nullptr;
 
     void updateDrawable();
     Drawable* getImageToUse() const;
@@ -96,5 +95,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToolbarButton)
 };
 
-
-#endif   // __JUCE_TOOLBARBUTTON_JUCEHEADER__
+} // namespace juce

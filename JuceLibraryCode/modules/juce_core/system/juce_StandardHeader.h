@@ -1,41 +1,37 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_STANDARDHEADER_JUCEHEADER__
-#define __JUCE_STANDARDHEADER_JUCEHEADER__
+#pragma once
 
 //==============================================================================
 /** Current JUCE version number.
 
     See also SystemStats::getJUCEVersion() for a string version.
 */
-#define JUCE_MAJOR_VERSION      2
+#define JUCE_MAJOR_VERSION      6
 #define JUCE_MINOR_VERSION      0
-#define JUCE_BUILDNUMBER        38
+#define JUCE_BUILDNUMBER        8
 
-/** Current Juce version number.
+/** Current JUCE version number.
 
     Bits 16 to 32 = major version.
     Bits 8 to 16 = minor version.
@@ -47,38 +43,48 @@
 
 
 //==============================================================================
-#include "juce_TargetPlatform.h"  // (sets up the various JUCE_WINDOWS, JUCE_MAC, etc flags)
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <cmath>
+#include <condition_variable>
+#include <cstddef>
+#include <functional>
+#include <iomanip>
+#include <iostream>
+#include <limits>
+#include <list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <numeric>
+#include <queue>
+#include <sstream>
+#include <unordered_set>
+#include <vector>
+
+//==============================================================================
+#include "juce_CompilerSupport.h"
+#include "juce_CompilerWarnings.h"
 #include "juce_PlatformDefs.h"
 
 //==============================================================================
 // Now we'll include some common OS headers..
+JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4514 4245 4100)
+
 #if JUCE_MSVC
- #pragma warning (push)
- #pragma warning (disable: 4514 4245 4100)
-#endif
-
-#include <cstdlib>
-#include <cstdarg>
-#include <climits>
-#include <limits>
-#include <cmath>
-#include <cwchar>
-#include <stdexcept>
-#include <typeinfo>
-#include <cstring>
-#include <cstdio>
-#include <iostream>
-#include <vector>
-
-#if JUCE_USE_INTRINSICS
  #include <intrin.h>
 #endif
 
+
 #if JUCE_MAC || JUCE_IOS
  #include <libkern/OSAtomic.h>
+ #include <xlocale.h>
+ #include <signal.h>
 #endif
 
 #if JUCE_LINUX
+ #include <cstring>
  #include <signal.h>
 
  #if __INTEL_COMPILER
@@ -94,20 +100,25 @@
  #include <crtdbg.h>
 #endif
 
-#if JUCE_MSVC
- #pragma warning (pop)
+JUCE_END_IGNORE_WARNINGS_MSVC
+
+#if JUCE_MINGW
+ #include <cstring>
+ #include <sys/types.h>
 #endif
 
 #if JUCE_ANDROID
- #include <sys/atomics.h>
+ #include <cstring>
  #include <byteswap.h>
 #endif
 
 // undef symbols that are sometimes set by misguided 3rd-party headers..
-#undef check
 #undef TYPE_BOOL
 #undef max
 #undef min
+#undef major
+#undef minor
+#undef KeyPress
 
 //==============================================================================
 // DLL building settings on Windows
@@ -128,7 +139,7 @@
 
 //==============================================================================
 #ifndef JUCE_API
- #define JUCE_API   /**< This macro is added to all juce public class declarations. */
+ #define JUCE_API   /**< This macro is added to all JUCE public class declarations. */
 #endif
 
 #if JUCE_MSVC && JUCE_DLL_BUILD
@@ -137,7 +148,7 @@
  #define JUCE_PUBLIC_IN_DLL_BUILD(declaration)  declaration;
 #endif
 
-/** This macro is added to all juce public function declarations. */
+/** This macro is added to all JUCE public function declarations. */
 #define JUCE_PUBLIC_FUNCTION        JUCE_API JUCE_CALLTYPE
 
 #if (! defined (JUCE_CATCH_DEPRECATED_CODE_MISUSE)) && JUCE_DEBUG && ! DOXYGEN
@@ -150,22 +161,3 @@
 #ifndef DOXYGEN
  #define JUCE_NAMESPACE juce  // This old macro is deprecated: you should just use the juce namespace directly.
 #endif
-
-//==============================================================================
-// Now include some common headers...
-namespace juce
-{
-    extern JUCE_API bool JUCE_CALLTYPE juce_isRunningUnderDebugger();
-
-    #if JUCE_LOG_ASSERTIONS
-     extern JUCE_API void logAssertion (const char* file, int line) noexcept;
-    #endif
-
-    #include "../memory/juce_Memory.h"
-    #include "../maths/juce_MathsFunctions.h"
-    #include "../memory/juce_ByteOrder.h"
-    #include "../logging/juce_Logger.h"
-    #include "../memory/juce_LeakedObjectDetector.h"
-}
-
-#endif   // __JUCE_STANDARDHEADER_JUCEHEADER__

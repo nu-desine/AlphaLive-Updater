@@ -1,30 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MEMORYMAPPEDAUDIOFORMATREADER_JUCEHEADER__
-#define __JUCE_MEMORYMAPPEDAUDIOFORMATREADER_JUCEHEADER__
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -40,6 +40,8 @@
     read has been mapped.
 
     @see AudioFormat::createMemoryMappedReader, AudioFormatReader
+
+    @tags{Audio}
 */
 class JUCE_API  MemoryMappedAudioFormatReader  : public AudioFormatReader
 {
@@ -62,21 +64,27 @@ public:
     bool mapEntireFile();
 
     /** Attempts to map a section of the file into memory. */
-    bool mapSectionOfFile (const Range<int64>& samplesToMap);
+    virtual bool mapSectionOfFile (Range<int64> samplesToMap);
 
     /** Returns the sample range that's currently memory-mapped and available for reading. */
-    const Range<int64>& getMappedSection() const noexcept   { return mappedSection; }
+    Range<int64> getMappedSection() const noexcept          { return mappedSection; }
 
     /** Touches the memory for the given sample, to force it to be loaded into active memory. */
     void touchSample (int64 sample) const noexcept;
 
+    /** Returns the samples for all channels at a given sample position.
+        The result array must be large enough to hold a value for each channel
+        that this reader contains.
+    */
+    virtual void getSample (int64 sampleIndex, float* result) const noexcept = 0;
+
     /** Returns the number of bytes currently being mapped */
-    size_t getNumBytesUsed() const           { return map != nullptr ? map->getSize() : 0; }
+    size_t getNumBytesUsed() const                          { return map != nullptr ? map->getSize() : 0; }
 
 protected:
     File file;
     Range<int64> mappedSection;
-    ScopedPointer<MemoryMappedFile> map;
+    std::unique_ptr<MemoryMappedFile> map;
     int64 dataChunkStart, dataLength;
     int bytesPerFrame;
 
@@ -91,16 +99,15 @@ protected:
 
     /** Used by AudioFormatReader subclasses to scan for min/max ranges in interleaved data. */
     template <typename SampleType, typename Endianness>
-    void scanMinAndMaxInterleaved (int channel, int64 startSampleInFile, int64 numSamples, float& mn, float& mx) const noexcept
+    Range<float> scanMinAndMaxInterleaved (int channel, int64 startSampleInFile, int64 numSamples) const noexcept
     {
-        typedef AudioData::Pointer <SampleType, Endianness, AudioData::Interleaved, AudioData::Const> SourceType;
+        using SourceType = AudioData::Pointer <SampleType, Endianness, AudioData::Interleaved, AudioData::Const>;
 
-        SourceType (addBytesToPointer (sampleToPointer (startSampleInFile), (bitsPerSample / 8) * channel), (int) numChannels)
-           .findMinAndMax ((size_t) numSamples, mn, mx);
+        return SourceType (addBytesToPointer (sampleToPointer (startSampleInFile), ((int) bitsPerSample / 8) * channel), (int) numChannels)
+                .findMinAndMax ((size_t) numSamples);
     }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MemoryMappedAudioFormatReader)
 };
 
-
-#endif   // __JUCE_MEMORYMAPPEDAUDIOFORMATREADER_JUCEHEADER__
+} // namespace juce

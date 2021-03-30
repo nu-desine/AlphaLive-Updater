@@ -1,50 +1,48 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_DRAWABLEIMAGE_JUCEHEADER__
-#define __JUCE_DRAWABLEIMAGE_JUCEHEADER__
-
-#include "juce_Drawable.h"
-#include "../positioning/juce_RelativeParallelogram.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     A drawable object which is a bitmap image.
 
     @see Drawable
+
+    @tags{GUI}
 */
 class JUCE_API  DrawableImage  : public Drawable
 {
 public:
     //==============================================================================
     DrawableImage();
-    DrawableImage (const DrawableImage& other);
+    DrawableImage (const DrawableImage&);
 
     /** Destructor. */
-    ~DrawableImage();
+    ~DrawableImage() override;
 
     //==============================================================================
     /** Sets the image that this drawable will render. */
@@ -68,75 +66,44 @@ public:
         This is handy for doing things like darkening or lightening an image by overlaying
         it with semi-transparent black or white.
     */
-    void setOverlayColour (const Colour& newOverlayColour);
+    void setOverlayColour (Colour newOverlayColour);
 
     /** Returns the overlay colour. */
-    const Colour& getOverlayColour() const noexcept             { return overlayColour; }
+    Colour getOverlayColour() const noexcept                    { return overlayColour; }
 
     /** Sets the bounding box within which the image should be displayed. */
-    void setBoundingBox (const RelativeParallelogram& newBounds);
+    void setBoundingBox (Parallelogram<float> newBounds);
+
+    /** Sets the bounding box within which the image should be displayed. */
+    void setBoundingBox (Rectangle<float> newBounds);
 
     /** Returns the position to which the image's top-left corner should be remapped in the target
         coordinate space when rendering this object.
         @see setTransform
     */
-    const RelativeParallelogram& getBoundingBox() const noexcept        { return bounds; }
+    Parallelogram<float> getBoundingBox() const noexcept        { return bounds; }
 
     //==============================================================================
     /** @internal */
-    void paint (Graphics& g);
+    void paint (Graphics&) override;
     /** @internal */
-    bool hitTest (int x, int y);
+    bool hitTest (int x, int y) override;
     /** @internal */
-    Drawable* createCopy() const;
+    std::unique_ptr<Drawable> createCopy() const override;
     /** @internal */
-    Rectangle<float> getDrawableBounds() const;
+    Rectangle<float> getDrawableBounds() const override;
     /** @internal */
-    void refreshFromValueTree (const ValueTree& tree, ComponentBuilder& builder);
-    /** @internal */
-    ValueTree createValueTree (ComponentBuilder::ImageProvider* imageProvider) const;
-    /** @internal */
-    static const Identifier valueTreeType;
-
-    //==============================================================================
-    /** Internally-used class for wrapping a DrawableImage's state into a ValueTree. */
-    class ValueTreeWrapper   : public Drawable::ValueTreeWrapperBase
-    {
-    public:
-        ValueTreeWrapper (const ValueTree& state);
-
-        var getImageIdentifier() const;
-        void setImageIdentifier (const var& newIdentifier, UndoManager* undoManager);
-        Value getImageIdentifierValue (UndoManager* undoManager);
-
-        float getOpacity() const;
-        void setOpacity (float newOpacity, UndoManager* undoManager);
-        Value getOpacityValue (UndoManager* undoManager);
-
-        Colour getOverlayColour() const;
-        void setOverlayColour (const Colour& newColour, UndoManager* undoManager);
-        Value getOverlayColourValue (UndoManager* undoManager);
-
-        RelativeParallelogram getBoundingBox() const;
-        void setBoundingBox (const RelativeParallelogram& newBounds, UndoManager* undoManager);
-
-        static const Identifier opacity, overlay, image, topLeft, topRight, bottomLeft;
-    };
+    Path getOutlineAsPath() const override;
 
 private:
     //==============================================================================
     Image image;
-    float opacity;
-    Colour overlayColour;
-    RelativeParallelogram bounds;
-
-    friend class Drawable::Positioner<DrawableImage>;
-    bool registerCoordinates (RelativeCoordinatePositionerBase&);
-    void recalculateCoordinates (Expression::Scope*);
+    float opacity = 1.0f;
+    Colour overlayColour { 0 };
+    Parallelogram<float> bounds;
 
     DrawableImage& operator= (const DrawableImage&);
     JUCE_LEAK_DETECTOR (DrawableImage)
 };
 
-
-#endif   // __JUCE_DRAWABLEIMAGE_JUCEHEADER__
+} // namespace juce

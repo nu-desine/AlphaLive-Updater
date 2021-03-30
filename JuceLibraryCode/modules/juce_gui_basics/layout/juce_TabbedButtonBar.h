@@ -1,32 +1,31 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_TABBEDBUTTONBAR_JUCEHEADER__
-#define __JUCE_TABBEDBUTTONBAR_JUCEHEADER__
+namespace juce
+{
 
-#include "../buttons/juce_Button.h"
 class TabbedButtonBar;
 
 
@@ -38,6 +37,8 @@ class TabbedButtonBar;
     method to create it instead of the default one.
 
     @see TabbedButtonBar
+
+    @tags{GUI}
 */
 class JUCE_API  TabBarButton  : public Button
 {
@@ -47,7 +48,7 @@ public:
     TabBarButton (const String& name, TabbedButtonBar& ownerBar);
 
     /** Destructor. */
-    ~TabBarButton();
+    ~TabBarButton() override;
 
     /** Returns the bar that contains this button. */
     TabbedButtonBar& getTabbedButtonBar() const   { return owner; }
@@ -72,7 +73,7 @@ public:
                             ExtraComponentPlacement extraComponentPlacement);
 
     /** Returns the custom component, if there is one. */
-    Component* getExtraComponent() const noexcept                           { return extraComponent; }
+    Component* getExtraComponent() const noexcept                           { return extraComponent.get(); }
 
     /** Returns the placement of the custom component, if there is one. */
     ExtraComponentPlacement getExtraComponentPlacement() const noexcept     { return extraCompPlacement; }
@@ -107,25 +108,26 @@ public:
 
     //==============================================================================
     /** @internal */
-    void paintButton (Graphics&, bool isMouseOverButton, bool isButtonDown);
+    void paintButton (Graphics&, bool, bool) override;
     /** @internal */
-    void clicked (const ModifierKeys&);
+    void clicked (const ModifierKeys&) override;
     /** @internal */
-    bool hitTest (int x, int y);
+    bool hitTest (int x, int y) override;
     /** @internal */
-    void resized();
+    void resized() override;
     /** @internal */
-    void childBoundsChanged (Component*);
+    void childBoundsChanged (Component*) override;
 
 protected:
     friend class TabbedButtonBar;
     TabbedButtonBar& owner;
-    int overlapPixels;
+    int overlapPixels = 0;
 
-    ScopedPointer<Component> extraComponent;
-    ExtraComponentPlacement extraCompPlacement;
+    std::unique_ptr<Component> extraComponent;
+    ExtraComponentPlacement extraCompPlacement = afterText;
 
 private:
+    using Button::clicked;
     void calcAreas (Rectangle<int>&, Rectangle<int>&) const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TabBarButton)
@@ -145,6 +147,8 @@ private:
     and other housekeeping.
 
     @see TabbedComponent
+
+    @tags{GUI}
 */
 class JUCE_API  TabbedButtonBar  : public Component,
                                    public ChangeBroadcaster
@@ -169,7 +173,7 @@ public:
     TabbedButtonBar (Orientation orientation);
 
     /** Destructor. */
-    ~TabbedButtonBar();
+    ~TabbedButtonBar() override;
 
     //==============================================================================
     /** Changes the bar's orientation.
@@ -207,19 +211,19 @@ public:
         If this is the first tab added, it'll also be automatically selected.
     */
     void addTab (const String& tabName,
-                 const Colour& tabBackgroundColour,
+                 Colour tabBackgroundColour,
                  int insertIndex);
 
     /** Changes the name of one of the tabs. */
     void setTabName (int tabIndex, const String& newName);
 
     /** Gets rid of one of the tabs. */
-    void removeTab (int tabIndex);
+    void removeTab (int tabIndex, bool animate = false);
 
     /** Moves a tab to a new index in the list.
         Pass -1 as the index to move it to the end of the list.
     */
-    void moveTab (int currentIndex, int newIndex);
+    void moveTab (int currentIndex, int newIndex, bool animate = false);
 
     /** Returns the number of tabs in the bar. */
     int getNumTabs() const;
@@ -256,6 +260,9 @@ public:
     /** Returns the index of a TabBarButton if it belongs to this bar. */
     int indexOfTabButton (const TabBarButton* button) const;
 
+    /** Returns the final bounds of this button if it is currently being animated. */
+    Rectangle<int> getTargetBounds (TabBarButton* button) const;
+
     //==============================================================================
     /** Callback method to indicate the selected tab has been changed.
         @see setCurrentTabIndex
@@ -274,7 +281,7 @@ public:
     /** Changes the background colour of a tab.
         @see addTab, getTabBackgroundColour
     */
-    void setTabBackgroundColour (int tabIndex, const Colour& newColour);
+    void setTabBackgroundColour (int tabIndex, Colour newColour);
 
     //==============================================================================
     /** A set of colour IDs to use to change the colour of various aspects of the component.
@@ -296,10 +303,37 @@ public:
     };
 
     //==============================================================================
+    /** This abstract base class is implemented by LookAndFeel classes to provide
+        window drawing functionality.
+    */
+    struct JUCE_API  LookAndFeelMethods
+    {
+        virtual ~LookAndFeelMethods() = default;
+
+        virtual int getTabButtonSpaceAroundImage() = 0;
+        virtual int getTabButtonOverlap (int tabDepth) = 0;
+        virtual int getTabButtonBestWidth (TabBarButton&, int tabDepth) = 0;
+        virtual Rectangle<int> getTabButtonExtraComponentBounds (const TabBarButton&, Rectangle<int>& textArea, Component& extraComp) = 0;
+
+        virtual void drawTabButton (TabBarButton&, Graphics&, bool isMouseOver, bool isMouseDown) = 0;
+        virtual Font getTabButtonFont (TabBarButton&, float height) = 0;
+        virtual void drawTabButtonText (TabBarButton&, Graphics&, bool isMouseOver, bool isMouseDown) = 0;
+        virtual void drawTabbedButtonBarBackground (TabbedButtonBar&, Graphics&) = 0;
+        virtual void drawTabAreaBehindFrontButton (TabbedButtonBar&, Graphics&, int w, int h) = 0;
+
+        virtual void createTabButtonShape (TabBarButton&, Path& path,  bool isMouseOver, bool isMouseDown) = 0;
+        virtual void fillTabButtonShape (TabBarButton&, Graphics&, const Path& path, bool isMouseOver, bool isMouseDown) = 0;
+
+        virtual Button* createTabBarExtrasButton() = 0;
+    };
+
+    //==============================================================================
     /** @internal */
-    void resized();
+    void paint (Graphics&) override;
     /** @internal */
-    void lookAndFeelChanged();
+    void resized() override;
+    /** @internal */
+    void lookAndFeelChanged() override;
 
 protected:
     //==============================================================================
@@ -311,31 +345,27 @@ protected:
     virtual TabBarButton* createTabButton (const String& tabName, int tabIndex);
 
 private:
-    Orientation orientation;
-
     struct TabInfo
     {
-        ScopedPointer<TabBarButton> button;
+        std::unique_ptr<TabBarButton> button;
         String name;
         Colour colour;
     };
 
-    OwnedArray <TabInfo> tabs;
+    OwnedArray<TabInfo> tabs;
 
-    double minimumScale;
-    int currentTabIndex;
+    Orientation orientation;
+    double minimumScale = 0.7;
+    int currentTabIndex = -1;
 
     class BehindFrontTabComp;
-    friend class BehindFrontTabComp;
-    friend class ScopedPointer<BehindFrontTabComp>;
-    ScopedPointer<BehindFrontTabComp> behindFrontTab;
-    ScopedPointer<Button> extraTabsButton;
+    std::unique_ptr<BehindFrontTabComp> behindFrontTab;
+    std::unique_ptr<Button> extraTabsButton;
 
     void showExtraItemsMenu();
-    static void extraItemsMenuCallback (int, TabbedButtonBar*);
+    void updateTabPositions (bool animate);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TabbedButtonBar)
 };
 
-
-#endif   // __JUCE_TABBEDBUTTONBAR_JUCEHEADER__
+} // namespace juce

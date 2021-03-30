@@ -1,33 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_CODEEDITORCOMPONENT_JUCEHEADER__
-#define __JUCE_CODEEDITORCOMPONENT_JUCEHEADER__
+namespace juce
+{
 
-#include "juce_CodeDocument.h"
 class CodeTokeniser;
+
 
 //==============================================================================
 /**
@@ -35,6 +35,8 @@ class CodeTokeniser;
 
     This is designed to handle syntax highlighting and fast editing of very large
     files.
+
+    @tags{GUI}
 */
 class JUCE_API  CodeEditorComponent   : public Component,
                                         public ApplicationCommandTarget,
@@ -54,7 +56,7 @@ public:
                          CodeTokeniser* codeTokeniser);
 
     /** Destructor. */
-    ~CodeEditorComponent();
+    ~CodeEditorComponent() override;
 
     //==============================================================================
     /** Returns the code document that this component is editing. */
@@ -91,7 +93,7 @@ public:
     CodeDocument::Position getCaretPos() const                  { return caretPos; }
 
     /** Returns the position of the caret, relative to the editor's origin. */
-    Rectangle<int> getCaretRectangle();
+    Rectangle<int> getCaretRectangle() override;
 
     /** Moves the caret.
         If selecting is true, the section of the document between the current
@@ -106,9 +108,15 @@ public:
     Rectangle<int> getCharacterBounds (const CodeDocument::Position& pos) const;
 
     /** Finds the character at a given on-screen position.
-        The co-ordinates are relative to this component's top-left origin.
+        The coordinates are relative to this component's top-left origin.
     */
     CodeDocument::Position getPositionAt (int x, int y);
+
+    /** Returns the start of the selection as a position. */
+    CodeDocument::Position getSelectionStart() const            { return selectionStart; }
+
+    /** Returns the end of the selection as a position. */
+    CodeDocument::Position getSelectionEnd() const              { return selectionEnd; }
 
     /** Enables or disables the line-number display in the gutter. */
     void setLineNumbersShown (bool shouldBeShown);
@@ -129,9 +137,9 @@ public:
     bool deleteBackwards (bool moveInWholeWordSteps);
     bool deleteForwards (bool moveInWholeWordSteps);
     bool deleteWhitespaceBackwardsToTabStop();
-    bool copyToClipboard();
-    bool cutToClipboard();
-    bool pasteFromClipboard();
+    virtual bool copyToClipboard();
+    virtual bool cutToClipboard();
+    virtual bool pasteFromClipboard();
     bool undo();
     bool redo();
 
@@ -143,32 +151,32 @@ public:
     void scrollBy (int deltaLines);
     void scrollToColumn (int newFirstColumnOnScreen);
     void scrollToKeepCaretOnScreen();
-    void scrollToKeepLinesOnScreen (const Range<int>& linesToShow);
+    void scrollToKeepLinesOnScreen (Range<int> linesToShow);
 
-    void insertTextAtCaret (const String& textToInsert);
+    void insertTextAtCaret (const String& textToInsert) override;
     void insertTabAtCaret();
 
     void indentSelection();
     void unindentSelection();
 
     //==============================================================================
-    Range<int> getHighlightedRegion() const;
+    Range<int> getHighlightedRegion() const override;
     bool isHighlightActive() const noexcept;
-    void setHighlightedRegion (const Range<int>& newRange);
-    String getTextInRange (const Range<int>& range) const;
+    void setHighlightedRegion (const Range<int>& newRange) override;
+    String getTextInRange (const Range<int>& range) const override;
 
     //==============================================================================
     /** Can be used to save and restore the editor's caret position, selection state, etc. */
     struct State
     {
         /** Creates an object containing the state of the given editor. */
-        State (const CodeEditorComponent& editor);
+        State (const CodeEditorComponent&);
         /** Creates a state object from a string that was previously created with toString(). */
         State (const String& stringifiedVersion);
-        State (const State& other) noexcept;
+        State (const State&) noexcept;
 
         /** Updates the given editor with this saved state. */
-        void restoreState (CodeEditorComponent& editor) const;
+        void restoreState (CodeEditorComponent&) const;
 
         /** Returns a stringified version of this state that can be used to recreate it later. */
         String toString() const;
@@ -205,9 +213,17 @@ public:
     /** Returns the font that the editor is using. */
     const Font& getFont() const noexcept                { return font; }
 
+    /** Makes the editor read-only. */
+    void setReadOnly (bool shouldBeReadOnly) noexcept;
+
+    /** Returns true if the editor is set to be read-only. */
+    bool isReadOnly() const noexcept                    { return readOnly; }
+
     //==============================================================================
+    /** Defines a syntax highlighting colour scheme */
     struct JUCE_API  ColourScheme
     {
+        /** Defines a colour for a token type */
         struct TokenType
         {
             String name;
@@ -216,7 +232,7 @@ public:
 
         Array<TokenType> types;
 
-        void set (const String& name, const Colour& colour);
+        void set (const String& name, Colour colour);
     };
 
     /** Changes the syntax highlighting scheme.
@@ -233,7 +249,20 @@ public:
         The token type values are dependent on the tokeniser being used.
         @see setColourScheme
     */
-    Colour getColourForTokenType (const int tokenType) const;
+    Colour getColourForTokenType (int tokenType) const;
+
+    /** Rebuilds the syntax highlighting for a section of text.
+
+        This happens automatically any time the CodeDocument is edited, but this
+        method lets you change text colours even when the CodeDocument hasn't changed.
+
+        For example, you could use this to highlight tokens as the cursor moves.
+        To do so you'll need to tell your custom CodeTokeniser where the token you
+        want to highlight is, and make it return a special type of token. Then you
+        should call this method supplying the range of the highlighted text.
+        @see CodeTokeniser
+     */
+    void retokenise (int startIndex, int endIndex);
 
     //==============================================================================
     /** A set of colour IDs to use to change the colour of various aspects of the editor.
@@ -266,6 +295,12 @@ public:
     virtual void handleTabKey();
     /** Called when the escape key is pressed - this can be overridden for custom behaviour. */
     virtual void handleEscapeKey();
+
+    /** Called when the view position is scrolled horizontally or vertically. */
+    virtual void editorViewportPositionChanged();
+
+    /** Called when the caret position moves. */
+    virtual void caretPositionMoved();
 
     //==============================================================================
     /** This adds the items to the popup menu.
@@ -301,7 +336,7 @@ public:
     */
     virtual void performPopupMenuAction (int menuItemID);
 
-    /** Specifies a commmand-manager which the editor will notify whenever the state
+    /** Specifies a command-manager which the editor will notify whenever the state
         of any of its commands changes.
         If you're making use of the editor's ApplicationCommandTarget interface, then
         you should also use this to tell it which command manager it should use. Make
@@ -312,65 +347,62 @@ public:
 
     //==============================================================================
     /** @internal */
-    void paint (Graphics&);
+    void paint (Graphics&) override;
     /** @internal */
-    void resized();
+    void resized() override;
     /** @internal */
-    bool keyPressed (const KeyPress&);
+    bool keyPressed (const KeyPress&) override;
     /** @internal */
-    void mouseDown (const MouseEvent&);
+    void mouseDown (const MouseEvent&) override;
     /** @internal */
-    void mouseDrag (const MouseEvent&);
+    void mouseDrag (const MouseEvent&) override;
     /** @internal */
-    void mouseUp (const MouseEvent&);
+    void mouseUp (const MouseEvent&) override;
     /** @internal */
-    void mouseDoubleClick (const MouseEvent&);
+    void mouseDoubleClick (const MouseEvent&) override;
     /** @internal */
-    void mouseWheelMove (const MouseEvent&, const MouseWheelDetails&);
+    void mouseWheelMove (const MouseEvent&, const MouseWheelDetails&) override;
     /** @internal */
-    void focusGained (FocusChangeType);
+    void focusGained (FocusChangeType) override;
     /** @internal */
-    void focusLost (FocusChangeType);
+    void focusLost (FocusChangeType) override;
     /** @internal */
-    bool isTextInputActive() const;
+    bool isTextInputActive() const override;
     /** @internal */
-    void setTemporaryUnderlining (const Array <Range<int> >&);
+    void setTemporaryUnderlining (const Array<Range<int>>&) override;
     /** @internal */
-    ApplicationCommandTarget* getNextCommandTarget();
+    ApplicationCommandTarget* getNextCommandTarget() override;
     /** @internal */
-    void getAllCommands (Array<CommandID>&);
+    void getAllCommands (Array<CommandID>&) override;
     /** @internal */
-    void getCommandInfo (CommandID, ApplicationCommandInfo&);
+    void getCommandInfo (CommandID, ApplicationCommandInfo&) override;
     /** @internal */
-    bool perform (const InvocationInfo&);
+    bool perform (const InvocationInfo&) override;
+    /** @internal */
+    void lookAndFeelChanged() override;
 
 private:
     //==============================================================================
     CodeDocument& document;
 
     Font font;
-    int firstLineOnScreen, spacesPerTab;
-    float charWidth;
-    int lineHeight, linesOnScreen, columnsOnScreen;
-    int scrollbarThickness, columnToTryToMaintain;
-    bool useSpacesForTabs, showLineNumbers;
-    double xOffset;
-
+    int firstLineOnScreen = 0, spacesPerTab = 4;
+    float charWidth = 0;
+    int lineHeight = 0, linesOnScreen = 0, columnsOnScreen = 0;
+    int scrollbarThickness = 16, columnToTryToMaintain = -1;
+    bool readOnly = false, useSpacesForTabs = true, showLineNumbers = false, shouldFollowDocumentChanges = false;
+    double xOffset = 0;
     CodeDocument::Position caretPos, selectionStart, selectionEnd;
 
-    ScopedPointer<CaretComponent> caret;
-    ScrollBar verticalScrollBar, horizontalScrollBar;
-    ApplicationCommandManager* appCommandManager;
+    std::unique_ptr<CaretComponent> caret;
+    ScrollBar verticalScrollBar { true }, horizontalScrollBar { false };
+    ApplicationCommandManager* appCommandManager = nullptr;
 
     class Pimpl;
-    friend class Pimpl;
-    friend class ScopedPointer<Pimpl>;
-    ScopedPointer<Pimpl> pimpl;
+    std::unique_ptr<Pimpl> pimpl;
 
     class GutterComponent;
-    friend class GutterComponent;
-    friend class ScopedPointer<GutterComponent>;
-    ScopedPointer<GutterComponent> gutter;
+    std::unique_ptr<GutterComponent> gutter;
 
     enum DragType
     {
@@ -379,19 +411,19 @@ private:
         draggingSelectionEnd
     };
 
-    DragType dragType;
+    DragType dragType = notDragging;
 
     //==============================================================================
     CodeTokeniser* codeTokeniser;
     ColourScheme colourScheme;
 
     class CodeEditorLine;
-    OwnedArray <CodeEditorLine> lines;
+    OwnedArray<CodeEditorLine> lines;
     void rebuildLineTokens();
     void rebuildLineTokensAsync();
     void codeDocumentChanged (int start, int end);
 
-    OwnedArray <CodeDocument::Iterator> cachedIterators;
+    Array<CodeDocument::Iterator> cachedIterators;
     void clearCachedIterators (int firstLineToBeInvalid);
     void updateCachedIterators (int maxLineNum);
     void getIteratorForPosition (int position, CodeDocument::Iterator&);
@@ -401,7 +433,7 @@ private:
 
     //==============================================================================
     void insertText (const String&);
-    void updateCaretPosition();
+    virtual void updateCaretPosition();
     void updateScrollBars();
     void scrollToLineInternal (int line);
     void scrollToColumnInternal (double column);
@@ -409,7 +441,7 @@ private:
     void cut();
     void indentSelectedLines (int spacesToAdd);
     bool skipBackwardsToPreviousTab();
-    bool performCommand (int);
+    bool performCommand (CommandID);
 
     int indexToColumn (int line, int index) const noexcept;
     int columnToIndex (int line, int column) const noexcept;
@@ -417,5 +449,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CodeEditorComponent)
 };
 
-
-#endif   // __JUCE_CODEEDITORCOMPONENT_JUCEHEADER__
+} // namespace juce

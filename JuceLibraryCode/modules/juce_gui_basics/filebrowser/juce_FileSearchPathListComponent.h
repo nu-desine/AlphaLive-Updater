@@ -1,36 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_FILESEARCHPATHLISTCOMPONENT_JUCEHEADER__
-#define __JUCE_FILESEARCHPATHLISTCOMPONENT_JUCEHEADER__
-
-#include "../widgets/juce_ListBox.h"
-#include "../buttons/juce_DrawableButton.h"
-#include "../buttons/juce_TextButton.h"
-#include "../mouse/juce_FileDragAndDropTarget.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -38,11 +32,12 @@
     re-ordered.
 
     @see FileSearchPath
+
+    @tags{GUI}
 */
 class JUCE_API  FileSearchPathListComponent  : public Component,
                                                public SettableTooltipClient,
                                                public FileDragAndDropTarget,
-                                               private ButtonListener,  // (can't use Button::Listener due to idiotic VC2005 bug)
                                                private ListBoxModel
 {
 public:
@@ -51,7 +46,7 @@ public:
     FileSearchPathListComponent();
 
     /** Destructor. */
-    ~FileSearchPathListComponent();
+    ~FileSearchPathListComponent() override;
 
     //==============================================================================
     /** Returns the path as it is currently shown. */
@@ -81,28 +76,25 @@ public:
 
     //==============================================================================
     /** @internal */
-    int getNumRows();
+    int getNumRows() override;
     /** @internal */
-    void paintListBoxItem (int rowNumber, Graphics& g, int width, int height, bool rowIsSelected);
+    void paintListBoxItem (int rowNumber, Graphics& g, int width, int height, bool rowIsSelected) override;
     /** @internal */
-    void deleteKeyPressed (int lastRowSelected);
+    void deleteKeyPressed (int lastRowSelected) override;
     /** @internal */
-    void returnKeyPressed (int lastRowSelected);
+    void returnKeyPressed (int lastRowSelected) override;
     /** @internal */
-    void listBoxItemDoubleClicked (int row, const MouseEvent&);
+    void listBoxItemDoubleClicked (int row, const MouseEvent&) override;
     /** @internal */
-    void selectedRowsChanged (int lastRowSelected);
+    void selectedRowsChanged (int lastRowSelected) override;
     /** @internal */
-    void resized();
+    void resized() override;
     /** @internal */
-    void paint (Graphics& g);
+    void paint (Graphics&) override;
     /** @internal */
-    bool isInterestedInFileDrag (const StringArray& files);
+    bool isInterestedInFileDrag (const StringArray&) override;
     /** @internal */
-    void filesDropped (const StringArray& files, int, int);
-    /** @internal */
-    void buttonClicked (Button* button);
-
+    void filesDropped (const StringArray& files, int, int) override;
 
 private:
     //==============================================================================
@@ -116,8 +108,12 @@ private:
     void changed();
     void updateButtons();
 
+    void addPath();
+    void deleteSelected();
+    void editSelected();
+    void moveSelection (int);
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FileSearchPathListComponent)
 };
 
-
-#endif   // __JUCE_FILESEARCHPATHLISTCOMPONENT_JUCEHEADER__
+} // namespace juce

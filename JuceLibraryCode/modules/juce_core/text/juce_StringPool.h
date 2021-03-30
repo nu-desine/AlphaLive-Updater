@@ -1,34 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_STRINGPOOL_JUCEHEADER__
-#define __JUCE_STRINGPOOL_JUCEHEADER__
-
-#include "juce_String.h"
-#include "../containers/juce_Array.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -40,6 +33,8 @@
     is returned every time a matching string is asked for. This means that it's trivial to
     compare two pooled strings for equality, as you can simply compare their pointers. It
     also cuts down on storage if you're using many copies of the same string.
+
+    @tags{Core}
 */
 class JUCE_API  StringPool
 {
@@ -52,41 +47,44 @@ public:
     ~StringPool();
 
     //==============================================================================
-    /** Returns a pointer to a copy of the string that is passed in.
-
-        The pool will always return the same pointer when asked for a string that matches it.
-        The pool will own all the pointers that it returns, deleting them when the pool itself
-        is deleted.
+    /** Returns a pointer to a shared copy of the string that is passed in.
+        The pool will always return the same String object when asked for a string that matches it.
     */
-    String::CharPointerType getPooledString (const String& original);
+    String getPooledString (const String& original);
 
     /** Returns a pointer to a copy of the string that is passed in.
-
-        The pool will always return the same pointer when asked for a string that matches it.
-        The pool will own all the pointers that it returns, deleting them when the pool itself
-        is deleted.
+        The pool will always return the same String object when asked for a string that matches it.
     */
-    String::CharPointerType getPooledString (const char* original);
+    String getPooledString (const char* original);
+
+    /** Returns a pointer to a shared copy of the string that is passed in.
+        The pool will always return the same String object when asked for a string that matches it.
+    */
+    String getPooledString (StringRef original);
 
     /** Returns a pointer to a copy of the string that is passed in.
-
-        The pool will always return the same pointer when asked for a string that matches it.
-        The pool will own all the pointers that it returns, deleting them when the pool itself
-        is deleted.
+        The pool will always return the same String object when asked for a string that matches it.
     */
-    String::CharPointerType getPooledString (const wchar_t* original);
+    String getPooledString (String::CharPointerType start, String::CharPointerType end);
 
     //==============================================================================
-    /** Returns the number of strings in the pool. */
-    int size() const noexcept;
+    /** Scans the pool, and removes any strings that are unreferenced.
+        You don't generally need to call this - it'll be called automatically when the pool grows
+        large enough to warrant it.
+    */
+    void garbageCollect();
 
-    /** Returns one of the strings in the pool, by index. */
-    String::CharPointerType operator[] (int index) const noexcept;
+    /** Returns a shared global pool which is used for things like Identifiers, XML parsing. */
+    static StringPool& getGlobalPool() noexcept;
 
 private:
-    Array <String> strings;
+    Array<String> strings;
     CriticalSection lock;
+    uint32 lastGarbageCollectionTime;
+
+    void garbageCollectIfNeeded();
+
+    JUCE_DECLARE_NON_COPYABLE (StringPool)
 };
 
-
-#endif   // __JUCE_STRINGPOOL_JUCEHEADER__
+} // namespace juce

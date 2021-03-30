@@ -1,33 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_COMPONENTBUILDER_JUCEHEADER__
-#define __JUCE_COMPONENTBUILDER_JUCEHEADER__
-
-#include "../components/juce_Component.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -44,6 +41,8 @@
     Once you've got the component you can either take it and delete the ComponentBuilder
     object, or if you keep the ComponentBuilder around, it'll monitor any changes in the
     ValueTree and automatically update the component to reflect these changes.
+
+    @tags{GUI}
 */
 class JUCE_API  ComponentBuilder  : private ValueTree::Listener
 {
@@ -59,7 +58,7 @@ public:
     ComponentBuilder();
 
     /** Destructor. */
-    ~ComponentBuilder();
+    ~ComponentBuilder() override;
 
     /** This is the ValueTree data object that the builder is working with. */
     ValueTree state;
@@ -170,7 +169,7 @@ public:
     /** Registers handlers for various standard juce components. */
     void registerStandardComponentTypes();
 
-    //=============================================================================
+    //==============================================================================
     /** This class is used when references to images need to be stored in ValueTrees.
 
         An instance of an ImageProvider provides a mechanism for converting an Image to/from
@@ -186,8 +185,8 @@ public:
     class JUCE_API  ImageProvider
     {
     public:
-        ImageProvider() {}
-        virtual ~ImageProvider() {}
+        ImageProvider() = default;
+        virtual ~ImageProvider() = default;
 
         /** Retrieves the image associated with this identifier, which could be any
             kind of string, number, filename, etc.
@@ -216,7 +215,7 @@ public:
     /** Returns the current image provider that this builder is using, or nullptr if none has been set. */
     ImageProvider* getImageProvider() const noexcept;
 
-    //=============================================================================
+    //==============================================================================
     /** Updates the children of a parent component by updating them from the children of
         a given ValueTree.
     */
@@ -228,21 +227,21 @@ public:
     static const Identifier idProperty;
 
 private:
-    //=============================================================================
-    OwnedArray <TypeHandler> types;
-    ScopedPointer<Component> component;
+    //==============================================================================
+    OwnedArray<TypeHandler> types;
+    std::unique_ptr<Component> component;
     ImageProvider* imageProvider;
    #if JUCE_DEBUG
     WeakReference<Component> componentRef;
    #endif
 
-    void valueTreePropertyChanged (ValueTree&, const Identifier&);
-    void valueTreeChildAdded (ValueTree&, ValueTree&);
-    void valueTreeChildRemoved (ValueTree&, ValueTree&);
-    void valueTreeChildOrderChanged (ValueTree&);
-    void valueTreeParentChanged (ValueTree&);
+    void valueTreePropertyChanged (ValueTree&, const Identifier&) override;
+    void valueTreeChildAdded (ValueTree&, ValueTree&) override;
+    void valueTreeChildRemoved (ValueTree&, ValueTree&, int) override;
+    void valueTreeChildOrderChanged (ValueTree&, int, int) override;
+    void valueTreeParentChanged (ValueTree&) override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ComponentBuilder)
 };
 
-#endif   // __JUCE_COMPONENTBUILDER_JUCEHEADER__
+} // namespace juce

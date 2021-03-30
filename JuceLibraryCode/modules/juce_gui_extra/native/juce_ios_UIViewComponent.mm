@@ -1,36 +1,38 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 class UIViewComponent::Pimpl  : public ComponentMovementWatcher
 {
 public:
-    Pimpl (UIView* const v, Component& comp)
+    Pimpl (UIView* v, Component& comp)
         : ComponentMovementWatcher (&comp),
           view (v),
-          owner (comp),
-          currentPeer (nullptr)
+          owner (comp)
     {
         [view retain];
 
@@ -38,28 +40,28 @@ public:
             componentPeerChanged();
     }
 
-    ~Pimpl()
+    ~Pimpl() override
     {
         [view removeFromSuperview];
         [view release];
     }
 
-    void componentMovedOrResized (bool /*wasMoved*/, bool /*wasResized*/)
+    void componentMovedOrResized (bool /*wasMoved*/, bool /*wasResized*/) override
     {
-        Component* const topComp = owner.getTopLevelComponent();
+        auto* topComp = owner.getTopLevelComponent();
 
         if (topComp->getPeer() != nullptr)
         {
-            const Point<int> pos (topComp->getLocalPoint (&owner, Point<int>()));
+            auto pos = topComp->getLocalPoint (&owner, Point<int>());
 
             [view setFrame: CGRectMake ((float) pos.x, (float) pos.y,
                                         (float) owner.getWidth(), (float) owner.getHeight())];
         }
     }
 
-    void componentPeerChanged()
+    void componentPeerChanged() override
     {
-        ComponentPeer* const peer = owner.getPeer();
+        auto* peer = owner.getPeer();
 
         if (currentPeer != peer)
         {
@@ -79,7 +81,7 @@ public:
         [view setHidden: ! owner.isShowing()];
      }
 
-    void componentVisibilityChanged()
+    void componentVisibilityChanged() override
     {
         componentPeerChanged();
     }
@@ -94,7 +96,7 @@ public:
 
 private:
     Component& owner;
-    ComponentPeer* currentPeer;
+    ComponentPeer* currentPeer = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Pimpl)
 };
@@ -103,14 +105,14 @@ private:
 UIViewComponent::UIViewComponent() {}
 UIViewComponent::~UIViewComponent() {}
 
-void UIViewComponent::setView (void* const view)
+void UIViewComponent::setView (void* view)
 {
     if (view != getView())
     {
-        pimpl = nullptr;
+        pimpl.reset();
 
         if (view != nullptr)
-            pimpl = new Pimpl ((UIView*) view, *this);
+            pimpl.reset (new Pimpl ((UIView*) view, *this));
     }
 }
 
@@ -126,3 +128,5 @@ void UIViewComponent::resizeToFitView()
 }
 
 void UIViewComponent::paint (Graphics&) {}
+
+} // namespace juce

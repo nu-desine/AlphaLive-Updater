@@ -1,39 +1,35 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_STRINGPAIRARRAY_JUCEHEADER__
-#define __JUCE_STRINGPAIRARRAY_JUCEHEADER__
-
-#include "juce_StringArray.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     A container for holding a set of strings which are keyed by another string.
 
     @see StringArray
+
+    @tags{Core}
 */
 class JUCE_API  StringPairArray
 {
@@ -76,16 +72,16 @@ public:
 
         @see getValue
     */
-    const String& operator[] (const String& key) const;
+    const String& operator[] (StringRef key) const;
 
     /** Finds the value corresponding to a key string.
-
         If no such key is found, this will just return the value provided as a default.
-
         @see operator[]
     */
-    String getValue (const String& key, const String& defaultReturnValue) const;
+    String getValue (StringRef, const String& defaultReturnValue) const;
 
+    /** Returns true if the given key exists. */
+    bool containsKey (StringRef key) const noexcept;
 
     /** Returns a list of all keys in the array. */
     const StringArray& getAllKeys() const noexcept          { return keys; }
@@ -94,19 +90,17 @@ public:
     const StringArray& getAllValues() const noexcept        { return values; }
 
     /** Returns the number of strings in the array */
-    inline int size() const noexcept                        { return keys.size(); };
+    inline int size() const noexcept                        { return keys.size(); }
 
 
     //==============================================================================
     /** Adds or amends a key/value pair.
-
         If a value already exists with this key, its value will be overwritten,
         otherwise the key/value pair will be added to the array.
     */
     void set (const String& key, const String& value);
 
     /** Adds the items from another array to this one.
-
         This is equivalent to using set() to add each of the pairs from the other array.
     */
     void addArray (const StringPairArray& other);
@@ -116,13 +110,11 @@ public:
     void clear();
 
     /** Removes a string from the array based on its key.
-
         If the key isn't found, nothing will happen.
     */
-    void remove (const String& key);
+    void remove (StringRef key);
 
     /** Removes a string from the array based on its index.
-
         If the index is out-of-range, no action will be taken.
     */
     void remove (int index);
@@ -131,6 +123,10 @@ public:
     /** Indicates whether to use a case-insensitive search when looking up a key string.
     */
     void setIgnoresCase (bool shouldIgnoreCase);
+
+    /** Indicates whether a case-insensitive search is used when looking up a key string.
+    */
+    bool getIgnoresCase() const noexcept;
 
     //==============================================================================
     /** Returns a descriptive string containing the items.
@@ -147,6 +143,9 @@ public:
     */
     void minimiseStorageOverheads();
 
+    //==============================================================================
+    /** Adds the contents of a map to this StringPairArray. */
+    void addMap (const std::map<String, String>& mapToAdd);
 
 private:
     //==============================================================================
@@ -156,5 +155,4 @@ private:
     JUCE_LEAK_DETECTOR (StringPairArray)
 };
 
-
-#endif   // __JUCE_STRINGPAIRARRAY_JUCEHEADER__
+} // namespace juce

@@ -1,45 +1,41 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MIDIMESSAGECOLLECTOR_JUCEHEADER__
-#define __JUCE_MIDIMESSAGECOLLECTOR_JUCEHEADER__
-
-#include "juce_MidiInput.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     Collects incoming realtime MIDI messages and turns them into blocks suitable for
     processing by a block-based audio callback.
 
-    The class can also be used as either a MidiKeyboardStateListener or a MidiInputCallback
+    The class can also be used as either a MidiKeyboardState::Listener or a MidiInputCallback
     so it can easily use a midi input or keyboard component as its source.
 
     @see MidiMessage, MidiInput
+
+    @tags{Audio}
 */
-class JUCE_API  MidiMessageCollector    : public MidiKeyboardStateListener,
+class JUCE_API  MidiMessageCollector    : public MidiKeyboardState::Listener,
                                           public MidiInputCallback
 {
 public:
@@ -48,7 +44,7 @@ public:
     MidiMessageCollector();
 
     /** Destructor. */
-    ~MidiMessageCollector();
+    ~MidiMessageCollector() override;
 
     //==============================================================================
     /** Clears any messages from the queue.
@@ -84,24 +80,34 @@ public:
     */
     void removeNextBlockOfMessages (MidiBuffer& destBuffer, int numSamples);
 
+    /** Preallocates storage for collected messages.
+
+        This can be called before audio processing begins to ensure that there
+        is sufficient space for the expected MIDI messages, in order to avoid
+        allocations within the audio callback.
+    */
+    void ensureStorageAllocated (size_t bytes);
+
 
     //==============================================================================
     /** @internal */
-    void handleNoteOn (MidiKeyboardState* source, int midiChannel, int midiNoteNumber, float velocity);
+    void handleNoteOn (MidiKeyboardState*, int midiChannel, int midiNoteNumber, float velocity) override;
     /** @internal */
-    void handleNoteOff (MidiKeyboardState* source, int midiChannel, int midiNoteNumber);
+    void handleNoteOff (MidiKeyboardState*, int midiChannel, int midiNoteNumber, float velocity) override;
     /** @internal */
-    void handleIncomingMidiMessage (MidiInput* source, const MidiMessage& message);
+    void handleIncomingMidiMessage (MidiInput*, const MidiMessage&) override;
 
 private:
     //==============================================================================
-    double lastCallbackTime;
+    double lastCallbackTime = 0;
     CriticalSection midiCallbackLock;
     MidiBuffer incomingMessages;
-    double sampleRate;
+    double sampleRate = 44100.0;
+   #if JUCE_DEBUG
+    bool hasCalledReset = false;
+   #endif
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiMessageCollector)
 };
 
-
-#endif   // __JUCE_MIDIMESSAGECOLLECTOR_JUCEHEADER__
+} // namespace juce

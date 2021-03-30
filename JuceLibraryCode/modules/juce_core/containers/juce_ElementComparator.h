@@ -1,30 +1,50 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_ELEMENTCOMPARATOR_JUCEHEADER__
-#define __JUCE_ELEMENTCOMPARATOR_JUCEHEADER__
+namespace juce
+{
+
+#ifndef DOXYGEN
+
+/** This is an internal helper class which converts a juce ElementComparator style
+    class (using a "compareElements" method) into a class that's compatible with
+    std::sort (i.e. using an operator() to compare the elements)
+
+    @tags{Core}
+*/
+template <typename ElementComparator>
+struct SortFunctionConverter
+{
+    SortFunctionConverter (ElementComparator& e) : comparator (e) {}
+
+    template <typename Type>
+    bool operator() (Type a, Type b)  { return comparator.compareElements (a, b) < 0; }
+
+private:
+    ElementComparator& comparator;
+    SortFunctionConverter& operator= (const SortFunctionConverter&) = delete;
+};
+
+#endif
 
 
 //==============================================================================
@@ -62,116 +82,16 @@ static void sortArray (ElementComparator& comparator,
                        int lastElement,
                        const bool retainOrderOfEquivalentItems)
 {
-    (void) comparator;  // if you pass in an object with a static compareElements() method, this
-                        // avoids getting warning messages about the parameter being unused
+    jassert (firstElement >= 0);
 
     if (lastElement > firstElement)
     {
+        SortFunctionConverter<ElementComparator> converter (comparator);
+
         if (retainOrderOfEquivalentItems)
-        {
-            for (int i = firstElement; i < lastElement; ++i)
-            {
-                if (comparator.compareElements (array[i], array [i + 1]) > 0)
-                {
-                    std::swap (array[i], array[i + 1]);
-
-                    if (i > firstElement)
-                        i -= 2;
-                }
-            }
-        }
+            std::stable_sort (array + firstElement, array + lastElement + 1, converter);
         else
-        {
-            int fromStack[30], toStack[30];
-            int stackIndex = 0;
-
-            for (;;)
-            {
-                const int size = (lastElement - firstElement) + 1;
-
-                if (size <= 8)
-                {
-                    int j = lastElement;
-                    int maxIndex;
-
-                    while (j > firstElement)
-                    {
-                        maxIndex = firstElement;
-                        for (int k = firstElement + 1; k <= j; ++k)
-                            if (comparator.compareElements (array[k], array [maxIndex]) > 0)
-                                maxIndex = k;
-
-                        std::swap (array[j], array[maxIndex]);
-                        --j;
-                    }
-                }
-                else
-                {
-                    const int mid = firstElement + (size >> 1);
-                    std::swap (array[mid], array[firstElement]);
-
-                    int i = firstElement;
-                    int j = lastElement + 1;
-
-                    for (;;)
-                    {
-                        while (++i <= lastElement
-                                && comparator.compareElements (array[i], array [firstElement]) <= 0)
-                        {}
-
-                        while (--j > firstElement
-                                && comparator.compareElements (array[j], array [firstElement]) >= 0)
-                        {}
-
-                        if (j < i)
-                            break;
-
-                        std::swap (array[i], array[j]);
-                    }
-
-                    std::swap (array[j], array[firstElement]);
-
-                    if (j - 1 - firstElement >= lastElement - i)
-                    {
-                        if (firstElement + 1 < j)
-                        {
-                            fromStack [stackIndex] = firstElement;
-                            toStack [stackIndex] = j - 1;
-                            ++stackIndex;
-                        }
-
-                        if (i < lastElement)
-                        {
-                            firstElement = i;
-                            continue;
-                        }
-                    }
-                    else
-                    {
-                        if (i < lastElement)
-                        {
-                            fromStack [stackIndex] = i;
-                            toStack [stackIndex] = lastElement;
-                            ++stackIndex;
-                        }
-
-                        if (firstElement + 1 < j)
-                        {
-                            lastElement = j - 1;
-                            continue;
-                        }
-                    }
-                }
-
-                if (--stackIndex < 0)
-                    break;
-
-                jassert (stackIndex < numElementsInArray (fromStack));
-
-                firstElement = fromStack [stackIndex];
-                lastElement = toStack [stackIndex];
-            }
-        }
+            std::sort        (array + firstElement, array + lastElement + 1, converter);
     }
 }
 
@@ -209,8 +129,8 @@ static int findInsertIndexInSortedArray (ElementComparator& comparator,
 {
     jassert (firstElement <= lastElement);
 
-    (void) comparator;  // if you pass in an object with a static compareElements() method, this
-                        // avoids getting warning messages about the parameter being unused
+    ignoreUnused (comparator); // if you pass in an object with a static compareElements() method, this
+                               // avoids getting warning messages about the parameter being unused
 
     while (firstElement < lastElement)
     {
@@ -252,18 +172,20 @@ static int findInsertIndexInSortedArray (ElementComparator& comparator,
     This will work for primitive types and objects that implement operator<().
 
     Example: @code
-    Array <int> myArray;
+    Array<int> myArray;
     DefaultElementComparator<int> sorter;
     myArray.sort (sorter);
     @endcode
 
     @see ElementComparator
+
+    @tags{Core}
 */
 template <class ElementType>
 class DefaultElementComparator
 {
 private:
-    typedef PARAMETER_TYPE (ElementType) ParameterType;
+    using ParameterType = typename TypeHelpers::ParameterType<ElementType>::type;
 
 public:
     static int compareElements (ParameterType first, ParameterType second)
@@ -272,5 +194,4 @@ public:
     }
 };
 
-
-#endif   // __JUCE_ELEMENTCOMPARATOR_JUCEHEADER__
+} // namespace juce

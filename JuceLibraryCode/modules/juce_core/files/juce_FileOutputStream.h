@@ -1,40 +1,35 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_FILEOUTPUTSTREAM_JUCEHEADER__
-#define __JUCE_FILEOUTPUTSTREAM_JUCEHEADER__
-
-#include "juce_File.h"
-#include "../streams/juce_OutputStream.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     An output stream that writes into a local file.
 
     @see OutputStream, FileInputStream, File::createOutputStream
+
+    @tags{Core}
 */
 class JUCE_API  FileOutputStream  : public OutputStream
 {
@@ -43,21 +38,36 @@ public:
     /** Creates a FileOutputStream.
 
         If the file doesn't exist, it will first be created. If the file can't be
-        created or opened, the failedToOpen() method will return
-        true.
+        created or opened (for example, because the parent directory of the file
+        does not exist), the failedToOpen() method will return true.
 
-        If the file already exists when opened, the stream's write-postion will
-        be set to the end of the file. To overwrite an existing file,
-        use File::deleteFile() before opening the stream, or use setPosition(0)
-        after it's opened (although this won't truncate the file).
+        If the file already exists when opened, the stream's write-position will
+        be set to the end of the file. To overwrite an existing file, you can truncate
+        it like this:
+
+        @code
+        FileOutputStream stream (file);
+
+        if (stream.openedOk())
+        {
+            stream.setPosition (0);
+            stream.truncate();
+            ...
+        }
+        @endcode
+
+
+        Destroying a FileOutputStream object does not force the operating system
+        to write the buffered data to disk immediately. If this is required you
+        should call flush() before triggering the destructor.
 
         @see TemporaryFile
     */
     FileOutputStream (const File& fileToWriteTo,
-                      int bufferSizeToUse = 16384);
+                      size_t bufferSizeToUse = 16384);
 
     /** Destructor. */
-    ~FileOutputStream();
+    ~FileOutputStream() override;
 
     //==============================================================================
     /** Returns the file that this stream is writing to.
@@ -87,21 +97,21 @@ public:
     Result truncate();
 
     //==============================================================================
-    void flush();
-    int64 getPosition();
-    bool setPosition (int64 pos);
-    bool write (const void* data, size_t numBytes);
-    void writeRepeatedByte (uint8 byte, size_t numTimesToRepeat);
+    void flush() override;
+    int64 getPosition() override;
+    bool setPosition (int64) override;
+    bool write (const void*, size_t) override;
+    bool writeRepeatedByte (uint8 byte, size_t numTimesToRepeat) override;
 
 
 private:
     //==============================================================================
     File file;
-    void* fileHandle;
-    Result status;
-    int64 currentPosition;
-    size_t bufferSize, bytesInBuffer;
-    HeapBlock <char> buffer;
+    void* fileHandle = nullptr;
+    Result status { Result::ok() };
+    int64 currentPosition = 0;
+    size_t bufferSize, bytesInBuffer = 0;
+    HeapBlock<char> buffer;
 
     void openHandle();
     void closeHandle();
@@ -113,4 +123,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FileOutputStream)
 };
 
-#endif   // __JUCE_FILEOUTPUTSTREAM_JUCEHEADER__
+} // namespace juce

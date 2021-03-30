@@ -1,35 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MOUSEEVENT_JUCEHEADER__
-#define __JUCE_MOUSEEVENT_JUCEHEADER__
-
-class Component;
-class MouseInputSource;
-#include "../keyboard/juce_ModifierKeys.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -37,8 +32,10 @@ class MouseInputSource;
 
     @see MouseListener, Component::mouseMove, Component::mouseEnter, Component::mouseExit,
          Component::mouseDown, Component::mouseUp, Component::mouseDrag
+
+    @tags{GUI}
 */
-class JUCE_API  MouseEvent
+class JUCE_API  MouseEvent  final
 {
 public:
     //==============================================================================
@@ -49,6 +46,13 @@ public:
         @param source           the source that's invoking the event
         @param position         the position of the mouse, relative to the component that is passed-in
         @param modifiers        the key modifiers at the time of the event
+        @param pressure         the pressure of the touch or stylus, in the range 0 to 1. Devices that
+                                do not support force information may return 0.0, 1.0, or a negative value,
+                                depending on the platform
+        @param orientation      the orientation of the touch input for this event in radians. The default is 0
+        @param rotation         the rotation of the pen device for this event in radians. The default is 0
+        @param tiltX            the tilt of the pen device along the x-axis between -1.0 and 1.0. The default is 0
+        @param tiltY            the tilt of the pen device along the y-axis between -1.0 and 1.0. The default is 0
         @param eventComponent   the component that the mouse event applies to
         @param originator       the component that originally received the event
         @param eventTime        the time the event happened
@@ -61,14 +65,17 @@ public:
         @param numberOfClicks   how many clicks, e.g. a double-click event will be 2, a triple-click will be 3, etc
         @param mouseWasDragged  whether the mouse has been dragged significantly since the previous mouse-down
     */
-    MouseEvent (MouseInputSource& source,
-                const Point<int>& position,
-                const ModifierKeys& modifiers,
+    MouseEvent (MouseInputSource source,
+                Point<float> position,
+                ModifierKeys modifiers,
+                float pressure,
+                float orientation, float rotation,
+                float tiltX, float tiltY,
                 Component* eventComponent,
                 Component* originator,
-                const Time& eventTime,
-                const Point<int>& mouseDownPos,
-                const Time& mouseDownTime,
+                Time eventTime,
+                Point<float> mouseDownPos,
+                Time mouseDownTime,
                 int numberOfClicks,
                 bool mouseWasDragged) noexcept;
 
@@ -76,10 +83,22 @@ public:
     ~MouseEvent() noexcept;
 
     //==============================================================================
+    /** The position of the mouse when the event occurred.
+
+        This value is relative to the top-left of the component to which the
+        event applies (as indicated by the MouseEvent::eventComponent field).
+
+        This is a more accurate floating-point version of the position returned by
+        getPosition() and the integer x and y member variables.
+    */
+    const Point<float> position;
+
     /** The x-position of the mouse when the event occurred.
 
         This value is relative to the top-left of the component to which the
         event applies (as indicated by the MouseEvent::eventComponent field).
+
+        For a floating-point coordinate, see MouseEvent::position
     */
     const int x;
 
@@ -87,6 +106,8 @@ public:
 
         This value is relative to the top-left of the component to which the
         event applies (as indicated by the MouseEvent::eventComponent field).
+
+        For a floating-point coordinate, see MouseEvent::position
     */
     const int y;
 
@@ -99,6 +120,39 @@ public:
         just before they were released, so that you can tell which button they let go of.
     */
     const ModifierKeys mods;
+
+    /** The pressure of the touch or stylus for this event.
+        The range is 0 (soft) to 1 (hard).
+        If the input device doesn't provide any pressure data, it may return a negative
+        value here, or 0.0 or 1.0, depending on the platform.
+    */
+    const float pressure;
+
+    /** The orientation of the touch input for this event in radians where 0 indicates a touch aligned with the x-axis
+        and pointing from left to right; increasing values indicate rotation in the clockwise direction. The default is 0.
+    */
+    const float orientation;
+
+    /** The rotation of the pen device for this event in radians. Indicates the clockwise
+        rotation, or twist, of the pen. The default is 0.
+    */
+    const float rotation;
+
+    /** The tilt of the pen device along the x-axis between -1.0 and 1.0. A positive value indicates
+        a tilt to the right. The default is 0.
+    */
+    const float tiltX;
+
+    /** The tilt of the pen device along the y-axis between -1.0 and 1.0. A positive value indicates
+        a tilt toward the user. The default is 0.
+    */
+    const float tiltY;
+
+    /** The coordinates of the last place that a mouse button was pressed.
+        The coordinates are relative to the component specified in MouseEvent::component.
+        @see getDistanceFromDragStart, getDistanceFromDragStartX, mouseWasDraggedSinceMouseDown
+    */
+    const Point<float> mouseDownPosition;
 
     /** The component that this event applies to.
 
@@ -131,30 +185,25 @@ public:
     const Time mouseDownTime;
 
     /** The source device that generated this event. */
-    MouseInputSource& source;
+    MouseInputSource source;
 
     //==============================================================================
-    /** Returns the x co-ordinate of the last place that a mouse was pressed.
-
-        The co-ordinate is relative to the component specified in MouseEvent::component.
-
-        @see getDistanceFromDragStart, getDistanceFromDragStartX, mouseWasClicked
+    /** Returns the x coordinate of the last place that a mouse was pressed.
+        The coordinate is relative to the component specified in MouseEvent::component.
+        @see getDistanceFromDragStart, getDistanceFromDragStartX, mouseWasDraggedSinceMouseDown
     */
     int getMouseDownX() const noexcept;
 
-    /** Returns the y co-ordinate of the last place that a mouse was pressed.
-
-        The co-ordinate is relative to the component specified in MouseEvent::component.
-
-        @see getDistanceFromDragStart, getDistanceFromDragStartX, mouseWasClicked
+    /** Returns the y coordinate of the last place that a mouse was pressed.
+        The coordinate is relative to the component specified in MouseEvent::component.
+        @see getDistanceFromDragStart, getDistanceFromDragStartX, mouseWasDraggedSinceMouseDown
     */
     int getMouseDownY() const noexcept;
 
-    /** Returns the co-ordinates of the last place that a mouse was pressed.
-
-        The co-ordinates are relative to the component specified in MouseEvent::component.
-
-        @see getDistanceFromDragStart, getDistanceFromDragStartX, mouseWasClicked
+    /** Returns the coordinates of the last place that a mouse was pressed.
+        The coordinates are relative to the component specified in MouseEvent::component.
+        For a floating point version of this value, see mouseDownPosition.
+        @see mouseDownPosition, getDistanceFromDragStart, getDistanceFromDragStartX, mouseWasDraggedSinceMouseDown
     */
     Point<int> getMouseDownPosition() const noexcept;
 
@@ -168,46 +217,48 @@ public:
     */
     int getDistanceFromDragStart() const noexcept;
 
-    /** Returns the difference between the mouse's current x postion and where it was
+    /** Returns the difference between the mouse's current x position and where it was
         when the button was last pressed.
 
         @see getDistanceFromDragStart
     */
     int getDistanceFromDragStartX() const noexcept;
 
-    /** Returns the difference between the mouse's current y postion and where it was
+    /** Returns the difference between the mouse's current y position and where it was
         when the button was last pressed.
 
         @see getDistanceFromDragStart
     */
     int getDistanceFromDragStartY() const noexcept;
 
-    /** Returns the difference between the mouse's current postion and where it was
+    /** Returns the difference between the mouse's current position and where it was
         when the button was last pressed.
 
         @see getDistanceFromDragStart
     */
     Point<int> getOffsetFromDragStart() const noexcept;
 
-    /** Returns true if the mouse has just been clicked.
+    /** Returns true if the user seems to be performing a drag gesture.
 
-        Used in either your mouseUp() or mouseDrag() methods, this will tell you whether
-        the user has dragged the mouse more than a few pixels from the place where the
-        mouse-down occurred.
+        This is only meaningful if called in either a mouseUp() or mouseDrag() method.
 
-        Once they have dragged it far enough for this method to return false, it will continue
-        to return false until the mouse-up, even if they move the mouse back to the same
-        position where they originally pressed it. This means that it's very handy for
+        It will return true if the user has dragged the mouse more than a few pixels from the place
+        where the mouse-down occurred or the mouse has been held down for a significant amount of time.
+
+        Once they have dragged it far enough for this method to return true, it will continue
+        to return true until the mouse-up, even if they move the mouse back to the same
+        location at which the mouse-down happened. This means that it's very handy for
         objects that can either be clicked on or dragged, as you can use it in the mouseDrag()
-        callback to ignore any small movements they might make while clicking.
+        callback to ignore small movements they might make while trying to click.
+    */
+    bool mouseWasDraggedSinceMouseDown() const noexcept;
 
-        @returns    true if the mouse wasn't dragged by more than a few pixels between
-                    the last time the button was pressed and released.
+    /** Returns true if the mouse event is part of a click gesture rather than a drag.
+        This is effectively the opposite of mouseWasDraggedSinceMouseDown()
     */
     bool mouseWasClicked() const noexcept;
 
     /** For a click event, the number of times the mouse was clicked in succession.
-
         So for example a double-click event will return 2, a triple-click 3, etc.
     */
     int getNumberOfClicks() const noexcept                              { return numberOfClicks; }
@@ -221,58 +272,60 @@ public:
     */
     int getLengthOfMousePress() const noexcept;
 
+    /** Returns true if the pressure value for this event is meaningful. */
+    bool isPressureValid() const noexcept;
+
+    /** Returns true if the orientation value for this event is meaningful. */
+    bool isOrientationValid() const noexcept;
+
+    /** Returns true if the rotation value for this event is meaningful. */
+    bool isRotationValid() const noexcept;
+
+    /** Returns true if the current tilt value (either x- or y-axis) is meaningful. */
+    bool isTiltValid (bool tiltX) const noexcept;
+
     //==============================================================================
     /** The position of the mouse when the event occurred.
 
         This position is relative to the top-left of the component to which the
         event applies (as indicated by the MouseEvent::eventComponent field).
+
+        For a floating-point position, see MouseEvent::position
     */
     Point<int> getPosition() const noexcept;
 
-    /** Returns the mouse x position of this event, in global screen co-ordinates.
-
-        The co-ordinates are relative to the top-left of the main monitor.
-
+    /** Returns the mouse x position of this event, in global screen coordinates.
+        The coordinates are relative to the top-left of the main monitor.
         @see getScreenPosition
     */
     int getScreenX() const;
 
-    /** Returns the mouse y position of this event, in global screen co-ordinates.
-
-        The co-ordinates are relative to the top-left of the main monitor.
-
+    /** Returns the mouse y position of this event, in global screen coordinates.
+        The coordinates are relative to the top-left of the main monitor.
         @see getScreenPosition
     */
     int getScreenY() const;
 
-    /** Returns the mouse position of this event, in global screen co-ordinates.
-
-        The co-ordinates are relative to the top-left of the main monitor.
-
+    /** Returns the mouse position of this event, in global screen coordinates.
+        The coordinates are relative to the top-left of the main monitor.
         @see getMouseDownScreenPosition
     */
     Point<int> getScreenPosition() const;
 
-    /** Returns the x co-ordinate at which the mouse button was last pressed.
-
-        The co-ordinates are relative to the top-left of the main monitor.
-
+    /** Returns the x coordinate at which the mouse button was last pressed.
+        The coordinates are relative to the top-left of the main monitor.
         @see getMouseDownScreenPosition
     */
     int getMouseDownScreenX() const;
 
-    /** Returns the y co-ordinate at which the mouse button was last pressed.
-
-        The co-ordinates are relative to the top-left of the main monitor.
-
+    /** Returns the y coordinate at which the mouse button was last pressed.
+        The coordinates are relative to the top-left of the main monitor.
         @see getMouseDownScreenPosition
     */
     int getMouseDownScreenY() const;
 
-    /** Returns the co-ordinates at which the mouse button was last pressed.
-
-        The co-ordinates are relative to the top-left of the main monitor.
-
+    /** Returns the coordinates at which the mouse button was last pressed.
+        The coordinates are relative to the top-left of the main monitor.
         @see getScreenPosition
     */
     Point<int> getMouseDownScreenPosition() const;
@@ -290,7 +343,13 @@ public:
         All other members of the event object are the same, but the x and y are
         replaced with these new values.
     */
-    MouseEvent withNewPosition (const Point<int>& newPosition) const noexcept;
+    MouseEvent withNewPosition (Point<float> newPosition) const noexcept;
+
+    /** Creates a copy of this event with a different position.
+        All other members of the event object are the same, but the x and y are
+        replaced with these new values.
+    */
+    MouseEvent withNewPosition (Point<int> newPosition) const noexcept;
 
     //==============================================================================
     /** Changes the application-wide setting for the double-click time limit.
@@ -314,7 +373,6 @@ public:
 
 private:
     //==============================================================================
-    const Point<int> mouseDownPos;
     const uint8 numberOfClicks, wasMovedSinceMouseDown;
 
     MouseEvent& operator= (const MouseEvent&);
@@ -326,8 +384,10 @@ private:
     Contains status information about a mouse wheel event.
 
     @see MouseListener, MouseEvent
+
+    @tags{GUI}
 */
-struct MouseWheelDetails
+struct MouseWheelDetails  final
 {
     //==============================================================================
     /** The amount that the wheel has been moved in the X axis.
@@ -355,7 +415,39 @@ struct MouseWheelDetails
 
     /** If true, then the wheel has continuous, un-stepped motion. */
     bool isSmooth;
+
+    /** If true, then this event is part of the inertial momentum phase that follows
+        the wheel being released. */
+    bool isInertial;
 };
 
+//==============================================================================
+/**
+    Contains status information about a pen event.
 
-#endif   // __JUCE_MOUSEEVENT_JUCEHEADER__
+    @see MouseListener, MouseEvent
+
+    @tags{GUI}
+*/
+struct PenDetails  final
+{
+    /**
+        The rotation of the pen device in radians. Indicates the clockwise rotation, or twist,
+        of the pen. The default is 0.
+    */
+    float rotation;
+
+    /**
+        Indicates the angle of tilt of the pointer in a range of -1.0 to 1.0 along the x-axis where
+        a positive value indicates a tilt to the right. The default is 0.
+    */
+    float tiltX;
+
+    /**
+        Indicates the angle of tilt of the pointer in a range of -1.0 to 1.0 along the y-axis where
+        a positive value indicates a tilt toward the user. The default is 0.
+    */
+    float tiltY;
+};
+
+} // namespace juce

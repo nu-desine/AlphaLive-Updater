@@ -1,29 +1,29 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-PropertySet::PropertySet (const bool ignoreCaseOfKeyNames)
+namespace juce
+{
+
+PropertySet::PropertySet (bool ignoreCaseOfKeyNames)
     : properties (ignoreCaseOfKeyNames),
       fallbackProperties (nullptr),
       ignoreCaseOfKeys (ignoreCaseOfKeyNames)
@@ -62,12 +62,10 @@ void PropertySet::clear()
     }
 }
 
-String PropertySet::getValue (const String& keyName,
-                              const String& defaultValue) const noexcept
+String PropertySet::getValue (StringRef keyName, const String& defaultValue) const noexcept
 {
     const ScopedLock sl (lock);
-
-    const int index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
+    auto index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
 
     if (index >= 0)
         return properties.getAllValues() [index];
@@ -76,11 +74,10 @@ String PropertySet::getValue (const String& keyName,
                                          : defaultValue;
 }
 
-int PropertySet::getIntValue (const String& keyName,
-                              const int defaultValue) const noexcept
+int PropertySet::getIntValue (StringRef keyName, int defaultValue) const noexcept
 {
     const ScopedLock sl (lock);
-    const int index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
+    auto index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
 
     if (index >= 0)
         return properties.getAllValues() [index].getIntValue();
@@ -89,11 +86,10 @@ int PropertySet::getIntValue (const String& keyName,
                                          : defaultValue;
 }
 
-double PropertySet::getDoubleValue (const String& keyName,
-                                    const double defaultValue) const noexcept
+double PropertySet::getDoubleValue (StringRef keyName, double defaultValue) const noexcept
 {
     const ScopedLock sl (lock);
-    const int index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
+    auto index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
 
     if (index >= 0)
         return properties.getAllValues()[index].getDoubleValue();
@@ -102,11 +98,10 @@ double PropertySet::getDoubleValue (const String& keyName,
                                          : defaultValue;
 }
 
-bool PropertySet::getBoolValue (const String& keyName,
-                                const bool defaultValue) const noexcept
+bool PropertySet::getBoolValue (StringRef keyName, bool defaultValue) const noexcept
 {
     const ScopedLock sl (lock);
-    const int index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
+    auto index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
 
     if (index >= 0)
         return properties.getAllValues() [index].getIntValue() != 0;
@@ -115,21 +110,20 @@ bool PropertySet::getBoolValue (const String& keyName,
                                          : defaultValue;
 }
 
-XmlElement* PropertySet::getXmlValue (const String& keyName) const
+std::unique_ptr<XmlElement> PropertySet::getXmlValue (StringRef keyName) const
 {
-    return XmlDocument::parse (getValue (keyName));
+    return parseXML (getValue (keyName));
 }
 
-void PropertySet::setValue (const String& keyName, const var& v)
+void PropertySet::setValue (StringRef keyName, const var& v)
 {
     jassert (keyName.isNotEmpty()); // shouldn't use an empty key name!
 
     if (keyName.isNotEmpty())
     {
-        const String value (v.toString());
+        auto value = v.toString();
         const ScopedLock sl (lock);
-
-        const int index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
+        auto index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
 
         if (index < 0 || properties.getAllValues() [index] != value)
         {
@@ -139,12 +133,12 @@ void PropertySet::setValue (const String& keyName, const var& v)
     }
 }
 
-void PropertySet::removeValue (const String& keyName)
+void PropertySet::removeValue (StringRef keyName)
 {
     if (keyName.isNotEmpty())
     {
         const ScopedLock sl (lock);
-        const int index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
+        auto index = properties.getAllKeys().indexOf (keyName, ignoreCaseOfKeys);
 
         if (index >= 0)
         {
@@ -154,13 +148,13 @@ void PropertySet::removeValue (const String& keyName)
     }
 }
 
-void PropertySet::setValue (const String& keyName, const XmlElement* const xml)
+void PropertySet::setValue (StringRef keyName, const XmlElement* xml)
 {
-    setValue (keyName, xml == nullptr ? var::null
-                                      : var (xml->createDocument (String::empty, true)));
+    setValue (keyName, xml == nullptr ? var()
+                                      : var (xml->toString (XmlElement::TextFormat().singleLine().withoutHeader())));
 }
 
-bool PropertySet::containsKey (const String& keyName) const noexcept
+bool PropertySet::containsKey (StringRef keyName) const noexcept
 {
     const ScopedLock sl (lock);
     return properties.getAllKeys().contains (keyName, ignoreCaseOfKeys);
@@ -181,14 +175,15 @@ void PropertySet::setFallbackPropertySet (PropertySet* fallbackProperties_) noex
     fallbackProperties = fallbackProperties_;
 }
 
-XmlElement* PropertySet::createXml (const String& nodeName) const
+std::unique_ptr<XmlElement> PropertySet::createXml (const String& nodeName) const
 {
+    auto xml = std::make_unique<XmlElement> (nodeName);
+
     const ScopedLock sl (lock);
-    XmlElement* const xml = new XmlElement (nodeName);
 
     for (int i = 0; i < properties.getAllKeys().size(); ++i)
     {
-        XmlElement* const e = xml->createNewChildElement ("VALUE");
+        auto e = xml->createNewChildElement ("VALUE");
         e->setAttribute ("name", properties.getAllKeys()[i]);
         e->setAttribute ("val", properties.getAllValues()[i]);
     }
@@ -201,7 +196,7 @@ void PropertySet::restoreFromXml (const XmlElement& xml)
     const ScopedLock sl (lock);
     clear();
 
-    forEachXmlChildElementWithTagName (xml, e, "VALUE")
+    for (auto* e : xml.getChildWithTagNameIterator ("VALUE"))
     {
         if (e->hasAttribute ("name")
              && e->hasAttribute ("val"))
@@ -218,3 +213,5 @@ void PropertySet::restoreFromXml (const XmlElement& xml)
 void PropertySet::propertyChanged()
 {
 }
+
+} // namespace juce

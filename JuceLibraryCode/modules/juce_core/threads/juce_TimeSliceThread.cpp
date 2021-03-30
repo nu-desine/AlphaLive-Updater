@@ -1,31 +1,29 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-TimeSliceThread::TimeSliceThread (const String& name)
-    : Thread (name),
-      clientBeingCalled (nullptr)
+namespace juce
+{
+
+TimeSliceThread::TimeSliceThread (const String& name)  : Thread (name)
 {
 }
 
@@ -67,6 +65,17 @@ void TimeSliceThread::removeTimeSliceClient (TimeSliceClient* const client)
     }
 }
 
+void TimeSliceThread::removeAllClients()
+{
+    for (;;)
+    {
+        if (auto* c = getClient (0))
+            removeTimeSliceClient (c);
+        else
+            break;
+    }
+}
+
 void TimeSliceThread::moveToFrontOfQueue (TimeSliceClient* client)
 {
     const ScopedLock sl (listLock);
@@ -86,7 +95,7 @@ int TimeSliceThread::getNumClients() const
 TimeSliceClient* TimeSliceThread::getClient (const int i) const
 {
     const ScopedLock sl (listLock);
-    return clients [i];
+    return clients[i];
 }
 
 //==============================================================================
@@ -97,7 +106,7 @@ TimeSliceClient* TimeSliceThread::getNextClient (int index) const
 
     for (int i = clients.size(); --i >= 0;)
     {
-        TimeSliceClient* const c = clients.getUnchecked ((i + index) % clients.size());
+        auto* c = clients.getUnchecked ((i + index) % clients.size());
 
         if (client == nullptr || c->nextCallTime < soonest)
         {
@@ -119,45 +128,50 @@ void TimeSliceThread::run()
 
         {
             Time nextClientTime;
+            int numClients = 0;
 
             {
                 const ScopedLock sl2 (listLock);
 
-                index = clients.size() > 0 ? ((index + 1) % clients.size()) : 0;
+                numClients = clients.size();
+                index = numClients > 0 ? ((index + 1) % numClients) : 0;
 
-                if (TimeSliceClient* const firstClient = getNextClient (index))
+                if (auto* firstClient = getNextClient (index))
                     nextClientTime = firstClient->nextCallTime;
             }
 
-            const Time now (Time::getCurrentTime());
-
-            if (nextClientTime > now)
+            if (numClients > 0)
             {
-                timeToWait = (int) jmin ((int64) 500, (nextClientTime - now).inMilliseconds());
-            }
-            else
-            {
-                timeToWait = index == 0 ? 1 : 0;
+                auto now = Time::getCurrentTime();
 
-                const ScopedLock sl (callbackLock);
-
+                if (nextClientTime > now)
                 {
-                    const ScopedLock sl2 (listLock);
-                    clientBeingCalled = getNextClient (index);
+                    timeToWait = (int) jmin ((int64) 500, (nextClientTime - now).inMilliseconds());
                 }
-
-                if (clientBeingCalled != nullptr)
+                else
                 {
-                    const int msUntilNextCall = clientBeingCalled->useTimeSlice();
+                    timeToWait = index == 0 ? 1 : 0;
 
-                    const ScopedLock sl2 (listLock);
+                    const ScopedLock sl (callbackLock);
 
-                    if (msUntilNextCall >= 0)
-                        clientBeingCalled->nextCallTime += RelativeTime::milliseconds (msUntilNextCall);
-                    else
-                        clients.removeFirstMatchingValue (clientBeingCalled);
+                    {
+                        const ScopedLock sl2 (listLock);
+                        clientBeingCalled = getNextClient (index);
+                    }
 
-                    clientBeingCalled = nullptr;
+                    if (clientBeingCalled != nullptr)
+                    {
+                        const int msUntilNextCall = clientBeingCalled->useTimeSlice();
+
+                        const ScopedLock sl2 (listLock);
+
+                        if (msUntilNextCall >= 0)
+                            clientBeingCalled->nextCallTime = now + RelativeTime::milliseconds (msUntilNextCall);
+                        else
+                            clients.removeFirstMatchingValue (clientBeingCalled);
+
+                        clientBeingCalled = nullptr;
+                    }
                 }
             }
         }
@@ -166,3 +180,5 @@ void TimeSliceThread::run()
             wait (timeToWait);
     }
 }
+
+} // namespace juce

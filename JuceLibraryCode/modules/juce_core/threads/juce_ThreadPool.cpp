@@ -1,34 +1,50 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-ThreadPoolJob::ThreadPoolJob (const String& name)
-    : jobName (name),
-      pool (nullptr),
-      shouldStop (false),
-      isActive (false),
-      shouldBeDeleted (false)
+namespace juce
+{
+
+struct ThreadPool::ThreadPoolThread  : public Thread
+{
+    ThreadPoolThread (ThreadPool& p, size_t stackSize)
+       : Thread ("Pool", stackSize), pool (p)
+    {
+    }
+
+    void run() override
+    {
+        while (! threadShouldExit())
+            if (! pool.runNextJob (*this))
+                wait (500);
+    }
+
+    std::atomic<ThreadPoolJob*> currentJob { nullptr };
+    ThreadPool& pool;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ThreadPoolThread)
+};
+
+//==============================================================================
+ThreadPoolJob::ThreadPoolJob (const String& name)  : jobName (name)
 {
 }
 
@@ -52,39 +68,33 @@ void ThreadPoolJob::setJobName (const String& newName)
 void ThreadPoolJob::signalJobShouldExit()
 {
     shouldStop = true;
+    listeners.call ([] (Thread::Listener& l) { l.exitSignalSent(); });
+}
+
+void ThreadPoolJob::addListener (Thread::Listener* listener)
+{
+    listeners.add (listener);
+}
+
+void ThreadPoolJob::removeListener (Thread::Listener* listener)
+{
+    listeners.remove (listener);
+}
+
+ThreadPoolJob* ThreadPoolJob::getCurrentThreadPoolJob()
+{
+    if (auto* t = dynamic_cast<ThreadPool::ThreadPoolThread*> (Thread::getCurrentThread()))
+        return t->currentJob.load();
+
+    return nullptr;
 }
 
 //==============================================================================
-class ThreadPool::ThreadPoolThread  : public Thread
-{
-public:
-    ThreadPoolThread (ThreadPool& pool_)
-        : Thread ("Pool"),
-          pool (pool_)
-    {
-    }
-
-    void run()
-    {
-        while (! threadShouldExit())
-        {
-            if (! pool.runNextJob())
-                wait (500);
-        }
-    }
-
-private:
-    ThreadPool& pool;
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ThreadPoolThread)
-};
-
-//==============================================================================
-ThreadPool::ThreadPool (const int numThreads)
+ThreadPool::ThreadPool (int numThreads, size_t threadStackSize)
 {
     jassert (numThreads > 0); // not much point having a pool without any threads!
 
-    createThreads (numThreads);
+    createThreads (numThreads, threadStackSize);
 }
 
 ThreadPool::ThreadPool()
@@ -98,25 +108,25 @@ ThreadPool::~ThreadPool()
     stopThreads();
 }
 
-void ThreadPool::createThreads (int numThreads)
+void ThreadPool::createThreads (int numThreads, size_t threadStackSize)
 {
     for (int i = jmax (1, numThreads); --i >= 0;)
-        threads.add (new ThreadPoolThread (*this));
+        threads.add (new ThreadPoolThread (*this, threadStackSize));
 
-    for (int i = threads.size(); --i >= 0;)
-        threads.getUnchecked(i)->startThread();
+    for (auto* t : threads)
+        t->startThread();
 }
 
 void ThreadPool::stopThreads()
 {
-    for (int i = threads.size(); --i >= 0;)
-        threads.getUnchecked(i)->signalThreadShouldExit();
+    for (auto* t : threads)
+        t->signalThreadShouldExit();
 
-    for (int i = threads.size(); --i >= 0;)
-        threads.getUnchecked(i)->stopThread (500);
+    for (auto* t : threads)
+        t->stopThread (500);
 }
 
-void ThreadPool::addJob (ThreadPoolJob* const job, const bool deleteJobWhenFinished)
+void ThreadPool::addJob (ThreadPoolJob* job, bool deleteJobWhenFinished)
 {
     jassert (job != nullptr);
     jassert (job->pool == nullptr);
@@ -133,40 +143,81 @@ void ThreadPool::addJob (ThreadPoolJob* const job, const bool deleteJobWhenFinis
             jobs.add (job);
         }
 
-        for (int i = threads.size(); --i >= 0;)
-            threads.getUnchecked(i)->notify();
+        for (auto* t : threads)
+            t->notify();
     }
 }
 
-int ThreadPool::getNumJobs() const
+void ThreadPool::addJob (std::function<ThreadPoolJob::JobStatus()> jobToRun)
 {
+    struct LambdaJobWrapper  : public ThreadPoolJob
+    {
+        LambdaJobWrapper (std::function<ThreadPoolJob::JobStatus()> j) : ThreadPoolJob ("lambda"), job (j) {}
+        JobStatus runJob() override      { return job(); }
+
+        std::function<ThreadPoolJob::JobStatus()> job;
+    };
+
+    addJob (new LambdaJobWrapper (jobToRun), true);
+}
+
+void ThreadPool::addJob (std::function<void()> jobToRun)
+{
+    struct LambdaJobWrapper  : public ThreadPoolJob
+    {
+        LambdaJobWrapper (std::function<void()> j) : ThreadPoolJob ("lambda"), job (j) {}
+        JobStatus runJob() override      { job(); return ThreadPoolJob::jobHasFinished; }
+
+        std::function<void()> job;
+    };
+
+    addJob (new LambdaJobWrapper (jobToRun), true);
+}
+
+int ThreadPool::getNumJobs() const noexcept
+{
+    const ScopedLock sl (lock);
     return jobs.size();
 }
 
-ThreadPoolJob* ThreadPool::getJob (const int index) const
+int ThreadPool::getNumThreads() const noexcept
+{
+    return threads.size();
+}
+
+ThreadPoolJob* ThreadPool::getJob (int index) const noexcept
 {
     const ScopedLock sl (lock);
     return jobs [index];
 }
 
-bool ThreadPool::contains (const ThreadPoolJob* const job) const
+bool ThreadPool::contains (const ThreadPoolJob* job) const noexcept
 {
     const ScopedLock sl (lock);
-    return jobs.contains (const_cast <ThreadPoolJob*> (job));
+    return jobs.contains (const_cast<ThreadPoolJob*> (job));
 }
 
-bool ThreadPool::isJobRunning (const ThreadPoolJob* const job) const
+bool ThreadPool::isJobRunning (const ThreadPoolJob* job) const noexcept
 {
     const ScopedLock sl (lock);
-    return jobs.contains (const_cast <ThreadPoolJob*> (job)) && job->isActive;
+    return jobs.contains (const_cast<ThreadPoolJob*> (job)) && job->isActive;
 }
 
-bool ThreadPool::waitForJobToFinish (const ThreadPoolJob* const job,
-                                     const int timeOutMs) const
+void ThreadPool::moveJobToFront (const ThreadPoolJob* job) noexcept
+{
+    const ScopedLock sl (lock);
+
+    auto index = jobs.indexOf (const_cast<ThreadPoolJob*> (job));
+
+    if (index > 0 && ! job->isActive)
+        jobs.move (index, 0);
+}
+
+bool ThreadPool::waitForJobToFinish (const ThreadPoolJob* job, int timeOutMs) const
 {
     if (job != nullptr)
     {
-        const uint32 start = Time::getMillisecondCounter();
+        auto start = Time::getMillisecondCounter();
 
         while (contains (job))
         {
@@ -180,9 +231,7 @@ bool ThreadPool::waitForJobToFinish (const ThreadPoolJob* const job,
     return true;
 }
 
-bool ThreadPool::removeJob (ThreadPoolJob* const job,
-                            const bool interruptIfRunning,
-                            const int timeOutMs)
+bool ThreadPool::removeJob (ThreadPoolJob* job, bool interruptIfRunning, int timeOutMs)
 {
     bool dontWait = true;
     OwnedArray<ThreadPoolJob> deletionList;
@@ -211,10 +260,10 @@ bool ThreadPool::removeJob (ThreadPoolJob* const job,
     return dontWait || waitForJobToFinish (job, timeOutMs);
 }
 
-bool ThreadPool::removeAllJobs (const bool interruptRunningJobs, const int timeOutMs,
+bool ThreadPool::removeAllJobs (bool interruptRunningJobs, int timeOutMs,
                                 ThreadPool::JobSelector* selectedJobsToRemove)
 {
-    Array <ThreadPoolJob*> jobsToWaitFor;
+    Array<ThreadPoolJob*> jobsToWaitFor;
 
     {
         OwnedArray<ThreadPoolJob> deletionList;
@@ -224,7 +273,7 @@ bool ThreadPool::removeAllJobs (const bool interruptRunningJobs, const int timeO
 
             for (int i = jobs.size(); --i >= 0;)
             {
-                ThreadPoolJob* const job = jobs.getUnchecked(i);
+                auto* job = jobs.getUnchecked(i);
 
                 if (selectedJobsToRemove == nullptr || selectedJobsToRemove->isJobSuitable (job))
                 {
@@ -245,13 +294,13 @@ bool ThreadPool::removeAllJobs (const bool interruptRunningJobs, const int timeO
         }
     }
 
-    const uint32 start = Time::getMillisecondCounter();
+    auto start = Time::getMillisecondCounter();
 
     for (;;)
     {
         for (int i = jobsToWaitFor.size(); --i >= 0;)
         {
-            ThreadPoolJob* const job = jobsToWaitFor.getUnchecked (i);
+            auto* job = jobsToWaitFor.getUnchecked (i);
 
             if (! isJobRunning (job))
                 jobsToWaitFor.remove (i);
@@ -269,27 +318,24 @@ bool ThreadPool::removeAllJobs (const bool interruptRunningJobs, const int timeO
     return true;
 }
 
-StringArray ThreadPool::getNamesOfAllJobs (const bool onlyReturnActiveJobs) const
+StringArray ThreadPool::getNamesOfAllJobs (bool onlyReturnActiveJobs) const
 {
     StringArray s;
     const ScopedLock sl (lock);
 
-    for (int i = 0; i < jobs.size(); ++i)
-    {
-        const ThreadPoolJob* const job = jobs.getUnchecked(i);
+    for (auto* job : jobs)
         if (job->isActive || ! onlyReturnActiveJobs)
             s.add (job->getJobName());
-    }
 
     return s;
 }
 
-bool ThreadPool::setThreadPriorities (const int newPriority)
+bool ThreadPool::setThreadPriorities (int newPriority)
 {
     bool ok = true;
 
-    for (int i = threads.size(); --i >= 0;)
-        if (! threads.getUnchecked(i)->setPriority (newPriority))
+    for (auto* t : threads)
+        if (! t->setPriority (newPriority))
             ok = false;
 
     return ok;
@@ -304,20 +350,21 @@ ThreadPoolJob* ThreadPool::pickNextJobToRun()
 
         for (int i = 0; i < jobs.size(); ++i)
         {
-            ThreadPoolJob* job = jobs[i];
-
-            if (job != nullptr && ! job->isActive)
+            if (auto* job = jobs[i])
             {
-                if (job->shouldStop)
+                if (! job->isActive)
                 {
-                    jobs.remove (i);
-                    addToDeleteList (deletionList, job);
-                    --i;
-                    continue;
-                }
+                    if (job->shouldStop)
+                    {
+                        jobs.remove (i);
+                        addToDeleteList (deletionList, job);
+                        --i;
+                        continue;
+                    }
 
-                job->isActive = true;
-                return job;
+                    job->isActive = true;
+                    return job;
+                }
             }
         }
     }
@@ -325,49 +372,55 @@ ThreadPoolJob* ThreadPool::pickNextJobToRun()
     return nullptr;
 }
 
-bool ThreadPool::runNextJob()
+bool ThreadPool::runNextJob (ThreadPoolThread& thread)
 {
-    ThreadPoolJob* const job = pickNextJobToRun();
-
-    if (job == nullptr)
-        return false;
-
-    ThreadPoolJob::JobStatus result = ThreadPoolJob::jobHasFinished;
-
-    JUCE_TRY
+    if (auto* job = pickNextJobToRun())
     {
-        result = job->runJob();
-    }
-    JUCE_CATCH_ALL_ASSERT
+        auto result = ThreadPoolJob::jobHasFinished;
+        thread.currentJob = job;
 
-    OwnedArray<ThreadPoolJob> deletionList;
-
-    {
-        const ScopedLock sl (lock);
-
-        if (jobs.contains (job))
+        try
         {
-            job->isActive = false;
+            result = job->runJob();
+        }
+        catch (...)
+        {
+            jassertfalse; // Your runJob() method mustn't throw any exceptions!
+        }
 
-            if (result != ThreadPoolJob::jobNeedsRunningAgain || job->shouldStop)
-            {
-                jobs.removeFirstMatchingValue (job);
-                addToDeleteList (deletionList, job);
+        thread.currentJob = nullptr;
 
-                jobFinishedSignal.signal();
-            }
-            else
+        OwnedArray<ThreadPoolJob> deletionList;
+
+        {
+            const ScopedLock sl (lock);
+
+            if (jobs.contains (job))
             {
-                // move the job to the end of the queue if it wants another go
-                jobs.move (jobs.indexOf (job), -1);
+                job->isActive = false;
+
+                if (result != ThreadPoolJob::jobNeedsRunningAgain || job->shouldStop)
+                {
+                    jobs.removeFirstMatchingValue (job);
+                    addToDeleteList (deletionList, job);
+
+                    jobFinishedSignal.signal();
+                }
+                else
+                {
+                    // move the job to the end of the queue if it wants another go
+                    jobs.move (jobs.indexOf (job), -1);
+                }
             }
         }
+
+        return true;
     }
 
-    return true;
+    return false;
 }
 
-void ThreadPool::addToDeleteList (OwnedArray<ThreadPoolJob>& deletionList, ThreadPoolJob* const job) const
+void ThreadPool::addToDeleteList (OwnedArray<ThreadPoolJob>& deletionList, ThreadPoolJob* job) const
 {
     job->shouldStop = true;
     job->pool = nullptr;
@@ -375,3 +428,5 @@ void ThreadPool::addToDeleteList (OwnedArray<ThreadPoolJob>& deletionList, Threa
     if (job->shouldBeDeleted)
         deletionList.add (job);
 }
+
+} // namespace juce

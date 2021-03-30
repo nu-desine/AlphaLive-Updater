@@ -1,27 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
 
 #if JUCE_USE_LAME_AUDIO_FORMAT
 
@@ -29,28 +32,27 @@ class LAMEEncoderAudioFormat::Writer   : public AudioFormatWriter
 {
 public:
     Writer (OutputStream* destStream, const String& formatName,
-            const File& lameApp, int vbr, int cbr,
-            double sampleRate, unsigned int numberOfChannels,
-            unsigned int bitsPerSample, const StringPairArray& metadata)
-        : AudioFormatWriter (destStream, formatName, sampleRate,
-                             numberOfChannels, bitsPerSample),
-          vbrLevel (vbr), cbrBitrate (cbr),
-          tempWav (".wav")
+            const File& appFile, int vbr, int cbr,
+            double sampleRateIn, unsigned int numberOfChannels,
+            int bitsPerSampleIn, const StringPairArray& metadata)
+        : AudioFormatWriter (destStream, formatName, sampleRateIn,
+                             numberOfChannels, (unsigned int) bitsPerSampleIn),
+          vbrLevel (vbr), cbrBitrate (cbr)
     {
         WavAudioFormat wavFormat;
 
-        if (FileOutputStream* out = tempWav.getFile().createOutputStream())
+        if (auto out = tempWav.getFile().createOutputStream())
         {
-            writer = wavFormat.createWriterFor (out, sampleRate, numChannels,
-                                                bitsPerSample, metadata, 0);
+            writer.reset (wavFormat.createWriterFor (out.release(), sampleRateIn, numChannels,
+                                                     bitsPerSampleIn, metadata, 0));
 
-            args.add (lameApp.getFullPathName());
+            args.add (appFile.getFullPathName());
 
             args.add ("--quiet");
 
             if (cbrBitrate == 0)
             {
-                args.add ("-vbr-new");
+                args.add ("--vbr-new");
                 args.add ("-V");
                 args.add (String (vbrLevel));
             }
@@ -73,7 +75,7 @@ public:
 
     void addMetadataArg (const StringPairArray& metadata, const char* key, const char* lameFlag)
     {
-        const String value (metadata.getValue (key, String::empty));
+        auto value = metadata.getValue (key, {});
 
         if (value.isNotEmpty())
         {
@@ -100,9 +102,25 @@ public:
 
 private:
     int vbrLevel, cbrBitrate;
-    TemporaryFile tempWav;
-    ScopedPointer<AudioFormatWriter> writer;
+    TemporaryFile tempWav { ".wav" };
+    std::unique_ptr<AudioFormatWriter> writer;
     StringArray args;
+
+    bool runLameChildProcess (const TemporaryFile& tempMP3, const StringArray& processArgs) const
+    {
+        ChildProcess cp;
+
+        if (cp.start (processArgs))
+        {
+            auto childOutput = cp.readAllProcessOutput();
+            DBG (childOutput); ignoreUnused (childOutput);
+
+            cp.waitForProcessToFinish (10000);
+            return tempMP3.getFile().getSize() > 0;
+        }
+
+        return false;
+    }
 
     bool convertToMP3() const
     {
@@ -112,24 +130,16 @@ private:
         args2.add (tempWav.getFile().getFullPathName());
         args2.add (tempMP3.getFile().getFullPathName());
 
-        ChildProcess cp;
+        DBG (args2.joinIntoString (" "));
 
-        DBG (args2.joinIntoString(" "));
-
-        if (cp.start (args2))
+        if (runLameChildProcess (tempMP3, args2))
         {
-            String childOutput (cp.readAllProcessOutput());
-            DBG (childOutput);
+            FileInputStream fis (tempMP3.getFile());
 
-            if (tempMP3.getFile().getSize() > 0)
+            if (fis.openedOk() && output->writeFromInputStream (fis, -1) > 0)
             {
-                FileInputStream fis (tempMP3.getFile());
-
-                if (fis.openedOk() && output->writeFromInputStream (fis, -1) > 0)
-                {
-                    output->flush();
-                    return true;
-                }
+                output->flush();
+                return true;
             }
         }
 
@@ -140,12 +150,9 @@ private:
 };
 
 //==============================================================================
-static const char* const lameFormatName = "MP3 file";
-static const char* const lameExtensions[] = { ".mp3", nullptr };
-
 LAMEEncoderAudioFormat::LAMEEncoderAudioFormat (const File& lameApplication)
-   : AudioFormat (TRANS (lameFormatName), StringArray (lameExtensions)),
-     lameApp (lameApplication)
+    : AudioFormat ("MP3 file", ".mp3"),
+      lameApp (lameApplication)
 {
 }
 
@@ -160,14 +167,12 @@ bool LAMEEncoderAudioFormat::canHandleFile (const File&)
 
 Array<int> LAMEEncoderAudioFormat::getPossibleSampleRates()
 {
-    const int rates[] = { 32000, 44100, 48000, 0 };
-    return Array <int> (rates);
+    return { 32000, 44100, 48000 };
 }
 
 Array<int> LAMEEncoderAudioFormat::getPossibleBitDepths()
 {
-    const int depths[] = { 16, 0 };
-    return Array <int> (depths);
+    return { 16 };
 }
 
 bool LAMEEncoderAudioFormat::canDoStereo()      { return true; }
@@ -176,11 +181,9 @@ bool LAMEEncoderAudioFormat::isCompressed()     { return true; }
 
 StringArray LAMEEncoderAudioFormat::getQualityOptions()
 {
-    const char* vbrOptions[] = { "VBR quality 0 (best)", "VBR quality 1", "VBR quality 2", "VBR quality 3",
-                                 "VBR quality 4 (normal)", "VBR quality 5", "VBR quality 6", "VBR quality 7", "VBR quality 8",
-                                 "VBR quality 9 (smallest)",
-                                 nullptr };
-
+    static const char* vbrOptions[] = { "VBR quality 0 (best)", "VBR quality 1", "VBR quality 2", "VBR quality 3",
+                                        "VBR quality 4 (normal)", "VBR quality 5", "VBR quality 6", "VBR quality 7",
+                                        "VBR quality 8", "VBR quality 9 (smallest)", nullptr };
     StringArray opts (vbrOptions);
 
     const int cbrRates[] = { 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320 };
@@ -203,6 +206,9 @@ AudioFormatWriter* LAMEEncoderAudioFormat::createWriterFor (OutputStream* stream
                                                             const StringPairArray& metadataValues,
                                                             int qualityOptionIndex)
 {
+    if (streamToWriteTo == nullptr)
+        return nullptr;
+
     int vbr = 4;
     int cbr = 0;
 
@@ -218,3 +224,5 @@ AudioFormatWriter* LAMEEncoderAudioFormat::createWriterFor (OutputStream* stream
 }
 
 #endif
+
+} // namespace juce

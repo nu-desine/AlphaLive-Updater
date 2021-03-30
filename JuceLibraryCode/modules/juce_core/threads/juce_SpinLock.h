@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_SPINLOCK_JUCEHEADER__
-#define __JUCE_SPINLOCK_JUCEHEADER__
-
-#include "juce_ScopedLock.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -35,18 +29,20 @@
     uncontended situations.
 
     Note that unlike a CriticalSection, this type of lock is not re-entrant, and may
-    be less efficient when used it a highly contended situation, but it's very small and
+    be less efficient when used in a highly contended situation, but it's very small and
     requires almost no initialisation.
     It's most appropriate for simple situations where you're only going to hold the
     lock for a very brief time.
 
     @see CriticalSection
+
+    @tags{Core}
 */
 class JUCE_API  SpinLock
 {
 public:
-    inline SpinLock() noexcept {}
-    inline ~SpinLock() noexcept {}
+    inline SpinLock() = default;
+    inline ~SpinLock() = default;
 
     /** Acquires the lock.
         This will block until the lock has been successfully acquired by this thread.
@@ -68,16 +64,19 @@ public:
     /** Releases the lock. */
     inline void exit() const noexcept
     {
-        jassert (lock.value == 1); // Agh! Releasing a lock that isn't currently held!
+        jassert (lock.get() == 1); // Agh! Releasing a lock that isn't currently held!
         lock = 0;
     }
 
     //==============================================================================
     /** Provides the type of scoped lock to use for locking a SpinLock. */
-    typedef GenericScopedLock <SpinLock>       ScopedLockType;
+    using ScopedLockType = GenericScopedLock<SpinLock>;
 
     /** Provides the type of scoped unlocker to use with a SpinLock. */
-    typedef GenericScopedUnlock <SpinLock>     ScopedUnlockType;
+    using ScopedUnlockType = GenericScopedUnlock<SpinLock>;
+
+    /** Provides the type of scoped try-lock to use for locking a SpinLock. */
+    using ScopedTryLockType = GenericScopedTryLock<SpinLock>;
 
 private:
     //==============================================================================
@@ -86,5 +85,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (SpinLock)
 };
 
-
-#endif   // __JUCE_SPINLOCK_JUCEHEADER__
+} // namespace juce

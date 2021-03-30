@@ -1,44 +1,43 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_LABEL_JUCEHEADER__
-#define __JUCE_LABEL_JUCEHEADER__
-
-#include "juce_TextEditor.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     A component that displays a text string, and can optionally become a text
     editor when clicked.
+
+    @tags{GUI}
 */
 class JUCE_API  Label  : public Component,
                          public SettableTooltipClient,
-                         protected TextEditorListener,
+                         protected TextEditor::Listener,
                          private ComponentListener,
-                         private ValueListener
+                         private Value::Listener
 {
 public:
     //==============================================================================
@@ -47,20 +46,20 @@ public:
         @param componentName    the name to give the component
         @param labelText        the text to show in the label
     */
-    Label (const String& componentName = String::empty,
-           const String& labelText = String::empty);
+    Label (const String& componentName = String(),
+           const String& labelText = String());
 
     /** Destructor. */
-    ~Label();
+    ~Label() override;
 
     //==============================================================================
     /** Changes the label text.
 
-        If broadcastChangeMessage is true and the new text is different to the current
-        text, then the class will broadcast a change message to any Label::Listener objects
-        that are registered.
+        The NotificationType parameter indicates whether to send a change message to
+        any Label::Listener objects if the new text is different.
     */
-    void setText (const String& newText, bool broadcastChangeMessage);
+    void setText (const String& newText,
+                  NotificationType notification);
 
     /** Returns the label's current text.
 
@@ -77,7 +76,7 @@ public:
         You can call Value::referTo() on this object to make the label read and control
         a Value object that you supply.
     */
-    Value& getTextValue()                               { return textValue; }
+    Value& getTextValue() noexcept                          { return textValue; }
 
     //==============================================================================
     /** Changes the font to use to draw the text.
@@ -104,35 +103,32 @@ public:
     */
     enum ColourIds
     {
-        backgroundColourId     = 0x1000280, /**< The background colour to fill the label with. */
-        textColourId           = 0x1000281, /**< The colour for the text. */
-        outlineColourId        = 0x1000282  /**< An optional colour to use to draw a border around the label.
-                                                 Leave this transparent to not have an outline. */
+        backgroundColourId             = 0x1000280, /**< The background colour to fill the label with. */
+        textColourId                   = 0x1000281, /**< The colour for the text. */
+        outlineColourId                = 0x1000282, /**< An optional colour to use to draw a border around the label.
+                                                         Leave this transparent to not have an outline. */
+        backgroundWhenEditingColourId  = 0x1000283, /**< The background colour when the label is being edited. */
+        textWhenEditingColourId        = 0x1000284, /**< The colour for the text when the label is being edited. */
+        outlineWhenEditingColourId     = 0x1000285  /**< An optional border colour when the label is being edited. */
     };
 
     //==============================================================================
     /** Sets the style of justification to be used for positioning the text.
-
         (The default is Justification::centredLeft)
     */
-    void setJustificationType (const Justification& justification);
+    void setJustificationType (Justification justification);
 
     /** Returns the type of justification, as set in setJustificationType(). */
     Justification getJustificationType() const noexcept                         { return justification; }
 
-    /** Changes the gap that is left between the edge of the component and the text.
+    /** Changes the border that is left between the edge of the component and the text.
         By default there's a small gap left at the sides of the component to allow for
         the drawing of the border, but you can change this if necessary.
     */
-    void setBorderSize (int horizontalBorder, int verticalBorder);
+    void setBorderSize (BorderSize<int> newBorderSize);
 
-    /** Returns the size of the horizontal gap being left around the text.
-    */
-    int getHorizontalBorderSize() const noexcept                                { return horizontalBorderSize; }
-
-    /** Returns the size of the vertical gap being left around the text.
-    */
-    int getVerticalBorderSize() const noexcept                                  { return verticalBorderSize; }
+    /** Returns the size of the border to be left around the text. */
+    BorderSize<int> getBorderSize() const noexcept                              { return border; }
 
     /** Makes this label "stick to" another component.
 
@@ -154,19 +150,23 @@ public:
 
     /** If the label is attached to the left of another component, this returns true.
 
-        Returns false if the label is above the other component. This is only relevent if
+        Returns false if the label is above the other component. This is only relevant if
         attachToComponent() has been called.
     */
     bool isAttachedOnLeft() const noexcept                                      { return leftOfOwnerComp; }
 
-    /** Specifies the minimum amount that the font can be squashed horizantally before it starts
-        using ellipsis.
+    /** Specifies the minimum amount that the font can be squashed horizontally before it starts
+        using ellipsis. Use a value of 0 for a default value.
 
         @see Graphics::drawFittedText
     */
     void setMinimumHorizontalScale (float newScale);
 
+    /** Specifies the amount that the font can be squashed horizontally. */
     float getMinimumHorizontalScale() const noexcept                            { return minimumHorizontalScale; }
+
+    /** Set a keyboard type for use when the text editor is shown. */
+    void setKeyboardType (TextInputTarget::VirtualKeyboardType type) noexcept   { keyboardType = type; }
 
     //==============================================================================
     /**
@@ -183,11 +183,16 @@ public:
     {
     public:
         /** Destructor. */
-        virtual ~Listener() {}
+        virtual ~Listener() = default;
 
-        /** Called when a Label's text has changed.
-        */
+        /** Called when a Label's text has changed. */
         virtual void labelTextChanged (Label* labelThatHasChanged) = 0;
+
+        /** Called when a Label goes into editing mode and displays a TextEditor. */
+        virtual void editorShown (Label*, TextEditor&) {}
+
+        /** Called when a Label is about to delete its TextEditor and exit editing mode. */
+        virtual void editorHidden (Label*, TextEditor&) {}
     };
 
     /** Registers a listener that will be called when the label's text changes. */
@@ -195,6 +200,16 @@ public:
 
     /** Deregisters a previously-registered listener. */
     void removeListener (Listener* listener);
+
+    //==============================================================================
+    /** You can assign a lambda to this callback object to have it called when the label text is changed. */
+    std::function<void()> onTextChange;
+
+    /** You can assign a lambda to this callback object to have it called when the label's editor is shown. */
+    std::function<void()> onEditorShow;
+
+    /** You can assign a lambda to this callback object to have it called when the label's editor is hidden. */
+    std::function<void()> onEditorHide;
 
     //==============================================================================
     /** Makes the label turn into a TextEditor when clicked.
@@ -234,7 +249,6 @@ public:
     bool isEditable() const noexcept                                    { return editSingleClick || editDoubleClick; }
 
     /** Makes the editor appear as if the label had been clicked by the user.
-
         @see textWasEdited, setEditable
     */
     void showEditor();
@@ -255,6 +269,19 @@ public:
     /** Returns the currently-visible text editor, or nullptr if none is open. */
     TextEditor* getCurrentTextEditor() const noexcept;
 
+    //==============================================================================
+    /** This abstract base class is implemented by LookAndFeel classes to provide
+        label drawing functionality.
+    */
+    struct JUCE_API  LookAndFeelMethods
+    {
+        virtual ~LookAndFeelMethods() = default;
+
+        virtual void drawLabel (Graphics&, Label&) = 0;
+        virtual Font getLabelFont (Label&) = 0;
+        virtual BorderSize<int> getLabelBorderSize (Label&) = 0;
+    };
+
 protected:
     //==============================================================================
     /** Creates the TextEditor component that will be used when the user has clicked on the label.
@@ -269,70 +296,70 @@ protected:
     virtual void textWasChanged();
 
     /** Called when the text editor has just appeared, due to a user click or other focus change. */
-    virtual void editorShown (TextEditor* editorComponent);
+    virtual void editorShown (TextEditor*);
 
     /** Called when the text editor is going to be deleted, after editing has finished. */
-    virtual void editorAboutToBeHidden (TextEditor* editorComponent);
+    virtual void editorAboutToBeHidden (TextEditor*);
 
     //==============================================================================
     /** @internal */
-    void paint (Graphics&);
+    void paint (Graphics&) override;
     /** @internal */
-    void resized();
+    void resized() override;
     /** @internal */
-    void mouseUp (const MouseEvent&);
+    void mouseUp (const MouseEvent&) override;
     /** @internal */
-    void mouseDoubleClick (const MouseEvent&);
+    void mouseDoubleClick (const MouseEvent&) override;
     /** @internal */
-    void componentMovedOrResized (Component&, bool wasMoved, bool wasResized);
+    void componentMovedOrResized (Component&, bool wasMoved, bool wasResized) override;
     /** @internal */
-    void componentParentHierarchyChanged (Component&);
+    void componentParentHierarchyChanged (Component&) override;
     /** @internal */
-    void componentVisibilityChanged (Component&);
+    void componentVisibilityChanged (Component&) override;
     /** @internal */
-    void inputAttemptWhenModal();
+    void inputAttemptWhenModal() override;
     /** @internal */
-    void focusGained (FocusChangeType);
+    void focusGained (FocusChangeType) override;
     /** @internal */
-    void enablementChanged();
+    void enablementChanged() override;
     /** @internal */
-    KeyboardFocusTraverser* createFocusTraverser();
+    KeyboardFocusTraverser* createFocusTraverser() override;
     /** @internal */
-    void textEditorTextChanged (TextEditor&);
+    void textEditorTextChanged (TextEditor&) override;
     /** @internal */
-    void textEditorReturnKeyPressed (TextEditor&);
+    void textEditorReturnKeyPressed (TextEditor&) override;
     /** @internal */
-    void textEditorEscapeKeyPressed (TextEditor&);
+    void textEditorEscapeKeyPressed (TextEditor&) override;
     /** @internal */
-    void textEditorFocusLost (TextEditor&);
+    void textEditorFocusLost (TextEditor&) override;
     /** @internal */
-    void colourChanged();
+    void colourChanged() override;
     /** @internal */
-    void valueChanged (Value&);
+    void valueChanged (Value&) override;
+    /** @internal */
+    void callChangeListeners();
 
 private:
     //==============================================================================
     Value textValue;
     String lastTextValue;
-    Font font;
-    Justification justification;
-    ScopedPointer<TextEditor> editor;
+    Font font { 15.0f };
+    Justification justification = Justification::centredLeft;
+    std::unique_ptr<TextEditor> editor;
     ListenerList<Listener> listeners;
     WeakReference<Component> ownerComponent;
-    int horizontalBorderSize, verticalBorderSize;
-    float minimumHorizontalScale;
-    bool editSingleClick : 1;
-    bool editDoubleClick : 1;
-    bool lossOfFocusDiscardsChanges : 1;
-    bool leftOfOwnerComp : 1;
+    BorderSize<int> border { 1, 5, 1, 5 };
+    float minimumHorizontalScale = 0;
+    TextInputTarget::VirtualKeyboardType keyboardType = TextInputTarget::textKeyboard;
+    bool editSingleClick = false;
+    bool editDoubleClick = false;
+    bool lossOfFocusDiscardsChanges = false;
+    bool leftOfOwnerComp = false;
 
     bool updateFromTextEditorContents (TextEditor&);
-    void callChangeListeners();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Label)
 };
 
-/** This typedef is just for compatibility with old code - newer code should use the Label::Listener class directly. */
-typedef Label::Listener LabelListener;
 
-#endif   // __JUCE_LABEL_JUCEHEADER__
+} // namespace juce

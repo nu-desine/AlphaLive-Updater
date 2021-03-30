@@ -1,34 +1,31 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_TOOLBAR_JUCEHEADER__
-#define __JUCE_TOOLBAR_JUCEHEADER__
+namespace juce
+{
 
-#include "../mouse/juce_DragAndDropContainer.h"
-#include "../layout/juce_ComponentAnimator.h"
-#include "../buttons/juce_Button.h"
 class ToolbarItemComponent;
 class ToolbarItemFactory;
 
@@ -49,11 +46,12 @@ class ToolbarItemFactory;
     component as a source of new items.
 
     @see ToolbarItemFactory, ToolbarItemComponent, ToolbarItemPalette
+
+    @tags{GUI}
 */
 class JUCE_API  Toolbar   : public Component,
                             public DragAndDropContainer,
-                            public DragAndDropTarget,
-                            private ButtonListener  // (can't use Button::Listener due to idiotic VC2005 bug)
+                            public DragAndDropTarget
 {
 public:
     //==============================================================================
@@ -71,7 +69,7 @@ public:
 
         Any items on the bar will be deleted when the toolbar is deleted.
     */
-    ~Toolbar();
+    ~Toolbar() override;
 
     //==============================================================================
     /** Changes the bar's orientation.
@@ -125,9 +123,11 @@ public:
                   int itemId,
                   int insertIndex = -1);
 
-    /** Deletes one of the items from the bar.
-    */
+    /** Deletes one of the items from the bar. */
     void removeToolbarItem (int itemIndex);
+
+    /** Removes an item from the bar and returns it. */
+    ToolbarItemComponent* removeAndReturnItem (int itemIndex);
 
     /** Returns the number of items currently on the toolbar.
 
@@ -138,7 +138,7 @@ public:
     /** Returns the ID of the item with the given index.
 
         If the index is less than zero or greater than the number of items,
-        this will return 0.
+        this will return nullptr.
 
         @see getNumItems
     */
@@ -147,7 +147,7 @@ public:
     /** Returns the component being used for the item with the given index.
 
         If the index is less than zero or greater than the number of items,
-        this will return 0.
+        this will return nullptr.
 
         @see getNumItems
     */
@@ -270,20 +270,40 @@ public:
                             const String& savedVersion);
 
     //==============================================================================
+    /** This abstract base class is implemented by LookAndFeel classes. */
+    struct JUCE_API  LookAndFeelMethods
+    {
+        virtual ~LookAndFeelMethods() = default;
+
+        virtual void paintToolbarBackground (Graphics&, int width, int height, Toolbar&) = 0;
+
+        virtual Button* createToolbarMissingItemsButton (Toolbar&) = 0;
+
+        virtual void paintToolbarButtonBackground (Graphics&, int width, int height,
+                                                   bool isMouseOver, bool isMouseDown,
+                                                   ToolbarItemComponent&) = 0;
+
+        virtual void paintToolbarButtonLabel (Graphics&, int x, int y, int width, int height,
+                                              const String& text, ToolbarItemComponent&) = 0;
+    };
+
+    //==============================================================================
     /** @internal */
-    void paint (Graphics& g);
+    void paint (Graphics&) override;
     /** @internal */
-    void resized();
+    void resized() override;
     /** @internal */
-    void mouseDown (const MouseEvent&);
+    void mouseDown (const MouseEvent&) override;
     /** @internal */
-    bool isInterestedInDragSource (const SourceDetails&);
+    bool isInterestedInDragSource (const SourceDetails&) override;
     /** @internal */
-    void itemDragMove (const SourceDetails&);
+    void itemDragMove (const SourceDetails&) override;
     /** @internal */
-    void itemDragExit (const SourceDetails&);
+    void itemDragExit (const SourceDetails&) override;
     /** @internal */
-    void itemDropped (const SourceDetails&);
+    void itemDropped (const SourceDetails&) override;
+    /** @internal */
+    void lookAndFeelChanged() override;
     /** @internal */
     void updateAllItemPositions (bool animate);
     /** @internal */
@@ -293,16 +313,16 @@ public:
 
 private:
     //==============================================================================
-    ScopedPointer<Button> missingItemsButton;
-    bool vertical, isEditingActive;
-    ToolbarItemStyle toolbarStyle;
+    std::unique_ptr<Button> missingItemsButton;
+    bool vertical = false, isEditingActive = false;
+    ToolbarItemStyle toolbarStyle = iconsOnly;
     class MissingItemsComponent;
     friend class MissingItemsComponent;
-    OwnedArray <ToolbarItemComponent> items;
+    OwnedArray<ToolbarItemComponent> items;
     class Spacer;
     class CustomisationDialog;
 
-    void buttonClicked (Button*);
+    void showMissingItems();
     void addItemInternal (ToolbarItemFactory& factory, int itemId, int insertIndex);
 
     ToolbarItemComponent* getNextActiveComponent (int index, int delta) const;
@@ -310,5 +330,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Toolbar)
 };
 
-
-#endif   // __JUCE_TOOLBAR_JUCEHEADER__
+} // namespace juce

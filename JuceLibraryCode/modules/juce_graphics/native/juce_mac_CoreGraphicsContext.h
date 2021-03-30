@@ -1,123 +1,150 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MAC_COREGRAPHICSCONTEXT_JUCEHEADER__
-#define __JUCE_MAC_COREGRAPHICSCONTEXT_JUCEHEADER__
+namespace juce
+{
+
+namespace detail
+{
+    struct ColorSpaceDelete
+    {
+        void operator() (CGColorSpaceRef ptr) const noexcept { CGColorSpaceRelease (ptr); }
+    };
+
+    struct ContextDelete
+    {
+        void operator() (CGContextRef ptr) const noexcept { CGContextRelease (ptr); }
+    };
+
+    struct DataProviderDelete
+    {
+        void operator() (CGDataProviderRef ptr) const noexcept { CGDataProviderRelease (ptr); }
+    };
+
+    struct ImageDelete
+    {
+        void operator() (CGImageRef ptr) const noexcept { CGImageRelease (ptr); }
+    };
+
+    struct GradientDelete
+    {
+        void operator() (CGGradientRef ptr) const noexcept { CGGradientRelease (ptr); }
+    };
+
+    //==============================================================================
+    using ColorSpacePtr = std::unique_ptr<CGColorSpace, ColorSpaceDelete>;
+    using ContextPtr = std::unique_ptr<CGContext, ContextDelete>;
+    using DataProviderPtr = std::unique_ptr<CGDataProvider, DataProviderDelete>;
+    using ImagePtr = std::unique_ptr<CGImage, ImageDelete>;
+    using GradientPtr = std::unique_ptr<CGGradient, GradientDelete>;
+}
 
 //==============================================================================
 class CoreGraphicsContext   : public LowLevelGraphicsContext
 {
 public:
-    CoreGraphicsContext (CGContextRef context, const float flipHeight, const float targetScale);
-    ~CoreGraphicsContext();
+    CoreGraphicsContext (CGContextRef context, float flipHeight);
+    ~CoreGraphicsContext() override;
 
     //==============================================================================
-    bool isVectorDevice() const         { return false; }
+    bool isVectorDevice() const override         { return false; }
 
-    void setOrigin (int x, int y);
-    void addTransform (const AffineTransform& transform);
-    float getScaleFactor();
-    float getTargetDeviceScaleFactor()  { return targetScale; }
-    bool clipToRectangle (const Rectangle<int>& r);
-    bool clipToRectangleList (const RectangleList& clipRegion);
-    void excludeClipRectangle (const Rectangle<int>& r);
-    void clipToPath (const Path& path, const AffineTransform& transform);
-    void clipToImageAlpha (const Image& sourceImage, const AffineTransform& transform);
-    bool clipRegionIntersects (const Rectangle<int>& r);
-    Rectangle<int> getClipBounds() const;
-    bool isClipEmpty() const;
-
-    //==============================================================================
-    void saveState();
-    void restoreState();
-    void beginTransparencyLayer (float opacity);
-    void endTransparencyLayer();
+    void setOrigin (Point<int>) override;
+    void addTransform (const AffineTransform&) override;
+    float getPhysicalPixelScaleFactor() override;
+    bool clipToRectangle (const Rectangle<int>&) override;
+    bool clipToRectangleList (const RectangleList<int>&) override;
+    void excludeClipRectangle (const Rectangle<int>&) override;
+    void clipToPath (const Path&, const AffineTransform&) override;
+    void clipToImageAlpha (const Image&, const AffineTransform&) override;
+    bool clipRegionIntersects (const Rectangle<int>&) override;
+    Rectangle<int> getClipBounds() const override;
+    bool isClipEmpty() const override;
 
     //==============================================================================
-    void setFill (const FillType& fillType);
-    void setOpacity (float newOpacity);
-    void setInterpolationQuality (Graphics::ResamplingQuality quality);
+    void saveState() override;
+    void restoreState() override;
+    void beginTransparencyLayer (float opacity) override;
+    void endTransparencyLayer() override;
 
     //==============================================================================
-    void fillRect (const Rectangle<int>& r, const bool replaceExistingContents);
-    void fillCGRect (const CGRect& cgRect, const bool replaceExistingContents);
-    void fillPath (const Path& path, const AffineTransform& transform);
-    void drawImage (const Image& sourceImage, const AffineTransform& transform);
+    void setFill (const FillType&) override;
+    void setOpacity (float) override;
+    void setInterpolationQuality (Graphics::ResamplingQuality) override;
 
     //==============================================================================
-    void drawLine (const Line<float>& line);
-    void drawVerticalLine (const int x, float top, float bottom);
-    void drawHorizontalLine (const int y, float left, float right);
-    void setFont (const Font& newFont);
-    const Font& getFont();
-    void drawGlyph (int glyphNumber, const AffineTransform& transform);
-    bool drawTextLayout (const AttributedString& text, const Rectangle<float>&);
+    void fillRect (const Rectangle<int>&, bool replaceExistingContents) override;
+    void fillRect (const Rectangle<float>&) override;
+    void fillRectList (const RectangleList<float>&) override;
+    void fillPath (const Path&, const AffineTransform&) override;
+    void drawImage (const Image& sourceImage, const AffineTransform&) override;
+
+    //==============================================================================
+    void drawLine (const Line<float>&) override;
+    void setFont (const Font&) override;
+    const Font& getFont() override;
+    void drawGlyph (int glyphNumber, const AffineTransform&) override;
+    bool drawTextLayout (const AttributedString&, const Rectangle<float>&) override;
 
 private:
-    CGContextRef context;
+    //==============================================================================
+    detail::ContextPtr context;
     const CGFloat flipHeight;
-    float targetScale;
-    CGColorSpaceRef rgbColourSpace, greyColourSpace;
-    CGFunctionCallbacks gradientCallbacks;
+    detail::ColorSpacePtr rgbColourSpace, greyColourSpace;
     mutable Rectangle<int> lastClipRect;
-    mutable bool lastClipRectIsValid;
+    mutable bool lastClipRectIsValid = false;
 
     struct SavedState
     {
         SavedState();
-        SavedState (const SavedState& other);
+        SavedState (const SavedState&);
         ~SavedState();
 
-        void setFill (const FillType& newFill);
-        CGShadingRef getShading (CoreGraphicsContext& owner);
-
-        static void gradientCallback (void* info, const CGFloat* inData, CGFloat* outData);
+        void setFill (const FillType&);
 
         FillType fillType;
         Font font;
-        CGFontRef fontRef;
-        CGAffineTransform fontTransform;
-
-    private:
-        CGShadingRef shading;
-        HeapBlock <PixelARGB> gradientLookupTable;
-        int numGradientLookupEntries;
+        CGFontRef fontRef = {};
+        CGAffineTransform textMatrix = CGAffineTransformIdentity,
+                   inverseTextMatrix = CGAffineTransformIdentity;
+        detail::GradientPtr gradient = {};
     };
 
-    ScopedPointer <SavedState> state;
-    OwnedArray <SavedState> stateStack;
+    std::unique_ptr<SavedState> state;
+    OwnedArray<SavedState> stateStack;
 
     void drawGradient();
-    void createPath (const Path& path) const;
-    void createPath (const Path& path, const AffineTransform& transform) const;
+    void createPath (const Path&) const;
+    void createPath (const Path&, const AffineTransform&) const;
     void flip() const;
-    void applyTransform (const AffineTransform& transform) const;
-    void drawImage (const Image& sourceImage, const AffineTransform& transform, bool fillEntireClipAsTiles);
-    bool clipToRectangleListWithoutTest (const RectangleList&);
+    void applyTransform (const AffineTransform&) const;
+    void drawImage (const Image&, const AffineTransform&, bool fillEntireClipAsTiles);
+    bool clipToRectangleListWithoutTest (const RectangleList<int>&);
+    void fillCGRect (const CGRect&, bool replaceExistingContents);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CoreGraphicsContext)
 };
 
-#endif   // __JUCE_MAC_COREGRAPHICSCONTEXT_JUCEHEADER__
+} // namespace juce

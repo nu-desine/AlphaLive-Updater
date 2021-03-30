@@ -1,27 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
 
 enum
 {
@@ -31,35 +31,6 @@ enum
     U_SMB_SUPER_MAGIC = 0x517B      // linux/smb_fs.h
 };
 
-//==============================================================================
-bool File::copyInternal (const File& dest) const
-{
-    FileInputStream in (*this);
-
-    if (dest.deleteFile())
-    {
-        {
-            FileOutputStream out (dest);
-
-            if (out.failedToOpen())
-                return false;
-
-            if (out.writeFromInputStream (in, -1) == getSize())
-                return true;
-        }
-
-        dest.deleteFile();
-    }
-
-    return false;
-}
-
-void File::findFileSystemRoots (Array<File>& destArray)
-{
-    destArray.add (File ("/"));
-}
-
-//==============================================================================
 bool File::isOnCDRomDrive() const
 {
     struct statfs buf;
@@ -82,11 +53,7 @@ bool File::isOnHardDisk() const
             case U_SMB_SUPER_MAGIC:     // Network Samba
                 return false;
 
-            default:
-                // Assume anything else is a hard-disk (but note it could
-                // be a RAM disk.  There isn't a good way of determining
-                // this for sure)
-                return true;
+            default: break;
         }
     }
 
@@ -100,32 +67,9 @@ bool File::isOnRemovableDrive() const
     return false;
 }
 
-bool File::isHidden() const
+String File::getVersion() const
 {
-    return getFileName().startsWithChar ('.');
-}
-
-//==============================================================================
-namespace
-{
-    File juce_readlink (const String& file, const File& defaultFile)
-    {
-        const size_t size = 8192;
-        HeapBlock<char> buffer;
-        buffer.malloc (size + 4);
-
-        const size_t numBytes = readlink (file.toUTF8(), buffer, size);
-
-        if (numBytes > 0 && numBytes <= size)
-            return File (file).getSiblingFile (String::fromUTF8 (buffer, (int) numBytes));
-
-        return defaultFile;
-    }
-}
-
-File File::getLinkedTarget() const
-{
-    return juce_readlink (getFullPathName().toUTF8(), *this);
+    return {}; // xxx not yet implemented
 }
 
 //==============================================================================
@@ -162,66 +106,59 @@ File File::getSpecialLocation (const SpecialLocationType type)
     {
         case userHomeDirectory:
         {
-            const char* homeDir = getenv ("HOME");
+            if (const char* homeDir = getenv ("HOME"))
+                return File (CharPointer_UTF8 (homeDir));
 
-            if (homeDir == nullptr)
-            {
-                struct passwd* const pw = getpwuid (getuid());
-                if (pw != nullptr)
-                    homeDir = pw->pw_dir;
-            }
+            if (auto* pw = getpwuid (getuid()))
+                return File (CharPointer_UTF8 (pw->pw_dir));
 
-            return File (CharPointer_UTF8 (homeDir));
+            return {};
         }
 
-        case userDocumentsDirectory:          return resolveXDGFolder ("XDG_DOCUMENTS_DIR", "~");
-        case userMusicDirectory:              return resolveXDGFolder ("XDG_MUSIC_DIR",     "~");
-        case userMoviesDirectory:             return resolveXDGFolder ("XDG_VIDEOS_DIR",    "~");
-        case userPicturesDirectory:           return resolveXDGFolder ("XDG_PICTURES_DIR",  "~");
+        case userDocumentsDirectory:          return resolveXDGFolder ("XDG_DOCUMENTS_DIR", "~/Documents");
+        case userMusicDirectory:              return resolveXDGFolder ("XDG_MUSIC_DIR",     "~/Music");
+        case userMoviesDirectory:             return resolveXDGFolder ("XDG_VIDEOS_DIR",    "~/Videos");
+        case userPicturesDirectory:           return resolveXDGFolder ("XDG_PICTURES_DIR",  "~/Pictures");
         case userDesktopDirectory:            return resolveXDGFolder ("XDG_DESKTOP_DIR",   "~/Desktop");
-        case userApplicationDataDirectory:    return File ("~");
-        case commonApplicationDataDirectory:  return File ("/var");
+        case userApplicationDataDirectory:    return resolveXDGFolder ("XDG_CONFIG_HOME",   "~/.config");
+        case commonDocumentsDirectory:
+        case commonApplicationDataDirectory:  return File ("/opt");
         case globalApplicationsDirectory:     return File ("/usr");
 
         case tempDirectory:
         {
-            File tmp ("/var/tmp");
+            if (const char* tmpDir = getenv ("TMPDIR"))
+                return File (CharPointer_UTF8 (tmpDir));
 
-            if (! tmp.isDirectory())
-            {
-                tmp = "/tmp";
-
-                if (! tmp.isDirectory())
-                    tmp = File::getCurrentWorkingDirectory();
-            }
-
-            return tmp;
+            return File ("/tmp");
         }
 
         case invokedExecutableFile:
             if (juce_argv != nullptr && juce_argc > 0)
                 return File (CharPointer_UTF8 (juce_argv[0]));
-            // deliberate fall-through...
+            // Falls through
+            JUCE_FALLTHROUGH
 
         case currentExecutableFile:
         case currentApplicationFile:
+           #if ! JUCE_STANDALONE_APPLICATION
             return juce_getExecutableFile();
+           #endif
+            // deliberate fall-through if this is not a shared-library
+            JUCE_FALLTHROUGH
 
         case hostApplicationPath:
-            return juce_readlink ("/proc/self/exe", juce_getExecutableFile());
+        {
+            const File f ("/proc/self/exe");
+            return f.isSymbolicLink() ? f.getLinkedTarget() : juce_getExecutableFile();
+        }
 
         default:
             jassertfalse; // unknown type?
             break;
     }
 
-    return File::nonexistent;
-}
-
-//==============================================================================
-String File::getVersion() const
-{
-    return String::empty; // xxx not yet implemented
+    return {};
 }
 
 //==============================================================================
@@ -243,82 +180,6 @@ bool File::moveToTrash() const
 }
 
 //==============================================================================
-class DirectoryIterator::NativeIterator::Pimpl
-{
-public:
-    Pimpl (const File& directory, const String& wildCard_)
-        : parentDir (File::addTrailingSeparator (directory.getFullPathName())),
-          wildCard (wildCard_),
-          dir (opendir (directory.getFullPathName().toUTF8()))
-    {
-    }
-
-    ~Pimpl()
-    {
-        if (dir != nullptr)
-            closedir (dir);
-    }
-
-    bool next (String& filenameFound,
-               bool* const isDir, bool* const isHidden, int64* const fileSize,
-               Time* const modTime, Time* const creationTime, bool* const isReadOnly)
-    {
-        if (dir != nullptr)
-        {
-            const char* wildcardUTF8 = nullptr;
-
-            for (;;)
-            {
-                struct dirent* const de = readdir (dir);
-
-                if (de == nullptr)
-                    break;
-
-                if (wildcardUTF8 == nullptr)
-                    wildcardUTF8 = wildCard.toUTF8();
-
-                if (fnmatch (wildcardUTF8, de->d_name, FNM_CASEFOLD) == 0)
-                {
-                    filenameFound = CharPointer_UTF8 (de->d_name);
-
-                    updateStatInfoForFile (parentDir + filenameFound, isDir, fileSize, modTime, creationTime, isReadOnly);
-
-                    if (isHidden != nullptr)
-                        *isHidden = filenameFound.startsWithChar ('.');
-
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-private:
-    String parentDir, wildCard;
-    DIR* dir;
-
-    JUCE_DECLARE_NON_COPYABLE (Pimpl)
-};
-
-DirectoryIterator::NativeIterator::NativeIterator (const File& directory, const String& wildCard)
-    : pimpl (new DirectoryIterator::NativeIterator::Pimpl (directory, wildCard))
-{
-}
-
-DirectoryIterator::NativeIterator::~NativeIterator()
-{
-}
-
-bool DirectoryIterator::NativeIterator::next (String& filenameFound,
-                                              bool* const isDir, bool* const isHidden, int64* const fileSize,
-                                              Time* const modTime, Time* const creationTime, bool* const isReadOnly)
-{
-    return pimpl->next (filenameFound, isDir, isHidden, fileSize, modTime, creationTime, isReadOnly);
-}
-
-
-//==============================================================================
 static bool isFileExecutable (const String& filename)
 {
     juce_statStruct info;
@@ -330,29 +191,27 @@ static bool isFileExecutable (const String& filename)
 
 bool Process::openDocument (const String& fileName, const String& parameters)
 {
-    String cmdString (fileName.replace (" ", "\\ ",false));
+    auto cmdString = fileName.replace (" ", "\\ ", false);
     cmdString << " " << parameters;
 
-    if (URL::isProbablyAWebsiteURL (fileName)
-         || cmdString.startsWithIgnoreCase ("file:")
-         || URL::isProbablyAnEmailAddress (fileName)
+    if (cmdString.startsWithIgnoreCase ("file:")
          || File::createFileWithoutCheckingPath (fileName).isDirectory()
          || ! isFileExecutable (fileName))
     {
-        // create a command that tries to launch a bunch of likely browsers
-        const char* const browserNames[] = { "xdg-open", "/etc/alternatives/x-www-browser", "firefox", "mozilla",
-                                             "google-chrome", "chromium-browser", "opera", "konqueror" };
         StringArray cmdLines;
 
-        for (int i = 0; i < numElementsInArray (browserNames); ++i)
-            cmdLines.add (String (browserNames[i]) + " " + cmdString.trim().quoted());
+        for (auto browserName : { "xdg-open", "/etc/alternatives/x-www-browser", "firefox", "mozilla",
+                                  "google-chrome", "chromium-browser", "opera", "konqueror" })
+        {
+            cmdLines.add (String (browserName) + " " + cmdString.trim().quoted());
+        }
 
         cmdString = cmdLines.joinIntoString (" || ");
     }
 
-    const char* const argv[4] = { "/bin/sh", "-c", cmdString.toUTF8(), 0 };
+    const char* const argv[4] = { "/bin/sh", "-c", cmdString.toUTF8(), nullptr };
 
-    const int cpid = fork();
+    auto cpid = fork();
 
     if (cpid == 0)
     {
@@ -373,3 +232,5 @@ void File::revealToUser() const
     else if (getParentDirectory().exists())
         getParentDirectory().startAsProcess();
 }
+
+} // namespace juce

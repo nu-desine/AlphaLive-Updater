@@ -1,40 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_VARIANT_JUCEHEADER__
-#define __JUCE_VARIANT_JUCEHEADER__
-
-#include "../text/juce_Identifier.h"
-#include "../streams/juce_OutputStream.h"
-#include "../streams/juce_InputStream.h"
-#include "../containers/juce_Array.h"
-
-#ifndef DOXYGEN
- class ReferenceCountedObject;
- class DynamicObject;
-#endif
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -48,13 +35,26 @@
     using writeToStream()/readFromStream(), or as JSON by using the JSON class.
 
     @see JSON, DynamicObject
+
+    @tags{Core}
 */
 class JUCE_API  var
 {
 public:
     //==============================================================================
-    typedef const var (DynamicObject::*MethodFunction) (const var* arguments, int numArguments);
-    typedef Identifier identifier;
+    /** This structure is passed to a NativeFunction callback, and contains invocation
+        details about the function's arguments and context.
+    */
+    struct JUCE_API  NativeFunctionArgs
+    {
+        NativeFunctionArgs (const var& thisObject, const var* args, int numArgs) noexcept;
+
+        const var& thisObject;
+        const var* arguments;
+        int numArguments;
+    };
+
+    using NativeFunction = std::function<var (const NativeFunctionArgs&)>;
 
     //==============================================================================
     /** Creates a void variant. */
@@ -62,9 +62,6 @@ public:
 
     /** Destructor. */
     ~var() noexcept;
-
-    /** A static var object that can be used where you need an empty variant object. */
-    static const var null;
 
     var (const var& valueToCopy);
     var (int value) noexcept;
@@ -75,8 +72,11 @@ public:
     var (const wchar_t* value);
     var (const String& value);
     var (const Array<var>& value);
+    var (const StringArray& value);
     var (ReferenceCountedObject* object);
-    var (MethodFunction method) noexcept;
+    var (NativeFunction method) noexcept;
+    var (const void* binaryData, size_t dataSize);
+    var (const MemoryBlock& binaryData);
 
     var& operator= (const var& valueToCopy);
     var& operator= (int value);
@@ -86,19 +86,24 @@ public:
     var& operator= (const char* value);
     var& operator= (const wchar_t* value);
     var& operator= (const String& value);
+    var& operator= (const MemoryBlock& value);
     var& operator= (const Array<var>& value);
     var& operator= (ReferenceCountedObject* object);
-    var& operator= (MethodFunction method);
+    var& operator= (NativeFunction method);
 
-   #if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
-    var (var&& other) noexcept;
-    var (String&& value);
-    var& operator= (var&& other) noexcept;
-    var& operator= (String&& value);
-   #endif
+    var (var&&) noexcept;
+    var (String&&);
+    var (MemoryBlock&&);
+    var (Array<var>&&);
+    var& operator= (var&&) noexcept;
+    var& operator= (String&&);
 
     void swapWith (var& other) noexcept;
 
+    /** Returns a var object that can be used where you need the javascript "undefined" value. */
+    static var undefined() noexcept;
+
+    //==============================================================================
     operator int() const noexcept;
     operator int64() const noexcept;
     operator bool() const noexcept;
@@ -106,11 +111,29 @@ public:
     operator double() const noexcept;
     operator String() const;
     String toString() const;
+
+    /** If this variant holds an array, this provides access to it.
+        NOTE: Beware when you use this - the array pointer is only valid for the lifetime
+        of the variant that returned it, so be very careful not to call this method on temporary
+        var objects that are the return-value of a function, and which may go out of scope before
+        you use the array!
+    */
     Array<var>* getArray() const noexcept;
+
+    /** If this variant holds a memory block, this provides access to it.
+        NOTE: Beware when you use this - the MemoryBlock pointer is only valid for the lifetime
+        of the variant that returned it, so be very careful not to call this method on temporary
+        var objects that are the return-value of a function, and which may go out of scope before
+        you use the MemoryBlock!
+    */
+    MemoryBlock* getBinaryData() const noexcept;
+
     ReferenceCountedObject* getObject() const noexcept;
     DynamicObject* getDynamicObject() const noexcept;
 
+    //==============================================================================
     bool isVoid() const noexcept;
+    bool isUndefined() const noexcept;
     bool isInt() const noexcept;
     bool isInt64() const noexcept;
     bool isBool() const noexcept;
@@ -118,6 +141,7 @@ public:
     bool isString() const noexcept;
     bool isObject() const noexcept;
     bool isArray() const noexcept;
+    bool isBinaryData() const noexcept;
     bool isMethod() const noexcept;
 
     /** Returns true if this var has the same value as the one supplied.
@@ -132,6 +156,15 @@ public:
         @see equals
     */
     bool equalsWithSameType (const var& other) const noexcept;
+
+    /** Returns true if this var has the same type as the one supplied. */
+    bool hasSameTypeAs (const var& other) const noexcept;
+
+    /** Returns a deep copy of this object.
+        For simple types this just returns a copy, but if the object contains any arrays
+        or DynamicObjects, they will be cloned (recursively).
+    */
+    var clone() const noexcept;
 
     //==============================================================================
     /** If the var is an array, this returns the number of elements.
@@ -198,27 +231,31 @@ public:
 
     //==============================================================================
     /** If this variant is an object, this returns one of its properties. */
-    var operator[] (const Identifier& propertyName) const;
+    const var& operator[] (const Identifier& propertyName) const;
     /** If this variant is an object, this returns one of its properties. */
-    var operator[] (const char* propertyName) const;
+    const var& operator[] (const char* propertyName) const;
     /** If this variant is an object, this returns one of its properties, or a default
         fallback value if the property is not set. */
     var getProperty (const Identifier& propertyName, const var& defaultReturnValue) const;
+    /** Returns true if this variant is an object and if it has the given property. */
+    bool hasProperty (const Identifier& propertyName) const noexcept;
 
-    /** If this variant is an object, this invokes one of its methods with no arguments. */
+    /** Invokes a named method call with no arguments. */
     var call (const Identifier& method) const;
-    /** If this variant is an object, this invokes one of its methods with one argument. */
+    /** Invokes a named method call with one argument. */
     var call (const Identifier& method, const var& arg1) const;
-    /** If this variant is an object, this invokes one of its methods with 2 arguments. */
+    /** Invokes a named method call with 2 arguments. */
     var call (const Identifier& method, const var& arg1, const var& arg2) const;
-    /** If this variant is an object, this invokes one of its methods with 3 arguments. */
+    /** Invokes a named method call with 3 arguments. */
     var call (const Identifier& method, const var& arg1, const var& arg2, const var& arg3);
-    /** If this variant is an object, this invokes one of its methods with 4 arguments. */
+    /** Invokes a named method call with 4 arguments. */
     var call (const Identifier& method, const var& arg1, const var& arg2, const var& arg3, const var& arg4) const;
-    /** If this variant is an object, this invokes one of its methods with 5 arguments. */
+    /** Invokes a named method call with 5 arguments. */
     var call (const Identifier& method, const var& arg1, const var& arg2, const var& arg3, const var& arg4, const var& arg5) const;
-    /** If this variant is an object, this invokes one of its methods with a list of arguments. */
+    /** Invokes a named method call with a list of arguments. */
     var invoke (const Identifier& method, const var* arguments, int numArguments) const;
+    /** If this object is a method, this returns the function pointer. */
+    NativeFunction getNativeFunction() const;
 
     //==============================================================================
     /** Writes a binary representation of this value to a stream.
@@ -234,18 +271,20 @@ public:
     */
     static var readFromStream (InputStream& input);
 
+    /* This was a static empty var object, but is now deprecated as it's too easy to accidentally
+       use it indirectly during a static constructor, leading to hard-to-find order-of-initialisation
+       problems.
+       @deprecated If you need a default-constructed var, just use var() or {}.
+       The only time you might miss having var::null available might be if you need to return an
+       empty var from a function by reference, but if you need to do that, it's easy enough to use
+       a function-local static var and return that, avoiding any order-of-initialisation issues.
+    */
+    JUCE_DEPRECATED_STATIC (static const var null;)
+
 private:
     //==============================================================================
-    class VariantType;         friend class VariantType;
-    class VariantType_Void;    friend class VariantType_Void;
-    class VariantType_Int;     friend class VariantType_Int;
-    class VariantType_Int64;   friend class VariantType_Int64;
-    class VariantType_Double;  friend class VariantType_Double;
-    class VariantType_Bool;    friend class VariantType_Bool;
-    class VariantType_String;  friend class VariantType_String;
-    class VariantType_Object;  friend class VariantType_Object;
-    class VariantType_Array;   friend class VariantType_Array;
-    class VariantType_Method;  friend class VariantType_Method;
+    struct VariantType;
+    struct Instance;
 
     union ValueUnion
     {
@@ -253,28 +292,64 @@ private:
         int64 int64Value;
         bool boolValue;
         double doubleValue;
-        char stringValue [sizeof (String)];
+        char stringValue[sizeof (String)];
         ReferenceCountedObject* objectValue;
-        Array<var>* arrayValue;
-        MethodFunction methodValue;
+        MemoryBlock* binaryValue;
+        NativeFunction* methodValue;
     };
+
+    friend bool canCompare (const var&, const var&);
 
     const VariantType* type;
     ValueUnion value;
 
     Array<var>* convertToArray();
-    friend class DynamicObject;
-    var invokeMethod (DynamicObject*, const var*, int) const;
+    var (const VariantType&) noexcept;
+
+    // This is needed to prevent the wrong constructor/operator being called
+    var (const ReferenceCountedObject*) = delete;
+    var& operator= (const ReferenceCountedObject*) = delete;
+    var (const void*) = delete;
+    var& operator= (const void*) = delete;
 };
 
 /** Compares the values of two var objects, using the var::equals() comparison. */
-bool operator== (const var& v1, const var& v2) noexcept;
+JUCE_API bool operator== (const var&, const var&);
 /** Compares the values of two var objects, using the var::equals() comparison. */
-bool operator!= (const var& v1, const var& v2) noexcept;
-bool operator== (const var& v1, const String& v2);
-bool operator!= (const var& v1, const String& v2);
-bool operator== (const var& v1, const char* v2);
-bool operator!= (const var& v1, const char* v2);
+JUCE_API bool operator!= (const var&, const var&);
+/** Compares the values of two var objects, using the var::equals() comparison. */
+JUCE_API bool operator<  (const var&, const var&);
+/** Compares the values of two var objects, using the var::equals() comparison. */
+JUCE_API bool operator<= (const var&, const var&);
+/** Compares the values of two var objects, using the var::equals() comparison. */
+JUCE_API bool operator>  (const var&, const var&);
+/** Compares the values of two var objects, using the var::equals() comparison. */
+JUCE_API bool operator>= (const var&, const var&);
 
+JUCE_API bool operator== (const var&, const String&);
+JUCE_API bool operator!= (const var&, const String&);
+JUCE_API bool operator== (const var&, const char*);
+JUCE_API bool operator!= (const var&, const char*);
 
-#endif   // __JUCE_VARIANT_JUCEHEADER__
+//==============================================================================
+/** This template-overloaded class can be used to convert between var and custom types.
+
+    @tags{Core}
+*/
+template <typename Type>
+struct VariantConverter
+{
+    static Type fromVar (const var& v)             { return static_cast<Type> (v); }
+    static var toVar (const Type& t)               { return t; }
+};
+
+#ifndef DOXYGEN
+template <>
+struct VariantConverter<String>
+{
+    static String fromVar (const var& v)           { return v.toString(); }
+    static var toVar (const String& s)             { return s; }
+};
+#endif
+
+} // namespace juce

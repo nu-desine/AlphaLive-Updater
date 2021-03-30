@@ -1,44 +1,54 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_COLOURGRADIENT_JUCEHEADER__
-#define __JUCE_COLOURGRADIENT_JUCEHEADER__
-
-#include "juce_Colour.h"
-#include "../geometry/juce_Point.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     Describes the layout and colours that should be used to paint a colour gradient.
 
     @see Graphics::setGradientFill
+
+    @tags{Graphics}
 */
-class JUCE_API  ColourGradient
+class JUCE_API  ColourGradient  final
 {
 public:
+    /** Creates an uninitialised gradient.
+
+        If you use this constructor instead of the other one, be sure to set all the
+        object's public member variables before using it!
+    */
+    ColourGradient() noexcept;
+
+    ColourGradient (const ColourGradient&);
+    ColourGradient (ColourGradient&&) noexcept;
+    ColourGradient& operator= (const ColourGradient&);
+    ColourGradient& operator= (ColourGradient&&) noexcept;
+
     //==============================================================================
     /** Creates a gradient object.
 
@@ -57,16 +67,53 @@ public:
 
         @see ColourGradient
     */
-    ColourGradient (const Colour& colour1, float x1, float y1,
-                    const Colour& colour2, float x2, float y2,
+    ColourGradient (Colour colour1, float x1, float y1,
+                    Colour colour2, float x2, float y2,
                     bool isRadial);
 
-    /** Creates an uninitialised gradient.
+    /** Creates a gradient object.
 
-        If you use this constructor instead of the other one, be sure to set all the
-        object's public member variables before using it!
+        point1 is the location to draw with colour1. Likewise point2 is where
+        colour2 should be. In between them there's a gradient.
+
+        If isRadial is true, the colours form a circular gradient with point1 at
+        its centre.
+
+        The alpha transparencies of the colours are used, so note that
+        if you blend from transparent to a solid colour, the RGB of the transparent
+        colour will become visible in parts of the gradient. e.g. blending
+        from Colour::transparentBlack to Colours::white will produce a
+        muddy grey colour midway, but Colour::transparentWhite to Colours::white
+        will be white all the way across.
+
+        @see ColourGradient
     */
-    ColourGradient() noexcept;
+    ColourGradient (Colour colour1, Point<float> point1,
+                    Colour colour2, Point<float> point2,
+                    bool isRadial);
+
+    //==============================================================================
+    /** Creates a vertical linear gradient between two Y coordinates */
+    static ColourGradient vertical (Colour colour1, float y1,
+                                    Colour colour2, float y2);
+
+    /** Creates a horizontal linear gradient between two X coordinates */
+    static ColourGradient horizontal (Colour colour1, float x1,
+                                      Colour colour2, float x2);
+
+    /** Creates a vertical linear gradient from top to bottom in a rectangle */
+    template <typename Type>
+    static ColourGradient vertical (Colour colourTop, Colour colourBottom, Rectangle<Type> area)
+    {
+        return vertical (colourTop, (float) area.getY(), colourBottom, (float) area.getBottom());
+    }
+
+    /** Creates a horizontal linear gradient from right to left in a rectangle */
+    template <typename Type>
+    static ColourGradient horizontal (Colour colourLeft, Colour colourRight, Rectangle<Type> area)
+    {
+        return horizontal (colourLeft, (float) area.getX(), colourRight, (float) area.getRight());
+    }
 
     /** Destructor */
     ~ColourGradient();
@@ -90,8 +137,7 @@ public:
         @param colour                       the colour that should be used at this point
         @returns the index at which the new point was added
     */
-    int addColour (double proportionAlongGradient,
-                   const Colour& colour);
+    int addColour (double proportionAlongGradient, Colour colour);
 
     /** Removes one of the colours from the gradient. */
     void removeColour (int index);
@@ -117,7 +163,7 @@ public:
     /** Changes the colour at a given index.
         The index is from 0 to getNumColours() - 1.
     */
-    void setColour (int index, const Colour& newColour) noexcept;
+    void setColour (int index, Colour newColour) noexcept;
 
     /** Returns the an interpolated colour at any position along the gradient.
         @param position     the position along the gradient, between 0 and 1
@@ -130,7 +176,7 @@ public:
         colours that it added.
         When calling this, the ColourGradient must have at least 2 colour stops specified.
     */
-    int createLookupTable (const AffineTransform& transform, HeapBlock <PixelARGB>& resultLookupTable) const;
+    int createLookupTable (const AffineTransform& transform, HeapBlock<PixelARGB>& resultLookupTable) const;
 
     /** Creates a set of interpolated premultiplied ARGB values.
         This will fill an array of a user-specified size with the gradient, interpolating to fit.
@@ -155,31 +201,24 @@ public:
     */
     bool isRadial;
 
-    bool operator== (const ColourGradient& other) const noexcept;
-    bool operator!= (const ColourGradient& other) const noexcept;
+    bool operator== (const ColourGradient&) const noexcept;
+    bool operator!= (const ColourGradient&) const noexcept;
 
 
 private:
     //==============================================================================
     struct ColourPoint
     {
-        ColourPoint() noexcept {}
-
-        ColourPoint (const double pos, const Colour& col) noexcept
-            : position (pos), colour (col)
-        {}
-
-        bool operator== (const ColourPoint& other) const noexcept;
-        bool operator!= (const ColourPoint& other) const noexcept;
+        bool operator== (ColourPoint) const noexcept;
+        bool operator!= (ColourPoint) const noexcept;
 
         double position;
         Colour colour;
     };
 
-    Array <ColourPoint> colours;
+    Array<ColourPoint> colours;
 
     JUCE_LEAK_DETECTOR (ColourGradient)
 };
 
-
-#endif   // __JUCE_COLOURGRADIENT_JUCEHEADER__
+} // namespace juce

@@ -1,35 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_BUFFEREDINPUTSTREAM_JUCEHEADER__
-#define __JUCE_BUFFEREDINPUTSTREAM_JUCEHEADER__
-
-#include "juce_InputStream.h"
-#include "../memory/juce_OptionalScopedPointer.h"
-#include "../memory/juce_HeapBlock.h"
-
+namespace juce
+{
 
 //==============================================================================
 /** Wraps another input stream, and reads from it using an intermediate buffer
@@ -38,6 +30,8 @@
     small read accesses to it, it's probably sensible to wrap it in one of these,
     so that the source stream gets accessed in larger chunk sizes, meaning less
     work for the underlying stream.
+
+    @tags{Core}
 */
 class JUCE_API  BufferedInputStream  : public InputStream
 {
@@ -67,27 +61,30 @@ public:
         This may also delete the source stream, if that option was chosen when the
         buffered stream was created.
     */
-    ~BufferedInputStream();
+    ~BufferedInputStream() override;
 
 
     //==============================================================================
-    int64 getTotalLength();
-    int64 getPosition();
-    bool setPosition (int64 newPosition);
-    int read (void* destBuffer, int maxBytesToRead);
-    String readString();
-    bool isExhausted();
+    /** Returns the next byte that would be read by a call to readByte() */
+    char peekByte();
+
+    int64 getTotalLength() override;
+    int64 getPosition() override;
+    bool setPosition (int64 newPosition) override;
+    int read (void* destBuffer, int maxBytesToRead) override;
+    String readString() override;
+    bool isExhausted() override;
 
 
 private:
     //==============================================================================
     OptionalScopedPointer<InputStream> source;
     int bufferSize;
-    int64 position, lastReadPos, bufferStart, bufferOverlap;
-    HeapBlock <char> buffer;
-    void ensureBuffered();
+    int64 position, lastReadPos = 0, bufferStart, bufferOverlap = 128;
+    HeapBlock<char> buffer;
+    bool ensureBuffered();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BufferedInputStream)
 };
 
-#endif   // __JUCE_BUFFEREDINPUTSTREAM_JUCEHEADER__
+} // namespace juce

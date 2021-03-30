@@ -1,30 +1,29 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-//==============================================================================
-#define JNI_CLASS_MEMBERS(METHOD, STATICMETHOD, FIELD, STATICFIELD) \
+namespace juce
+{
+
+#define JNI_CLASS_MEMBERS(METHOD, STATICMETHOD, FIELD, STATICFIELD, CALLBACK) \
  STATICMETHOD (getMinBufferSize,            "getMinBufferSize",             "(III)I") \
  STATICMETHOD (getNativeOutputSampleRate,   "getNativeOutputSampleRate",    "(I)I") \
  METHOD (constructor,   "<init>",   "(IIIIII)V") \
@@ -35,11 +34,11 @@
  METHOD (flush,         "flush",    "()V") \
  METHOD (write,         "write",    "([SII)I") \
 
-DECLARE_JNI_CLASS (AudioTrack, "android/media/AudioTrack");
+DECLARE_JNI_CLASS (AudioTrack, "android/media/AudioTrack")
 #undef JNI_CLASS_MEMBERS
 
 //==============================================================================
-#define JNI_CLASS_MEMBERS(METHOD, STATICMETHOD, FIELD, STATICFIELD) \
+#define JNI_CLASS_MEMBERS(METHOD, STATICMETHOD, FIELD, STATICFIELD, CALLBACK) \
  STATICMETHOD (getMinBufferSize, "getMinBufferSize", "(III)I") \
  METHOD (constructor,       "<init>",           "(IIIII)V") \
  METHOD (getState,          "getState",         "()I") \
@@ -48,7 +47,7 @@ DECLARE_JNI_CLASS (AudioTrack, "android/media/AudioTrack");
  METHOD (read,              "read",             "([SII)I") \
  METHOD (release,           "release",          "()V") \
 
-DECLARE_JNI_CLASS (AudioRecord, "android/media/AudioRecord");
+DECLARE_JNI_CLASS (AudioRecord, "android/media/AudioRecord")
 #undef JNI_CLASS_MEMBERS
 
 //==============================================================================
@@ -74,12 +73,12 @@ public:
     AndroidAudioIODevice (const String& deviceName)
         : AudioIODevice (deviceName, javaAudioTypeName),
           Thread ("audio"),
-          minBufferSizeOut (0), minBufferSizeIn (0), callback (0), sampleRate (0),
+          minBufferSizeOut (0), minBufferSizeIn (0), callback (nullptr), sampleRate (0),
           numClientInputChannels (0), numDeviceInputChannels (0), numDeviceInputChannelsAvailable (2),
           numClientOutputChannels (0), numDeviceOutputChannels (0),
           actualBufferSize (0), isRunning (false),
-          outputChannelBuffer (1, 1),
-          inputChannelBuffer (1, 1)
+          inputChannelBuffer (1, 1),
+          outputChannelBuffer (1, 1)
     {
         JNIEnv* env = getEnv();
         sampleRate = env->CallStaticIntMethod (AudioTrack, AudioTrack.getNativeOutputSampleRate, MODE_STREAM);
@@ -101,12 +100,12 @@ public:
               << sampleRate << " Hz; input chans: " << numDeviceInputChannelsAvailable);
     }
 
-    ~AndroidAudioIODevice()
+    ~AndroidAudioIODevice() override
     {
         close();
     }
 
-    StringArray getOutputChannelNames()
+    StringArray getOutputChannelNames() override
     {
         StringArray s;
         s.add ("Left");
@@ -114,7 +113,7 @@ public:
         return s;
     }
 
-    StringArray getInputChannelNames()
+    StringArray getInputChannelNames() override
     {
         StringArray s;
 
@@ -131,36 +130,43 @@ public:
         return s;
     }
 
-    int getNumSampleRates()             { return 1;}
-    double getSampleRate (int index)    { return sampleRate; }
-
-    int getDefaultBufferSize()          { return 2048; }
-    int getNumBufferSizesAvailable()    { return 50; }
-
-    int getBufferSizeSamples (int index)
+    Array<double> getAvailableSampleRates() override
     {
+        Array<double> r;
+        r.add ((double) sampleRate);
+        return r;
+    }
+
+    Array<int> getAvailableBufferSizes() override
+    {
+        Array<int> b;
         int n = 16;
-        for (int i = 0; i < index; ++i)
+
+        for (int i = 0; i < 50; ++i)
+        {
+            b.add (n);
             n += n < 64 ? 16
                         : (n < 512 ? 32
                                    : (n < 1024 ? 64
                                                : (n < 2048 ? 128 : 256)));
+        }
 
-        return n;
+        return b;
     }
 
+    int getDefaultBufferSize() override                 { return 2048; }
 
     String open (const BigInteger& inputChannels,
                  const BigInteger& outputChannels,
                  double requestedSampleRate,
-                 int bufferSize)
+                 int bufferSize) override
     {
         close();
 
         if (sampleRate != (int) requestedSampleRate)
             return "Sample rate not allowed";
 
-        lastError = String::empty;
+        lastError.clear();
         int preferredBufferSize = (bufferSize <= 0) ? getDefaultBufferSize() : bufferSize;
 
         numDeviceInputChannels = 0;
@@ -185,29 +191,58 @@ public:
         if (numClientOutputChannels > 0)
         {
             numDeviceOutputChannels = 2;
-            outputDevice = GlobalRef (env->NewObject (AudioTrack, AudioTrack.constructor,
-                                                      STREAM_MUSIC, sampleRate, CHANNEL_OUT_STEREO, ENCODING_PCM_16BIT,
-                                                      (jint) (minBufferSizeOut * numDeviceOutputChannels * sizeof (int16)), MODE_STREAM));
+            outputDevice = GlobalRef (LocalRef<jobject>(env->NewObject (AudioTrack, AudioTrack.constructor,
+                                                                        STREAM_MUSIC, sampleRate, CHANNEL_OUT_STEREO, ENCODING_PCM_16BIT,
+                                                                        (jint) (minBufferSizeOut * numDeviceOutputChannels * static_cast<int> (sizeof (int16))), MODE_STREAM)));
 
-            if (env->CallIntMethod (outputDevice, AudioTrack.getState) != STATE_UNINITIALIZED)
+            const bool supportsUnderrunCount = (getAndroidSDKVersion() >= 24);
+            getUnderrunCount = supportsUnderrunCount ? env->GetMethodID (AudioTrack, "getUnderrunCount", "()I") : nullptr;
+
+            int outputDeviceState = env->CallIntMethod (outputDevice, AudioTrack.getState);
+            if (outputDeviceState > 0)
+            {
                 isRunning = true;
+            }
             else
-                outputDevice.clear(); // failed to open the device
+            {
+                 // failed to open the device
+                outputDevice.clear();
+                lastError = "Error opening audio output device: android.media.AudioTrack failed with state = " + String (outputDeviceState);
+            }
         }
 
         if (numClientInputChannels > 0 && numDeviceInputChannelsAvailable > 0)
         {
-            numDeviceInputChannels = jmin (numClientInputChannels, numDeviceInputChannelsAvailable);
-            inputDevice = GlobalRef (env->NewObject (AudioRecord, AudioRecord.constructor,
-                                                     0 /* (default audio source) */, sampleRate,
-                                                     numDeviceInputChannelsAvailable > 1 ? CHANNEL_IN_STEREO : CHANNEL_IN_MONO,
-                                                     ENCODING_PCM_16BIT,
-                                                     (jint) (minBufferSizeIn * numDeviceInputChannels * sizeof (int16))));
+            if (! RuntimePermissions::isGranted (RuntimePermissions::recordAudio))
+            {
+                // If you hit this assert, you probably forgot to get RuntimePermissions::recordAudio
+                // before trying to open an audio input device. This is not going to work!
+                jassertfalse;
 
-            if (env->CallIntMethod (inputDevice, AudioRecord.getState) != STATE_UNINITIALIZED)
-                isRunning = true;
+                inputDevice.clear();
+                lastError = "Error opening audio input device: the app was not granted android.permission.RECORD_AUDIO";
+            }
             else
-                inputDevice.clear(); // failed to open the device
+            {
+                numDeviceInputChannels = jmin (numClientInputChannels, numDeviceInputChannelsAvailable);
+                inputDevice = GlobalRef (LocalRef<jobject>(env->NewObject (AudioRecord, AudioRecord.constructor,
+                                                                           0 /* (default audio source) */, sampleRate,
+                                                                           numDeviceInputChannelsAvailable > 1 ? CHANNEL_IN_STEREO : CHANNEL_IN_MONO,
+                                                                           ENCODING_PCM_16BIT,
+                                                                           (jint) (minBufferSizeIn * numDeviceInputChannels * static_cast<int> (sizeof (int16))))));
+
+                int inputDeviceState = env->CallIntMethod (inputDevice, AudioRecord.getState);
+                if (inputDeviceState > 0)
+                {
+                    isRunning = true;
+                }
+                else
+                {
+                     // failed to open the device
+                    inputDevice.clear();
+                    lastError = "Error opening audio input device: android.media.AudioRecord failed with state = " + String (inputDeviceState);
+                }
+            }
         }
 
         if (isRunning)
@@ -228,7 +263,7 @@ public:
         return lastError;
     }
 
-    void close()
+    void close() override
     {
         if (isRunning)
         {
@@ -238,18 +273,26 @@ public:
         }
     }
 
-    int getOutputLatencyInSamples()                     { return (minBufferSizeOut * 3) / 4; }
-    int getInputLatencyInSamples()                      { return (minBufferSizeIn * 3) / 4; }
-    bool isOpen()                                       { return isRunning; }
-    int getCurrentBufferSizeSamples()                   { return actualBufferSize; }
-    int getCurrentBitDepth()                            { return 16; }
-    double getCurrentSampleRate()                       { return sampleRate; }
-    BigInteger getActiveOutputChannels() const          { return activeOutputChans; }
-    BigInteger getActiveInputChannels() const           { return activeInputChans; }
-    String getLastError()                               { return lastError; }
-    bool isPlaying()                                    { return isRunning && callback != 0; }
+    int getOutputLatencyInSamples() override             { return (minBufferSizeOut * 3) / 4; }
+    int getInputLatencyInSamples() override              { return (minBufferSizeIn * 3) / 4; }
+    bool isOpen() override                               { return isRunning; }
+    int getCurrentBufferSizeSamples() override           { return actualBufferSize; }
+    int getCurrentBitDepth() override                    { return 16; }
+    double getCurrentSampleRate() override               { return sampleRate; }
+    BigInteger getActiveOutputChannels() const override  { return activeOutputChans; }
+    BigInteger getActiveInputChannels() const override   { return activeInputChans; }
+    String getLastError() override                       { return lastError; }
+    bool isPlaying() override                            { return isRunning && callback != nullptr; }
 
-    void start (AudioIODeviceCallback* newCallback)
+    int getXRunCount() const noexcept override
+    {
+        if (outputDevice != nullptr && getUnderrunCount != nullptr)
+            return getEnv()->CallIntMethod (outputDevice, getUnderrunCount);
+
+        return -1;
+    }
+
+    void start (AudioIODeviceCallback* newCallback) override
     {
         if (isRunning && callback != newCallback)
         {
@@ -261,7 +304,7 @@ public:
         }
     }
 
-    void stop()
+    void stop() override
     {
         if (isRunning)
         {
@@ -278,7 +321,7 @@ public:
         }
     }
 
-    void run()
+    void run() override
     {
         JNIEnv* env = getEnv();
         jshortArray audioBuffer = env->NewShortArray (actualBufferSize * jmax (numDeviceOutputChannels, numDeviceInputChannels));
@@ -294,11 +337,11 @@ public:
                     DBG ("Audio read under-run! " << numRead);
                 }
 
-                jshort* const src = env->GetShortArrayElements (audioBuffer, 0);
+                jshort* const src = env->GetShortArrayElements (audioBuffer, nullptr);
 
                 for (int chan = 0; chan < inputChannelBuffer.getNumChannels(); ++chan)
                 {
-                    AudioData::Pointer <AudioData::Float32, AudioData::NativeEndian, AudioData::NonInterleaved, AudioData::NonConst> d (inputChannelBuffer.getSampleData (chan));
+                    AudioData::Pointer <AudioData::Float32, AudioData::NativeEndian, AudioData::NonInterleaved, AudioData::NonConst> d (inputChannelBuffer.getWritePointer (chan));
 
                     if (chan < numDeviceInputChannels)
                     {
@@ -322,8 +365,8 @@ public:
 
                 if (callback != nullptr)
                 {
-                    callback->audioDeviceIOCallback ((const float**) inputChannelBuffer.getArrayOfChannels(), numClientInputChannels,
-                                                     outputChannelBuffer.getArrayOfChannels(), numClientOutputChannels,
+                    callback->audioDeviceIOCallback (inputChannelBuffer.getArrayOfReadPointers(), numClientInputChannels,
+                                                     outputChannelBuffer.getArrayOfWritePointers(), numClientOutputChannels,
                                                      actualBufferSize);
                 }
                 else
@@ -337,13 +380,13 @@ public:
                 if (threadShouldExit())
                     break;
 
-                jshort* const dest = env->GetShortArrayElements (audioBuffer, 0);
+                jshort* const dest = env->GetShortArrayElements (audioBuffer, nullptr);
 
                 for (int chan = 0; chan < numDeviceOutputChannels; ++chan)
                 {
                     AudioData::Pointer <AudioData::Int16, AudioData::NativeEndian, AudioData::Interleaved, AudioData::NonConst> d (dest + chan, numDeviceOutputChannels);
 
-                    const float* const sourceChanData = outputChannelBuffer.getSampleData (jmin (chan, outputChannelBuffer.getNumChannels() - 1));
+                    const float* const sourceChanData = outputChannelBuffer.getReadPointer (jmin (chan, outputChannelBuffer.getNumChannels() - 1));
                     AudioData::Pointer <AudioData::Float32, AudioData::NativeEndian, AudioData::NonInterleaved, AudioData::Const> s (sourceChanData);
                     d.convertSamples (s, actualBufferSize);
                 }
@@ -362,7 +405,7 @@ public:
     int minBufferSizeOut, minBufferSizeIn;
 
 private:
-    //==================================================================================================
+    //==============================================================================
     CriticalSection callbackLock;
     AudioIODeviceCallback* callback;
     jint sampleRate;
@@ -373,7 +416,8 @@ private:
     String lastError;
     BigInteger activeOutputChans, activeInputChans;
     GlobalRef outputDevice, inputDevice;
-    AudioSampleBuffer inputChannelBuffer, outputChannelBuffer;
+    AudioBuffer<float> inputChannelBuffer, outputChannelBuffer;
+    jmethodID getUnderrunCount = nullptr;
 
     void closeDevices()
     {
@@ -403,20 +447,20 @@ public:
 
     //==============================================================================
     void scanForDevices() {}
-    StringArray getDeviceNames (bool wantInputNames) const              { return StringArray (javaAudioTypeName); }
-    int getDefaultDeviceIndex (bool forInput) const                     { return 0; }
-    int getIndexOfDevice (AudioIODevice* device, bool asInput) const    { return device != nullptr ? 0 : -1; }
+    StringArray getDeviceNames (bool) const                             { return StringArray (javaAudioTypeName); }
+    int getDefaultDeviceIndex (bool) const                              { return 0; }
+    int getIndexOfDevice (AudioIODevice* device, bool) const            { return device != nullptr ? 0 : -1; }
     bool hasSeparateInputsAndOutputs() const                            { return false; }
 
     AudioIODevice* createDevice (const String& outputDeviceName,
                                  const String& inputDeviceName)
     {
-        ScopedPointer<AndroidAudioIODevice> dev;
+        std::unique_ptr<AndroidAudioIODevice> dev;
 
         if (outputDeviceName.isNotEmpty() || inputDeviceName.isNotEmpty())
         {
-            dev = new AndroidAudioIODevice (outputDeviceName.isNotEmpty() ? outputDeviceName
-                                                                          : inputDeviceName);
+            dev.reset (new AndroidAudioIODevice (outputDeviceName.isNotEmpty() ? outputDeviceName
+                                                                               : inputDeviceName));
 
             if (dev->getCurrentSampleRate() <= 0 || dev->getDefaultBufferSize() <= 0)
                 dev = nullptr;
@@ -431,14 +475,7 @@ private:
 
 
 //==============================================================================
+extern bool isOboeAvailable();
 extern bool isOpenSLAvailable();
 
-AudioIODeviceType* AudioIODeviceType::createAudioIODeviceType_Android()
-{
-   #if JUCE_USE_ANDROID_OPENSLES
-    if (isOpenSLAvailable())
-        return nullptr;
-   #endif
-
-    return new AndroidAudioIODeviceType();
-}
+} // namespace juce

@@ -1,39 +1,38 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_RELATIVEPOINT_JUCEHEADER__
-#define __JUCE_RELATIVEPOINT_JUCEHEADER__
-
-#include "juce_RelativeCoordinate.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     An X-Y position stored as a pair of RelativeCoordinate values.
 
     @see RelativeCoordinate, RelativeRectangle
+
+    @tags{GUI}
 */
 class JUCE_API  RelativePoint
 {
@@ -42,7 +41,7 @@ public:
     RelativePoint();
 
     /** Creates an absolute point, relative to the origin. */
-    RelativePoint (const Point<float>& absolutePoint);
+    RelativePoint (Point<float> absolutePoint);
 
     /** Creates an absolute point, relative to the origin. */
     RelativePoint (float absoluteX, float absoluteY);
@@ -57,15 +56,15 @@ public:
     */
     RelativePoint (const String& stringVersion);
 
-    bool operator== (const RelativePoint& other) const noexcept;
-    bool operator!= (const RelativePoint& other) const noexcept;
+    bool operator== (const RelativePoint&) const noexcept;
+    bool operator!= (const RelativePoint&) const noexcept;
 
     /** Calculates the absolute position of this point.
 
         You'll need to provide a suitable Expression::Scope for looking up any coordinates that may
         be needed to calculate the result.
     */
-    const Point<float> resolve (const Expression::Scope* evaluationContext) const;
+    Point<float> resolve (const Expression::Scope* evaluationContext) const;
 
     /** Changes the values of this point's coordinates to make it resolve to the specified position.
 
@@ -73,7 +72,7 @@ public:
         or relative positions to whatever values are necessary to make the resultant position
         match the position that is provided.
     */
-    void moveToAbsolute (const Point<float>& newPos, const Expression::Scope* evaluationContext);
+    void moveToAbsolute (Point<float> newPos, const Expression::Scope* evaluationContext);
 
     /** Returns a string which represents this point.
         This returns a comma-separated pair of coordinates. For details of the string syntax used by the
@@ -89,5 +88,4 @@ public:
     RelativeCoordinate x, y;
 };
 
-
-#endif   // __JUCE_RELATIVEPOINT_JUCEHEADER__
+} // namespace juce

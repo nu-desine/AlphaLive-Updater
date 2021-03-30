@@ -1,49 +1,50 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 FilenameComponent::FilenameComponent (const String& name,
                                       const File& currentFile,
-                                      const bool canEditFilename,
-                                      const bool isDirectory,
-                                      const bool isForSaving,
+                                      bool canEditFilename,
+                                      bool isDirectory,
+                                      bool isForSaving,
                                       const String& fileBrowserWildcard,
-                                      const String& enforcedSuffix_,
+                                      const String& suffix,
                                       const String& textWhenNothingSelected)
     : Component (name),
-      maxRecentFiles (30),
       isDir (isDirectory),
       isSaving (isForSaving),
-      isFileDragOver (false),
       wildcard (fileBrowserWildcard),
-      enforcedSuffix (enforcedSuffix_)
+      enforcedSuffix (suffix)
 {
-    addAndMakeVisible (&filenameBox);
+    addAndMakeVisible (filenameBox);
     filenameBox.setEditableText (canEditFilename);
-    filenameBox.addListener (this);
     filenameBox.setTextWhenNothingSelected (textWhenNothingSelected);
     filenameBox.setTextWhenNoChoicesAvailable (TRANS ("(no recently selected files)"));
+    filenameBox.onChange = [this] { setCurrentFile (getCurrentFile(), true); };
 
     setBrowseButtonText ("...");
 
@@ -60,13 +61,20 @@ void FilenameComponent::paintOverChildren (Graphics& g)
     if (isFileDragOver)
     {
         g.setColour (Colours::red.withAlpha (0.2f));
-        g.drawRect (0, 0, getWidth(), getHeight(), 3);
+        g.drawRect (getLocalBounds(), 3);
     }
 }
 
 void FilenameComponent::resized()
 {
-    getLookAndFeel().layoutFilenameComponent (*this, &filenameBox, browseButton);
+    getLookAndFeel().layoutFilenameComponent (*this, &filenameBox, browseButton.get());
+}
+
+KeyboardFocusTraverser* FilenameComponent::createFocusTraverser()
+{
+    // This prevents the sub-components from grabbing focus if the
+    // FilenameComponent has been set to refuse focus.
+    return getWantsKeyboardFocus() ? Component::createFocusTraverser() : nullptr;
 }
 
 void FilenameComponent::setBrowseButtonText (const String& newBrowseButtonText)
@@ -77,13 +85,12 @@ void FilenameComponent::setBrowseButtonText (const String& newBrowseButtonText)
 
 void FilenameComponent::lookAndFeelChanged()
 {
-    browseButton = nullptr;
-
-    addAndMakeVisible (browseButton = getLookAndFeel().createFilenameComponentBrowseButton (browseButtonText));
+    browseButton.reset();
+    browseButton.reset (getLookAndFeel().createFilenameComponentBrowseButton (browseButtonText));
+    addAndMakeVisible (browseButton.get());
     browseButton->setConnectedEdges (Button::ConnectedOnLeft);
+    browseButton->onClick = [this] { showChooser(); };
     resized();
-
-    browseButton->addListener (this);
 }
 
 void FilenameComponent::setTooltip (const String& newTooltip)
@@ -97,13 +104,20 @@ void FilenameComponent::setDefaultBrowseTarget (const File& newDefaultDirectory)
     defaultBrowseFile = newDefaultDirectory;
 }
 
-void FilenameComponent::buttonClicked (Button*)
+File FilenameComponent::getLocationToBrowse()
+{
+    if (lastFilename.isEmpty() && defaultBrowseFile != File())
+        return defaultBrowseFile;
+
+    return getCurrentFile();
+}
+
+void FilenameComponent::showChooser()
 {
    #if JUCE_MODAL_LOOPS_PERMITTED
     FileChooser fc (isDir ? TRANS ("Choose a new directory")
                           : TRANS ("Choose a new file"),
-                    getCurrentFile() == File::nonexistent ? defaultBrowseFile
-                                                          : getCurrentFile(),
+                    getLocationToBrowse(),
                     wildcard);
 
     if (isDir ? fc.browseForDirectory()
@@ -113,13 +127,9 @@ void FilenameComponent::buttonClicked (Button*)
         setCurrentFile (fc.getResult(), true);
     }
    #else
+    ignoreUnused (isSaving);
     jassertfalse; // needs rewriting to deal with non-modal environments
    #endif
-}
-
-void FilenameComponent::comboBoxChanged (ComboBox*)
-{
-    setCurrentFile (getCurrentFile(), true);
 }
 
 bool FilenameComponent::isInterestedInFileDrag (const StringArray&)
@@ -151,9 +161,14 @@ void FilenameComponent::fileDragExit (const StringArray&)
 }
 
 //==============================================================================
+String FilenameComponent::getCurrentFileText() const
+{
+    return filenameBox.getText();
+}
+
 File FilenameComponent::getCurrentFile() const
 {
-    File f (filenameBox.getText());
+    auto f = File::getCurrentWorkingDirectory().getChildFile (getCurrentFileText());
 
     if (enforcedSuffix.isNotEmpty())
         f = f.withFileExtension (enforcedSuffix);
@@ -175,7 +190,7 @@ void FilenameComponent::setCurrentFile (File newFile,
         if (addToRecentlyUsedList)
             addRecentlyUsedFile (newFile);
 
-        filenameBox.setText (lastFilename, true);
+        filenameBox.setText (lastFilename, dontSendNotification);
 
         if (notification != dontSendNotification)
         {
@@ -222,7 +237,7 @@ void FilenameComponent::setMaxNumberOfRecentFiles (const int newMaximum)
 
 void FilenameComponent::addRecentlyUsedFile (const File& file)
 {
-    StringArray files (getRecentlyUsedFilenames());
+    auto files = getRecentlyUsedFilenames();
 
     if (file.getFullPathName().isNotEmpty())
     {
@@ -247,5 +262,7 @@ void FilenameComponent::removeListener (FilenameComponentListener* const listene
 void FilenameComponent::handleAsyncUpdate()
 {
     Component::BailOutChecker checker (this);
-    listeners.callChecked (checker, &FilenameComponentListener::filenameComponentChanged, this);
+    listeners.callChecked (checker, [this] (FilenameComponentListener& l) { l.filenameComponentChanged (this); });
 }
+
+} // namespace juce

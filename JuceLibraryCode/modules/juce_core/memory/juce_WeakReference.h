@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_WEAKREFERENCE_JUCEHEADER__
-#define __JUCE_WEAKREFERENCE_JUCEHEADER__
-
-#include "juce_ReferenceCountedObject.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -38,18 +32,16 @@
     It must embed a WeakReference::Master object, which stores a shared pointer object, and must clear
     this master pointer in its destructor.
 
+    Note that WeakReference is not designed to be thread-safe, so if you're accessing it from
+    different threads, you'll need to do your own locking around all uses of the pointer and
+    the object it refers to.
+
     E.g.
     @code
     class MyObject
     {
     public:
-        MyObject()
-        {
-            // If you're planning on using your WeakReferences in a multi-threaded situation, you may choose
-            // to create a WeakReference to the object here in the constructor, which will pre-initialise the
-            // embedded object, avoiding an (extremely unlikely) race condition that could occur if multiple
-            // threads overlap while creating the first WeakReference to it.
-        }
+        MyObject() {}
 
         ~MyObject()
         {
@@ -65,41 +57,46 @@
         friend class WeakReference<MyObject>;
     };
 
+    OR: just use the handy JUCE_DECLARE_WEAK_REFERENCEABLE macro to do all this for you.
+
     // Here's an example of using a pointer..
 
-    MyObject* n = new MyObject();
+    auto* n = new MyObject();
     WeakReference<MyObject> myObjectRef = n;
 
-    MyObject* pointer1 = myObjectRef;  // returns a valid pointer to 'n'
+    auto pointer1 = myObjectRef.get();  // returns a valid pointer to 'n'
     delete n;
-    MyObject* pointer2 = myObjectRef;  // returns a null pointer
+    auto pointer2 = myObjectRef.get();  // now returns nullptr
     @endcode
 
     @see WeakReference::Master
+
+    @tags{Core}
 */
 template <class ObjectType, class ReferenceCountingType = ReferenceCountedObject>
 class WeakReference
 {
 public:
-    /** Creates a null SafePointer. */
-    inline WeakReference() noexcept {}
+    /** Creates a null WeakReference. */
+    inline WeakReference() = default;
 
     /** Creates a WeakReference that points at the given object. */
-    WeakReference (ObjectType* const object)  : holder (getRef (object)) {}
+    WeakReference (ObjectType* object)  : holder (getRef (object)) {}
 
     /** Creates a copy of another WeakReference. */
     WeakReference (const WeakReference& other) noexcept         : holder (other.holder) {}
+
+    /** Move constructor */
+    WeakReference (WeakReference&& other) noexcept              : holder (std::move (other.holder)) {}
 
     /** Copies another pointer to this one. */
     WeakReference& operator= (const WeakReference& other)       { holder = other.holder; return *this; }
 
     /** Copies another pointer to this one. */
-    WeakReference& operator= (ObjectType* const newObject)      { holder = getRef (newObject); return *this; }
+    WeakReference& operator= (ObjectType* newObject)            { holder = getRef (newObject); return *this; }
 
-   #if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
-    WeakReference (WeakReference&& other) noexcept              : holder (static_cast <SharedRef&&> (other.holder)) {}
-    WeakReference& operator= (WeakReference&& other) noexcept   { holder = static_cast <SharedRef&&> (other.holder); return *this; }
-   #endif
+    /** Move assignment operator */
+    WeakReference& operator= (WeakReference&& other) noexcept   { holder = std::move (other.holder); return *this; }
 
     /** Returns the object that this pointer refers to, or null if the object no longer exists. */
     ObjectType* get() const noexcept                            { return holder != nullptr ? holder->get() : nullptr; }
@@ -108,10 +105,7 @@ public:
     operator ObjectType*() const noexcept                       { return get(); }
 
     /** Returns the object that this pointer refers to, or null if the object no longer exists. */
-    ObjectType* operator->() noexcept                           { return get(); }
-
-    /** Returns the object that this pointer refers to, or null if the object no longer exists. */
-    const ObjectType* operator->() const noexcept               { return get(); }
+    ObjectType* operator->() const noexcept                     { return get(); }
 
     /** This returns true if this reference has been pointing at an object, but that object has
         since been deleted.
@@ -122,8 +116,8 @@ public:
     */
     bool wasObjectDeleted() const noexcept                      { return holder != nullptr && holder->get() == nullptr; }
 
-    bool operator== (ObjectType* const object) const noexcept   { return get() == object; }
-    bool operator!= (ObjectType* const object) const noexcept   { return get() != object; }
+    bool operator== (ObjectType* object) const noexcept         { return get() == object; }
+    bool operator!= (ObjectType* object) const noexcept         { return get() != object; }
 
     //==============================================================================
     /** This class is used internally by the WeakReference class - don't use it directly
@@ -133,18 +127,18 @@ public:
     class SharedPointer   : public ReferenceCountingType
     {
     public:
-        explicit SharedPointer (ObjectType* const obj) noexcept : owner (obj) {}
+        explicit SharedPointer (ObjectType* obj) noexcept : owner (obj) {}
 
         inline ObjectType* get() const noexcept     { return owner; }
         void clearPointer() noexcept                { owner = nullptr; }
 
     private:
-        ObjectType* volatile owner;
+        ObjectType* owner;
 
         JUCE_DECLARE_NON_COPYABLE (SharedPointer)
     };
 
-    typedef ReferenceCountedObjectPtr<SharedPointer> SharedRef;
+    using SharedRef = ReferenceCountedObjectPtr<SharedPointer>;
 
     //==============================================================================
     /**
@@ -155,9 +149,9 @@ public:
     class Master
     {
     public:
-        Master() noexcept {}
+        Master() = default;
 
-        ~Master()
+        ~Master() noexcept
         {
             // You must remember to call clear() in your source object's destructor! See the notes
             // for the WeakReference class for an example of how to do this.
@@ -167,11 +161,11 @@ public:
         /** The first call to this method will create an internal object that is shared by all weak
             references to the object.
         */
-        SharedPointer* getSharedPointer (ObjectType* const object)
+        SharedRef getSharedPointer (ObjectType* object)
         {
             if (sharedPointer == nullptr)
             {
-                sharedPointer = new SharedPointer (object);
+                sharedPointer = *new SharedPointer (object);
             }
             else
             {
@@ -186,10 +180,16 @@ public:
             to zero all the references to this object that may be out there. See the WeakReference
             class notes for an example of how to do this.
         */
-        void clear()
+        void clear() noexcept
         {
             if (sharedPointer != nullptr)
                 sharedPointer->clearPointer();
+        }
+
+        /** Returns the number of WeakReferences that are out there pointing to this object. */
+        int getNumActiveWeakReferences() const noexcept
+        {
+            return sharedPointer == nullptr ? 0 : (sharedPointer->getReferenceCount() - 1);
         }
 
     private:
@@ -201,11 +201,40 @@ public:
 private:
     SharedRef holder;
 
-    static inline SharedPointer* getRef (ObjectType* const o)
+    static SharedRef getRef (ObjectType* o)
     {
-        return (o != nullptr) ? o->masterReference.getSharedPointer (o) : nullptr;
+        if (o != nullptr)
+            return o->masterReference.getSharedPointer (o);
+
+        return {};
     }
 };
 
 
-#endif   // __JUCE_WEAKREFERENCE_JUCEHEADER__
+//==============================================================================
+/**
+     Macro to easily allow a class to be made weak-referenceable.
+     This can be inserted in a class definition to add the requisite weak-ref boilerplate to that class.
+     e.g.
+
+     @code
+     class MyObject
+     {
+     public:
+         MyObject();
+         ~MyObject();
+
+     private:
+         JUCE_DECLARE_WEAK_REFERENCEABLE (MyObject)
+     };
+     @endcode
+
+     @see WeakReference, WeakReference::Master
+*/
+#define JUCE_DECLARE_WEAK_REFERENCEABLE(Class) \
+    struct WeakRefMaster  : public juce::WeakReference<Class>::Master { ~WeakRefMaster() { this->clear(); } }; \
+    WeakRefMaster masterReference; \
+    friend class juce::WeakReference<Class>; \
+
+
+} // namespace juce

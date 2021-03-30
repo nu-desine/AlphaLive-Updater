@@ -1,35 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_EXPRESSION_JUCEHEADER__
-#define __JUCE_EXPRESSION_JUCEHEADER__
-
-#include "../memory/juce_ReferenceCountedObject.h"
-#include "../containers/juce_Array.h"
-#include "../memory/juce_ScopedPointer.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -45,6 +37,8 @@
     Expression::Scope to be supplied when evaluating them, and this object
     is expected to be able to resolve the symbol names and perform the functions that
     are used.
+
+    @tags{Core}
 */
 class JUCE_API  Expression
 {
@@ -56,37 +50,37 @@ public:
     /** Destructor. */
     ~Expression();
 
+    /** Creates a copy of an expression. */
+    Expression (const Expression&);
+
+    /** Copies another expression. */
+    Expression& operator= (const Expression&);
+
+    /** Move constructor */
+    Expression (Expression&&) noexcept;
+
+    /** Move assignment operator */
+    Expression& operator= (Expression&&) noexcept;
+
     /** Creates a simple expression with a specified constant value. */
     explicit Expression (double constant);
 
-    /** Creates a copy of an expression. */
-    Expression (const Expression& other);
-
-    /** Copies another expression. */
-    Expression& operator= (const Expression& other);
-
-   #if JUCE_COMPILER_SUPPORTS_MOVE_SEMANTICS
-    Expression (Expression&& other) noexcept;
-    Expression& operator= (Expression&& other) noexcept;
-   #endif
-
-    /** Creates an expression by parsing a string.
-        If there's a syntax error in the string, this will throw a ParseError exception.
-        @throws ParseError
+    /** Attempts to create an expression by parsing a string.
+        Any errors are returned in the parseError argument provided.
     */
-    explicit Expression (const String& stringToParse);
+    Expression (const String& stringToParse, String& parseError);
 
     /** Returns a string version of the expression. */
     String toString() const;
 
-    /** Returns an expression which is an addtion operation of two existing expressions. */
-    Expression operator+ (const Expression& other) const;
+    /** Returns an expression which is an addition operation of two existing expressions. */
+    Expression operator+ (const Expression&) const;
     /** Returns an expression which is a subtraction operation of two existing expressions. */
-    Expression operator- (const Expression& other) const;
+    Expression operator- (const Expression&) const;
     /** Returns an expression which is a multiplication operation of two existing expressions. */
-    Expression operator* (const Expression& other) const;
+    Expression operator* (const Expression&) const;
     /** Returns an expression which is a division operation of two existing expressions. */
-    Expression operator/ (const Expression& other) const;
+    Expression operator/ (const Expression&) const;
     /** Returns an expression which performs a negation operation on an existing expression. */
     Expression operator-() const;
 
@@ -102,10 +96,10 @@ public:
         The pointer is incremented so that on return, it indicates the character that follows
         the end of the expression that was parsed.
 
-        If there's a syntax error in the string, this will throw a ParseError exception.
-        @throws ParseError
+        If there's a syntax error in parsing, the parseError argument will be set
+        to a description of the problem.
     */
-    static Expression parse (String::CharPointerType& stringToParse);
+    static Expression parse (String::CharPointerType& stringToParse, String& parseError);
 
     //==============================================================================
     /** When evaluating an Expression object, this class is used to resolve symbols and
@@ -142,7 +136,7 @@ public:
         class Visitor
         {
         public:
-            virtual ~Visitor() {}
+            virtual ~Visitor() = default;
             virtual void visit (const Scope&) = 0;
         };
 
@@ -218,16 +212,6 @@ public:
     void findReferencedSymbols (Array<Symbol>& results, const Scope& scope) const;
 
     //==============================================================================
-    /** An exception that can be thrown by Expression::parse(). */
-    class ParseError  : public std::exception
-    {
-    public:
-        ParseError (const String& message);
-
-        String description;
-    };
-
-    //==============================================================================
     /** Expression type.
         @see Expression::getType()
     */
@@ -259,13 +243,9 @@ private:
     //==============================================================================
     class Term;
     struct Helpers;
-    friend class Term;
-    friend struct Helpers;
-    friend class ScopedPointer<Term>;
-    friend class ReferenceCountedObjectPtr<Term>;
     ReferenceCountedObjectPtr<Term> term;
 
     explicit Expression (Term*);
 };
 
-#endif   // __JUCE_EXPRESSION_JUCEHEADER__
+} // namespace juce

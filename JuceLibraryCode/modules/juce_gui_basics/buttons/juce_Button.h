@@ -1,35 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_BUTTON_JUCEHEADER__
-#define __JUCE_BUTTON_JUCEHEADER__
-
-#include "../components/juce_Component.h"
-#include "../keyboard/juce_KeyListener.h"
-#include "../commands/juce_ApplicationCommandManager.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -40,12 +35,11 @@
     and radio groups, etc.
 
     @see TextButton, DrawableButton, ToggleButton
+
+    @tags{GUI}
 */
 class JUCE_API  Button  : public Component,
-                          public SettableTooltipClient,
-                          public ApplicationCommandManagerListener,
-                          public ValueListener,
-                          private KeyListener
+                          public SettableTooltipClient
 {
 protected:
     //==============================================================================
@@ -59,7 +53,7 @@ protected:
 
 public:
     /** Destructor. */
-    virtual ~Button();
+    ~Button() override;
 
     //==============================================================================
     /** Changes the button's text.
@@ -73,13 +67,13 @@ public:
     const String& getButtonText() const               { return text; }
 
     //==============================================================================
-    /** Returns true if the button is currently being held down by the mouse.
+    /** Returns true if the button is currently being held down.
         @see isOver
     */
     bool isDown() const noexcept;
 
     /** Returns true if the mouse is currently over the button.
-        This will be also be true if the mouse is being held down.
+        This will be also be true if the button is being held down.
         @see isDown
     */
     bool isOver() const noexcept;
@@ -91,17 +85,16 @@ public:
         an action you won't change this. Toggle buttons, however will want to
         change their state when turned on or off.
 
-        @param shouldBeOn               whether to set the button's toggle state to be on or
-                                        off. If it's a member of a button group, this will
-                                        always try to turn it on, and to turn off any other
-                                        buttons in the group
-        @param sendChangeNotification   if true, a callback will be made to clicked(); if false
-                                        the button will be repainted but no notification will
-                                        be sent
+        @param shouldBeOn       whether to set the button's toggle state to be on or
+                                off. If it's a member of a button group, this will
+                                always try to turn it on, and to turn off any other
+                                buttons in the group
+        @param notification     determines the behaviour if the value changes - this
+                                can invoke a synchronous call to clicked(), but
+                                sendNotificationAsync is not supported
         @see getToggleState, setRadioGroupId
     */
-    void setToggleState (bool shouldBeOn,
-                         bool sendChangeNotification);
+    void setToggleState (bool shouldBeOn, NotificationType notification);
 
     /** Returns true if the button is 'on'.
 
@@ -113,10 +106,12 @@ public:
     */
     bool getToggleState() const noexcept                        { return isOn.getValue(); }
 
-    /** Returns the Value object that represents the botton's toggle state.
+    /** Returns the Value object that represents the button's toggle state.
+
         You can use this Value object to connect the button's state to external values or setters,
         either by taking a copy of the Value, or by using Value::referTo() to make it point to
         your own Value object.
+
         @see getToggleState, Value
     */
     Value& getToggleStateValue() noexcept                       { return isOn; }
@@ -127,7 +122,7 @@ public:
         If set to true, then before the clicked() callback occurs, the toggle-state
         of the button is flipped.
     */
-    void setClickingTogglesState (bool shouldToggle) noexcept;
+    void setClickingTogglesState (bool shouldAutoToggleOnClick) noexcept;
 
     /** Returns true if this button is set to be an automatic toggle-button.
         This returns the last value that was passed to setClickingTogglesState().
@@ -150,9 +145,12 @@ public:
         Set the group ID back to zero if you want it to act as a normal toggle
         button again.
 
+        The notification argument lets you specify how other buttons should react
+        to being turned on or off in response to this call.
+
         @see getRadioGroupId
     */
-    void setRadioGroupId (int newGroupId);
+    void setRadioGroupId (int newGroupId, NotificationType notification = sendNotification);
 
     /** Returns the ID of the group to which this button belongs.
         (See setRadioGroupId() for an explanation of this).
@@ -169,10 +167,10 @@ public:
     {
     public:
         /** Destructor. */
-        virtual ~Listener()  {}
+        virtual ~Listener() = default;
 
         /** Called when the button is clicked. */
-        virtual void buttonClicked (Button* button) = 0;
+        virtual void buttonClicked (Button*) = 0;
 
         /** Called when the button's state changes. */
         virtual void buttonStateChanged (Button*)  {}
@@ -188,6 +186,13 @@ public:
         @see addListener
     */
     void removeListener (Listener* listener);
+
+    //==============================================================================
+    /** You can assign a lambda to this callback object to have it called when the button is clicked. */
+    std::function<void()> onClick;
+
+    /** You can assign a lambda to this callback object to have it called when the button's state changes. */
+    std::function<void()> onStateChange;
 
     //==============================================================================
     /** Causes the button to act as if it's been clicked.
@@ -207,7 +212,7 @@ public:
 
         Obviously be careful that the ApplicationCommandManager doesn't get deleted
         before this button is. To disable the command triggering, call this method and
-        pass 0 for the parameters.
+        pass nullptr as the command manager.
 
         If generateTooltip is true, then the button's tooltip will be automatically
         generated based on the name of this command and its current shortcut key.
@@ -215,11 +220,11 @@ public:
         @see addShortcut, getCommandID
     */
     void setCommandToTrigger (ApplicationCommandManager* commandManagerToUse,
-                              int commandID,
+                              CommandID commandID,
                               bool generateTooltip);
 
     /** Returns the command ID that was set by setCommandToTrigger(). */
-    int getCommandID() const noexcept               { return commandID; }
+    CommandID getCommandID() const noexcept             { return commandID; }
 
     //==============================================================================
     /** Assigns a shortcut key to trigger the button.
@@ -231,7 +236,7 @@ public:
 
         @see clearShortcuts
     */
-    void addShortcut (const KeyPress& key);
+    void addShortcut (const KeyPress&);
 
     /** Removes all key shortcuts that had been set for this button.
         @see addShortcut
@@ -241,7 +246,7 @@ public:
     /** Returns true if the given keypress is a shortcut for this button.
         @see addShortcut
     */
-    bool isRegisteredForShortcut (const KeyPress& key) const;
+    bool isRegisteredForShortcut (const KeyPress&) const;
 
     //==============================================================================
     /** Sets an auto-repeat speed for the button when it is held down.
@@ -272,6 +277,11 @@ public:
     */
     void setTriggeredOnMouseDown (bool isTriggeredOnMouseDown) noexcept;
 
+    /** Returns whether the button click happens when the mouse is pressed or released.
+        @see setTriggeredOnMouseDown
+    */
+    bool getTriggeredOnMouseDown() const noexcept;
+
     /** Returns the number of milliseconds since the last time the button
         went into the 'down' state.
     */
@@ -279,14 +289,9 @@ public:
 
     //==============================================================================
     /** Sets the tooltip for this button.
-
         @see TooltipClient, TooltipWindow
     */
-    void setTooltip (const String& newTooltip);
-
-    // (implementation of the TooltipClient method)
-    String getTooltip();
-
+    void setTooltip (const String& newTooltip) override;
 
     //==============================================================================
     /** A combination of these flags are used by setConnectedEdges(). */
@@ -306,7 +311,7 @@ public:
         E.g. if you are placing two buttons adjacent to each other, you could use this to
         indicate which edges are touching, and the LookAndFeel might choose to drawn them
         without rounded corners on the edges that connect. It's only a hint, so the
-        LookAndFeel can choose to ignore it if it's not relevent for this type of
+        LookAndFeel can choose to ignore it if it's not relevant for this type of
         button.
     */
     void setConnectedEdges (int connectedEdgeFlags);
@@ -352,20 +357,54 @@ public:
         The state that you set here will only last until it is automatically changed when the mouse
         enters or exits the button, or the mouse-button is pressed or released.
     */
-    void setState (const ButtonState newState);
+    void setState (ButtonState newState);
 
+    /** Returns the button's current over/down/up state. */
+    ButtonState getState() const noexcept               { return buttonState; }
+
+    //==============================================================================
+    /** This abstract base class is implemented by LookAndFeel classes to provide
+        button-drawing functionality.
+    */
+    struct JUCE_API  LookAndFeelMethods
+    {
+        virtual ~LookAndFeelMethods() = default;
+
+        virtual void drawButtonBackground (Graphics&, Button&, const Colour& backgroundColour,
+                                           bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) = 0;
+
+        virtual Font getTextButtonFont (TextButton&, int buttonHeight) = 0;
+        virtual int getTextButtonWidthToFitText (TextButton&, int buttonHeight) = 0;
+
+        /** Draws the text for a TextButton. */
+        virtual void drawButtonText (Graphics&, TextButton&,
+                                     bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) = 0;
+
+        /** Draws the contents of a standard ToggleButton. */
+        virtual void drawToggleButton (Graphics&, ToggleButton&,
+                                       bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) = 0;
+
+        virtual void changeToggleButtonWidthToFitText (ToggleButton&) = 0;
+
+        virtual void drawTickBox (Graphics&, Component&, float x, float y, float w, float h,
+                                  bool ticked, bool isEnabled,
+                                  bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) = 0;
+
+        virtual void drawDrawableButton (Graphics&, DrawableButton&,
+                                         bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) = 0;
+    };
+
+    // This method's parameters have changed - see the new version.
+    JUCE_DEPRECATED (void setToggleState (bool, bool));
 
 protected:
     //==============================================================================
     /** This method is called when the button has been clicked.
 
-        Subclasses can override this to perform whatever they actions they need
-        to do.
-
-        Alternatively, a ButtonListener can be added to the button, and these listeners
-        will be called when the click occurs.
-
-        @see triggerClick
+        Subclasses can override this to perform whatever actions they need to do.
+        In general, you wouldn't use this method to receive clicks, but should get your callbacks
+        by attaching a std::function to the onClick callback, or adding a Button::Listener.
+        @see triggerClick, onClick
     */
     virtual void clicked();
 
@@ -383,14 +422,13 @@ protected:
         It's better to use this than the paint method, because it gives you information
         about the over/down state of the button.
 
-        @param g                    the graphics context to use
-        @param isMouseOverButton    true if the button is either in the 'over' or
-                                    'down' state
-        @param isButtonDown         true if the button should be drawn in the 'down' position
+        @param g                                the graphics context to use
+        @param shouldDrawButtonAsHighlighted    true if the button is either in the 'over' or 'down' state
+        @param shouldDrawButtonAsDown           true if the button should be drawn in the 'down' position
     */
     virtual void paintButton (Graphics& g,
-                              bool isMouseOverButton,
-                              bool isButtonDown) = 0;
+                              bool shouldDrawButtonAsHighlighted,
+                              bool shouldDrawButtonAsDown) = 0;
 
     /** Called when the button's up/down/over state changes.
 
@@ -405,92 +443,78 @@ protected:
     /** @internal */
     virtual void internalClickCallback (const ModifierKeys&);
     /** @internal */
-    void handleCommandMessage (int commandId);
+    void handleCommandMessage (int commandId) override;
     /** @internal */
-    void mouseEnter (const MouseEvent&);
+    void mouseEnter (const MouseEvent&) override;
     /** @internal */
-    void mouseExit (const MouseEvent&);
+    void mouseExit (const MouseEvent&) override;
     /** @internal */
-    void mouseDown (const MouseEvent&);
+    void mouseDown (const MouseEvent&) override;
     /** @internal */
-    void mouseDrag (const MouseEvent&);
+    void mouseDrag (const MouseEvent&) override;
     /** @internal */
-    void mouseUp (const MouseEvent&);
+    void mouseUp (const MouseEvent&) override;
     /** @internal */
-    bool keyPressed (const KeyPress&);
-    /** @internal */
-    bool keyPressed (const KeyPress&, Component*);
-    /** @internal */
-    bool keyStateChanged (bool isKeyDown, Component*);
+    bool keyPressed (const KeyPress&) override;
     /** @internal */
     using Component::keyStateChanged;
     /** @internal */
-    void paint (Graphics&);
+    void paint (Graphics&) override;
     /** @internal */
-    void parentHierarchyChanged();
+    void parentHierarchyChanged() override;
     /** @internal */
-    void visibilityChanged();
+    void visibilityChanged() override;
     /** @internal */
-    void focusGained (FocusChangeType);
+    void focusGained (FocusChangeType) override;
     /** @internal */
-    void focusLost (FocusChangeType);
+    void focusLost (FocusChangeType) override;
     /** @internal */
-    void enablementChanged();
-    /** @internal */
-    void applicationCommandInvoked (const ApplicationCommandTarget::InvocationInfo&);
-    /** @internal */
-    void applicationCommandListChanged();
-    /** @internal */
-    void valueChanged (Value&);
+    void enablementChanged() override;
 
 private:
     //==============================================================================
-    Array <KeyPress> shortcuts;
+    Array<KeyPress> shortcuts;
     WeakReference<Component> keySource;
     String text;
-    ListenerList <Listener> buttonListeners;
+    ListenerList<Listener> buttonListeners;
 
-    class RepeatTimer;
-    friend class RepeatTimer;
-    friend class ScopedPointer <RepeatTimer>;
-    ScopedPointer <RepeatTimer> repeatTimer;
-    uint32 buttonPressTime, lastRepeatTime;
-    ApplicationCommandManager* commandManagerToUse;
-    int autoRepeatDelay, autoRepeatSpeed, autoRepeatMinimumDelay;
-    int radioGroupId, commandID, connectedEdgeFlags;
-    ButtonState buttonState;
+    struct CallbackHelper;
+    std::unique_ptr<CallbackHelper> callbackHelper;
+    uint32 buttonPressTime = 0, lastRepeatTime = 0;
+    ApplicationCommandManager* commandManagerToUse = nullptr;
+    int autoRepeatDelay = -1, autoRepeatSpeed = 0, autoRepeatMinimumDelay = -1;
+    int radioGroupId = 0, connectedEdgeFlags = 0;
+    CommandID commandID = {};
+    ButtonState buttonState = buttonNormal, lastStatePainted = buttonNormal;
 
     Value isOn;
-    bool lastToggleState : 1;
-    bool clickTogglesState : 1;
-    bool needsToRelease : 1;
-    bool needsRepainting : 1;
-    bool isKeyDown : 1;
-    bool triggerOnMouseDown : 1;
-    bool generateTooltip : 1;
+    bool lastToggleState = false;
+    bool clickTogglesState = false;
+    bool needsToRelease = false;
+    bool needsRepainting = false;
+    bool isKeyDown = false;
+    bool triggerOnMouseDown = false;
+    bool generateTooltip = false;
 
     void repeatTimerCallback();
-    RepeatTimer& getRepeatTimer();
+    bool keyStateChangedCallback();
+    void applicationCommandListChangeCallback();
+    void updateAutomaticTooltip (const ApplicationCommandInfo&);
 
     ButtonState updateState();
     ButtonState updateState (bool isOver, bool isDown);
     bool isShortcutPressed() const;
-    void turnOffOtherButtonsInGroup (bool sendChangeNotification);
+    void turnOffOtherButtonsInGroup (NotificationType click, NotificationType state);
 
     void flashButtonState();
     void sendClickMessage (const ModifierKeys&);
     void sendStateMessage();
+    void setToggleState (bool shouldBeOn, NotificationType click, NotificationType state);
 
-    // These are deprecated - please use addListener() and removeListener() instead!
-    JUCE_DEPRECATED (void addButtonListener (Listener*));
-    JUCE_DEPRECATED (void removeButtonListener (Listener*));
+    bool isMouseSourceOver (const MouseEvent& e);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Button)
 };
 
-#ifndef DOXYGEN
- /** This typedef is just for compatibility with old code and VC6 - newer code should use Button::Listener instead. */
- typedef Button::Listener ButtonListener;
-#endif
 
-#endif   // __JUCE_BUTTON_JUCEHEADER__
+} // namespace juce

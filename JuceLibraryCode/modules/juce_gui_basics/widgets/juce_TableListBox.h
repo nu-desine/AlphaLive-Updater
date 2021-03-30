@@ -1,34 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_TABLELISTBOX_JUCEHEADER__
-#define __JUCE_TABLELISTBOX_JUCEHEADER__
-
-#include "juce_TableHeaderComponent.h"
-#include "juce_ListBox.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -38,15 +34,17 @@
     table cells, and reacting to events.
 
     @see TableListBox
+
+    @tags{GUI}
 */
 class JUCE_API  TableListBoxModel
 {
 public:
     //==============================================================================
-    TableListBoxModel()  {}
+    TableListBoxModel() = default;
 
     /** Destructor. */
-    virtual ~TableListBoxModel()  {}
+    virtual ~TableListBoxModel() = default;
 
     //==============================================================================
     /** This must return the number of rows currently in the table.
@@ -60,8 +58,11 @@ public:
 
         The graphics context has its origin at the row's top-left, and your method
         should fill the area specified by the width and height parameters.
+
+        Note that the rowNumber value may be greater than the number of rows in your
+        list, so be careful that you don't assume it's less than getNumRows().
     */
-    virtual void paintRowBackground (Graphics& g,
+    virtual void paintRowBackground (Graphics&,
                                      int rowNumber,
                                      int width, int height,
                                      bool rowIsSelected) = 0;
@@ -70,8 +71,11 @@ public:
 
         The graphics context's origin will already be set to the top-left of the cell,
         whose size is specified by (width, height).
+
+        Note that the rowNumber value may be greater than the number of rows in your
+        list, so be careful that you don't assume it's less than getNumRows().
     */
-    virtual void paintCell (Graphics& g,
+    virtual void paintCell (Graphics&,
                             int rowNumber,
                             int columnId,
                             int width, int height,
@@ -107,21 +111,21 @@ public:
         The mouse event's coordinates will be relative to the entire table row.
         @see cellDoubleClicked, backgroundClicked
     */
-    virtual void cellClicked (int rowNumber, int columnId, const MouseEvent& e);
+    virtual void cellClicked (int rowNumber, int columnId, const MouseEvent&);
 
     /** This callback is made when the user clicks on one of the cells in the table.
 
         The mouse event's coordinates will be relative to the entire table row.
         @see cellClicked, backgroundClicked
     */
-    virtual void cellDoubleClicked (int rowNumber, int columnId, const MouseEvent& e);
+    virtual void cellDoubleClicked (int rowNumber, int columnId, const MouseEvent&);
 
     /** This can be overridden to react to the user double-clicking on a part of the list where
         there are no rows.
 
         @see cellClicked
     */
-    virtual void backgroundClicked();
+    virtual void backgroundClicked (const MouseEvent&);
 
     //==============================================================================
     /** This callback is made when the table's sort order is changed.
@@ -146,25 +150,21 @@ public:
     */
     virtual int getColumnAutoSizeWidth (int columnId);
 
-    /** Returns a tooltip for a particular cell in the table.
-    */
+    /** Returns a tooltip for a particular cell in the table. */
     virtual String getCellTooltip (int rowNumber, int columnId);
 
     //==============================================================================
     /** Override this to be informed when rows are selected or deselected.
-
         @see ListBox::selectedRowsChanged()
     */
     virtual void selectedRowsChanged (int lastRowSelected);
 
     /** Override this to be informed when the delete key is pressed.
-
         @see ListBox::deleteKeyPressed()
     */
     virtual void deleteKeyPressed (int lastRowSelected);
 
     /** Override this to be informed when the return key is pressed.
-
         @see ListBox::returnKeyPressed()
     */
     virtual void returnKeyPressed (int lastRowSelected);
@@ -186,6 +186,12 @@ public:
         @see getDragSourceCustomData, DragAndDropContainer::startDragging
     */
     virtual var getDragSourceDescription (const SparseSet<int>& currentlySelectedRows);
+
+private:
+   #if JUCE_CATCH_DEPRECATED_CODE_MISUSE
+    // This method's signature has changed to take a MouseEvent parameter - please update your code!
+    JUCE_DEPRECATED_WITH_BODY (virtual int backgroundClicked(), { return 0; })
+   #endif
 };
 
 
@@ -198,6 +204,8 @@ public:
 
 
     @see TableListBoxModel, TableHeaderComponent
+
+    @tags{GUI}
 */
 class JUCE_API  TableListBox   : public ListBox,
                                  private ListBoxModel,
@@ -208,31 +216,36 @@ public:
     /** Creates a TableListBox.
 
         The model pointer passed-in can be null, in which case you can set it later
-        with setModel().
+        with setModel(). The TableListBox does not take ownership of the model - it's
+        the caller's responsibility to manage its lifetime and make sure it
+        doesn't get deleted while still being used.
     */
-    TableListBox (const String& componentName = String::empty,
-                  TableListBoxModel* model = 0);
+    TableListBox (const String& componentName = String(),
+                  TableListBoxModel* model = nullptr);
 
     /** Destructor. */
-    ~TableListBox();
+    ~TableListBox() override;
 
     //==============================================================================
     /** Changes the TableListBoxModel that is being used for this table.
+        The TableListBox does not take ownership of the model - it's the caller's responsibility
+        to manage its lifetime and make sure it doesn't get deleted while still being used.
     */
     void setModel (TableListBoxModel* newModel);
 
     /** Returns the model currently in use. */
-    TableListBoxModel* getModel() const                             { return model; }
+    TableListBoxModel* getModel() const noexcept                    { return model; }
 
     //==============================================================================
     /** Returns the header component being used in this table. */
-    TableHeaderComponent& getHeader() const                         { return *header; }
+    TableHeaderComponent& getHeader() const noexcept                { return *header; }
 
     /** Sets the header component to use for the table.
         The table will take ownership of the component that you pass in, and will delete it
         when it's no longer needed.
+        The pointer passed in may not be null.
     */
-    void setHeader (TableHeaderComponent* newHeader);
+    void setHeader (std::unique_ptr<TableHeaderComponent> newHeader);
 
     /** Changes the height of the table header component.
         @see getHeaderHeight
@@ -242,7 +255,7 @@ public:
     /** Returns the height of the table header.
         @see setHeaderHeight
     */
-    int getHeaderHeight() const;
+    int getHeaderHeight() const noexcept;
 
     //==============================================================================
     /** Resizes a column to fit its contents.
@@ -258,23 +271,22 @@ public:
     void autoSizeAllColumns();
 
     /** Enables or disables the auto size options on the popup menu.
-
         By default, these are enabled.
     */
-    void setAutoSizeMenuOptionShown (bool shouldBeShown);
+    void setAutoSizeMenuOptionShown (bool shouldBeShown) noexcept;
 
     /** True if the auto-size options should be shown on the menu.
-        @see setAutoSizeMenuOptionsShown
+        @see setAutoSizeMenuOptionShown
     */
-    bool isAutoSizeMenuOptionShown() const;
+    bool isAutoSizeMenuOptionShown() const noexcept                 { return autoSizeOptionsShown; }
 
     /** Returns the position of one of the cells in the table.
 
-        If relativeToComponentTopLeft is true, the co-ordinates are relative to
+        If relativeToComponentTopLeft is true, the coordinates are relative to
         the table component's top-left. The row number isn't checked to see if it's
         in-range, but the column ID must exist or this will return an empty rectangle.
 
-        If relativeToComponentTopLeft is false, the co-ords are relative to the
+        If relativeToComponentTopLeft is false, the coordinates are relative to the
         top-left of the table's top-left cell.
     */
     Rectangle<int> getCellPosition (int columnId, int rowNumber,
@@ -282,7 +294,7 @@ public:
 
     /** Returns the component that currently represents a given cell.
         If the component for this cell is off-screen or if the position is out-of-range,
-        this may return 0.
+        this may return nullptr.
         @see getCellPosition
     */
     Component* getCellComponent (int columnId, int rowNumber) const;
@@ -295,31 +307,31 @@ public:
 
     //==============================================================================
     /** @internal */
-    int getNumRows();
+    int getNumRows() override;
     /** @internal */
-    void paintListBoxItem (int, Graphics&, int, int, bool);
+    void paintListBoxItem (int, Graphics&, int, int, bool) override;
     /** @internal */
-    Component* refreshComponentForRow (int rowNumber, bool isRowSelected, Component* existingComponentToUpdate);
+    Component* refreshComponentForRow (int rowNumber, bool isRowSelected, Component* existingComponentToUpdate) override;
     /** @internal */
-    void selectedRowsChanged (int lastRowSelected);
+    void selectedRowsChanged (int row) override;
     /** @internal */
-    void deleteKeyPressed (int currentSelectedRow);
+    void deleteKeyPressed (int currentSelectedRow) override;
     /** @internal */
-    void returnKeyPressed (int currentSelectedRow);
+    void returnKeyPressed (int currentSelectedRow) override;
     /** @internal */
-    void backgroundClicked();
+    void backgroundClicked (const MouseEvent&) override;
     /** @internal */
-    void listWasScrolled();
+    void listWasScrolled() override;
     /** @internal */
-    void tableColumnsChanged (TableHeaderComponent*);
+    void tableColumnsChanged (TableHeaderComponent*) override;
     /** @internal */
-    void tableColumnsResized (TableHeaderComponent*);
+    void tableColumnsResized (TableHeaderComponent*) override;
     /** @internal */
-    void tableSortOrderChanged (TableHeaderComponent*);
+    void tableSortOrderChanged (TableHeaderComponent*) override;
     /** @internal */
-    void tableColumnDraggingChanged (TableHeaderComponent*, int);
+    void tableColumnDraggingChanged (TableHeaderComponent*, int) override;
     /** @internal */
-    void resized();
+    void resized() override;
 
 
 private:
@@ -327,15 +339,14 @@ private:
     class Header;
     class RowComp;
 
-    TableHeaderComponent* header;
+    TableHeaderComponent* header = nullptr;
     TableListBoxModel* model;
-    int columnIdNowBeingDragged;
-    bool autoSizeOptionsShown;
+    int columnIdNowBeingDragged = 0;
+    bool autoSizeOptionsShown = true;
 
     void updateColumnComponents() const;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TableListBox)
 };
 
-
-#endif   // __JUCE_TABLELISTBOX_JUCEHEADER__
+} // namespace juce

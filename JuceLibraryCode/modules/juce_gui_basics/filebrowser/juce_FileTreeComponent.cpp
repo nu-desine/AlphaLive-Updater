@@ -1,29 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-Image juce_createIconForFile (const File& file);
+namespace juce
+{
 
 //==============================================================================
 class FileListTreeItem   : public TreeViewItem,
@@ -32,22 +33,22 @@ class FileListTreeItem   : public TreeViewItem,
                            private ChangeListener
 {
 public:
-    FileListTreeItem (FileTreeComponent& owner_,
-                      DirectoryContentsList* const parentContentsList_,
-                      const int indexInContentsList_,
-                      const File& file_,
-                      TimeSliceThread& thread_)
-        : file (file_),
-          owner (owner_),
-          parentContentsList (parentContentsList_),
-          indexInContentsList (indexInContentsList_),
+    FileListTreeItem (FileTreeComponent& treeComp,
+                      DirectoryContentsList* parentContents,
+                      int indexInContents,
+                      const File& f,
+                      TimeSliceThread& t)
+        : file (f),
+          owner (treeComp),
+          parentContentsList (parentContents),
+          indexInContentsList (indexInContents),
           subContentsList (nullptr, false),
-          thread (thread_)
+          thread (t)
     {
         DirectoryContentsList::FileInfo fileInfo;
 
-        if (parentContentsList_ != nullptr
-             && parentContentsList_->getFileInfo (indexInContentsList_, fileInfo))
+        if (parentContents != nullptr
+             && parentContents->getFileInfo (indexInContents, fileInfo))
         {
             fileSize = File::descriptionOfSizeInBytes (fileInfo.fileSize);
             modTime = fileInfo.modificationTime.formatted ("%d %b '%y %H:%M");
@@ -59,20 +60,21 @@ public:
         }
     }
 
-    ~FileListTreeItem()
+    ~FileListTreeItem() override
     {
         thread.removeTimeSliceClient (this);
         clearSubItems();
+        removeSubContentsList();
     }
 
     //==============================================================================
-    bool mightContainSubItems()                 { return isDirectory; }
-    String getUniqueName() const                { return file.getFullPathName(); }
-    int getItemHeight() const                   { return 22; }
+    bool mightContainSubItems() override                 { return isDirectory; }
+    String getUniqueName() const override                { return file.getFullPathName(); }
+    int getItemHeight() const override                   { return owner.getItemHeight(); }
 
-    var getDragSourceDescription()              { return owner.getDragAndDropDescription(); }
+    var getDragSourceDescription() override              { return owner.getDragAndDropDescription(); }
 
-    void itemOpennessChanged (bool isNowOpen)
+    void itemOpennessChanged (bool isNowOpen) override
     {
         if (isNowOpen)
         {
@@ -86,8 +88,11 @@ public:
                 {
                     jassert (parentContentsList != nullptr);
 
-                    DirectoryContentsList* const l = new DirectoryContentsList (parentContentsList->getFilter(), thread);
-                    l->setDirectory (file, true, true);
+                    auto l = new DirectoryContentsList (parentContentsList->getFilter(), thread);
+
+                    l->setDirectory (file,
+                                     parentContentsList->isFindingDirectories(),
+                                     parentContentsList->isFindingFiles());
 
                     setSubContentsList (l, true);
                 }
@@ -97,10 +102,20 @@ public:
         }
     }
 
+    void removeSubContentsList()
+    {
+        if (subContentsList != nullptr)
+        {
+            subContentsList->removeChangeListener (this);
+            subContentsList.reset();
+        }
+    }
+
     void setSubContentsList (DirectoryContentsList* newList, const bool canDeleteList)
     {
-        OptionalScopedPointer<DirectoryContentsList> newPointer (newList, canDeleteList);
-        subContentsList = newPointer;
+        removeSubContentsList();
+
+        subContentsList = OptionalScopedPointer<DirectoryContentsList> (newList, canDeleteList);
         newList->addChangeListener (this);
     }
 
@@ -119,7 +134,7 @@ public:
             for (int maxRetries = 500; --maxRetries > 0;)
             {
                 for (int i = 0; i < getNumSubItems(); ++i)
-                    if (FileListTreeItem* f = dynamic_cast <FileListTreeItem*> (getSubItem (i)))
+                    if (auto* f = dynamic_cast<FileListTreeItem*> (getSubItem (i)))
                         if (f->selectFile (target))
                             return true;
 
@@ -139,7 +154,7 @@ public:
         return false;
     }
 
-    void changeListenerCallback (ChangeBroadcaster*)
+    void changeListenerCallback (ChangeBroadcaster*) override
     {
         rebuildItemsFromContentList();
     }
@@ -156,9 +171,11 @@ public:
         }
     }
 
-    void paintItem (Graphics& g, int width, int height)
+    void paintItem (Graphics& g, int width, int height) override
     {
-        if (file != File::nonexistent)
+        ScopedLock lock (iconUpdate);
+
+        if (file != File())
         {
             updateIcon (true);
 
@@ -167,36 +184,36 @@ public:
         }
 
         owner.getLookAndFeel().drawFileBrowserRow (g, width, height,
-                                                   file.getFileName(),
+                                                   file, file.getFileName(),
                                                    &icon, fileSize, modTime,
                                                    isDirectory, isSelected(),
                                                    indexInContentsList, owner);
     }
 
-    void itemClicked (const MouseEvent& e)
+    void itemClicked (const MouseEvent& e) override
     {
         owner.sendMouseClickMessage (file, e);
     }
 
-    void itemDoubleClicked (const MouseEvent& e)
+    void itemDoubleClicked (const MouseEvent& e) override
     {
         TreeViewItem::itemDoubleClicked (e);
 
         owner.sendDoubleClickMessage (file);
     }
 
-    void itemSelectionChanged (bool)
+    void itemSelectionChanged (bool) override
     {
         owner.sendSelectionChangeMessage();
     }
 
-    int useTimeSlice()
+    int useTimeSlice() override
     {
         updateIcon (false);
         return -1;
     }
 
-    void handleAsyncUpdate()
+    void handleAsyncUpdate() override
     {
         owner.repaint();
     }
@@ -210,6 +227,7 @@ private:
     OptionalScopedPointer<DirectoryContentsList> subContentsList;
     bool isDirectory;
     TimeSliceThread& thread;
+    CriticalSection iconUpdate;
     Image icon;
     String fileSize, modTime;
 
@@ -217,8 +235,8 @@ private:
     {
         if (icon.isNull())
         {
-            const int hashCode = (file.getFullPathName() + "_iconCacheSalt").hashCode();
-            Image im (ImageCache::getFromHashCode (hashCode));
+            auto hashCode = (file.getFullPathName() + "_iconCacheSalt").hashCode();
+            auto im = ImageCache::getFromHashCode (hashCode);
 
             if (im.isNull() && ! onlyUpdateIfCached)
             {
@@ -230,7 +248,11 @@ private:
 
             if (im.isValid())
             {
-                icon = im;
+                {
+                    ScopedLock lock (iconUpdate);
+                    icon = im;
+                }
+
                 triggerAsyncUpdate();
             }
         }
@@ -241,7 +263,8 @@ private:
 
 //==============================================================================
 FileTreeComponent::FileTreeComponent (DirectoryContentsList& listToShow)
-    : DirectoryContentsDisplayComponent (listToShow)
+    : DirectoryContentsDisplayComponent (listToShow),
+      itemHeight (22)
 {
     setRootItemVisible (false);
     refresh();
@@ -256,21 +279,20 @@ void FileTreeComponent::refresh()
 {
     deleteRootItem();
 
-    FileListTreeItem* const root
-        = new FileListTreeItem (*this, nullptr, 0, fileList.getDirectory(),
-                                fileList.getTimeSliceThread());
+    auto root = new FileListTreeItem (*this, nullptr, 0, directoryContentsList.getDirectory(),
+                                      directoryContentsList.getTimeSliceThread());
 
-    root->setSubContentsList (&fileList, false);
+    root->setSubContentsList (&directoryContentsList, false);
     setRootItem (root);
 }
 
 //==============================================================================
 File FileTreeComponent::getSelectedFile (const int index) const
 {
-    if (const FileListTreeItem* const item = dynamic_cast <const FileListTreeItem*> (getSelectedItem (index)))
+    if (auto* item = dynamic_cast<const FileListTreeItem*> (getSelectedItem (index)))
         return item->file;
 
-    return File::nonexistent;
+    return {};
 }
 
 void FileTreeComponent::deselectAllFiles()
@@ -280,7 +302,7 @@ void FileTreeComponent::deselectAllFiles()
 
 void FileTreeComponent::scrollToTop()
 {
-    getViewport()->getVerticalScrollBar()->setCurrentRangeStart (0);
+    getViewport()->getVerticalScrollBar().setCurrentRangeStart (0);
 }
 
 void FileTreeComponent::setDragAndDropDescription (const String& description)
@@ -290,7 +312,20 @@ void FileTreeComponent::setDragAndDropDescription (const String& description)
 
 void FileTreeComponent::setSelectedFile (const File& target)
 {
-    if (FileListTreeItem* t = dynamic_cast <FileListTreeItem*> (getRootItem()))
+    if (auto* t = dynamic_cast<FileListTreeItem*> (getRootItem()))
         if (! t->selectFile (target))
             clearSelectedItems();
 }
+
+void FileTreeComponent::setItemHeight (int newHeight)
+{
+    if (itemHeight != newHeight)
+    {
+        itemHeight = newHeight;
+
+        if (auto* root = getRootItem())
+            root->treeHasChanged();
+    }
+}
+
+} // namespace juce

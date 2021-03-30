@@ -1,44 +1,46 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 MemoryOutputStream::MemoryOutputStream (const size_t initialSize)
-  : data (internalBlock),
-    position (0),
-    size (0)
+  : blockToUse (&internalBlock)
 {
     internalBlock.setSize (initialSize, false);
 }
 
 MemoryOutputStream::MemoryOutputStream (MemoryBlock& memoryBlockToWriteTo,
                                         const bool appendToExistingBlockContent)
-  : data (memoryBlockToWriteTo),
-    position (0),
-    size (0)
+  : blockToUse (&memoryBlockToWriteTo)
 {
     if (appendToExistingBlockContent)
         position = size = memoryBlockToWriteTo.getSize();
+}
+
+MemoryOutputStream::MemoryOutputStream (void* destBuffer, size_t destBufferSize)
+  : externalData (destBuffer), availableSize (destBufferSize)
+{
+    jassert (externalData != nullptr); // This must be a valid pointer.
 }
 
 MemoryOutputStream::~MemoryOutputStream()
@@ -53,13 +55,14 @@ void MemoryOutputStream::flush()
 
 void MemoryOutputStream::trimExternalBlockSize()
 {
-    if (&data != &internalBlock)
-        data.setSize (size, false);
+    if (blockToUse != &internalBlock && blockToUse != nullptr)
+        blockToUse->setSize (size, false);
 }
 
 void MemoryOutputStream::preallocate (const size_t bytesToPreallocate)
 {
-    data.ensureSize (bytesToPreallocate + 1);
+    if (blockToUse != nullptr)
+        blockToUse->ensureSize (bytesToPreallocate + 1);
 }
 
 void MemoryOutputStream::reset() noexcept
@@ -68,39 +71,73 @@ void MemoryOutputStream::reset() noexcept
     size = 0;
 }
 
-void MemoryOutputStream::prepareToWrite (size_t numBytes)
+char* MemoryOutputStream::prepareToWrite (size_t numBytes)
 {
     jassert ((ssize_t) numBytes >= 0);
-    size_t storageNeeded = position + numBytes;
+    auto storageNeeded = position + numBytes;
 
-    if (storageNeeded >= data.getSize())
-        data.ensureSize ((storageNeeded + jmin (storageNeeded / 2, (size_t) (1024 * 1024)) + 32) & ~31u);
+    char* data;
+
+    if (blockToUse != nullptr)
+    {
+        if (storageNeeded >= blockToUse->getSize())
+            blockToUse->ensureSize ((storageNeeded + jmin (storageNeeded / 2, (size_t) (1024 * 1024)) + 32) & ~31u);
+
+        data = static_cast<char*> (blockToUse->getData());
+    }
+    else
+    {
+        if (storageNeeded > availableSize)
+            return nullptr;
+
+        data = static_cast<char*> (externalData);
+    }
+
+    auto* writePointer = data + position;
+    position += numBytes;
+    size = jmax (size, position);
+    return writePointer;
 }
 
 bool MemoryOutputStream::write (const void* const buffer, size_t howMany)
 {
-    jassert (buffer != nullptr && ((ssize_t) howMany) >= 0);
+    if (howMany == 0)
+        return true;
 
-    if (howMany > 0)
+    jassert (buffer != nullptr);
+
+    if (auto* dest = prepareToWrite (howMany))
     {
-        prepareToWrite (howMany);
-        memcpy (static_cast<char*> (data.getData()) + position, buffer, howMany);
-        position += howMany;
-        size = jmax (size, position);
+        memcpy (dest, buffer, howMany);
+        return true;
     }
 
-    return true;
+    return false;
 }
 
-void MemoryOutputStream::writeRepeatedByte (uint8 byte, size_t howMany)
+bool MemoryOutputStream::writeRepeatedByte (uint8 byte, size_t howMany)
 {
-    if (howMany > 0)
+    if (howMany == 0)
+        return true;
+
+    if (auto* dest = prepareToWrite (howMany))
     {
-        prepareToWrite (howMany);
-        memset (static_cast<char*> (data.getData()) + position, byte, howMany);
-        position += howMany;
-        size = jmax (size, position);
+        memset (dest, byte, howMany);
+        return true;
     }
+
+    return false;
+}
+
+bool MemoryOutputStream::appendUTF8Char (juce_wchar c)
+{
+    if (auto* dest = prepareToWrite (CharPointer_UTF8::getBytesRequiredFor (c)))
+    {
+        CharPointer_UTF8 (dest).write (c);
+        return true;
+    }
+
+    return false;
 }
 
 MemoryBlock MemoryOutputStream::getMemoryBlock() const
@@ -110,10 +147,13 @@ MemoryBlock MemoryOutputStream::getMemoryBlock() const
 
 const void* MemoryOutputStream::getData() const noexcept
 {
-    if (data.getSize() > size)
-        static_cast <char*> (data.getData()) [size] = 0;
+    if (blockToUse == nullptr)
+        return externalData;
 
-    return data.getData();
+    if (blockToUse->getSize() > size)
+        static_cast<char*> (blockToUse->getData()) [size] = 0;
+
+    return blockToUse->getData();
 }
 
 bool MemoryOutputStream::setPosition (int64 newPosition)
@@ -129,17 +169,18 @@ bool MemoryOutputStream::setPosition (int64 newPosition)
     return false;
 }
 
-int MemoryOutputStream::writeFromInputStream (InputStream& source, int64 maxNumBytesToWrite)
+int64 MemoryOutputStream::writeFromInputStream (InputStream& source, int64 maxNumBytesToWrite)
 {
     // before writing from an input, see if we can preallocate to make it more efficient..
     int64 availableData = source.getTotalLength() - source.getPosition();
 
     if (availableData > 0)
     {
-        if (maxNumBytesToWrite > availableData)
+        if (maxNumBytesToWrite > availableData || maxNumBytesToWrite < 0)
             maxNumBytesToWrite = availableData;
 
-        preallocate (data.getSize() + (size_t) maxNumBytesToWrite);
+        if (blockToUse != nullptr)
+            preallocate (blockToUse->getSize() + (size_t) maxNumBytesToWrite);
     }
 
     return OutputStream::writeFromInputStream (source, maxNumBytesToWrite);
@@ -147,7 +188,7 @@ int MemoryOutputStream::writeFromInputStream (InputStream& source, int64 maxNumB
 
 String MemoryOutputStream::toUTF8() const
 {
-    const char* const d = static_cast <const char*> (getData());
+    auto* d = static_cast<const char*> (getData());
     return String (CharPointer_UTF8 (d), CharPointer_UTF8 (d + getDataSize()));
 }
 
@@ -158,10 +199,12 @@ String MemoryOutputStream::toString() const
 
 OutputStream& JUCE_CALLTYPE operator<< (OutputStream& stream, const MemoryOutputStream& streamToRead)
 {
-    const size_t dataSize = streamToRead.getDataSize();
+    auto dataSize = streamToRead.getDataSize();
 
     if (dataSize > 0)
         stream.write (streamToRead.getData(), dataSize);
 
     return stream;
 }
+
+} // namespace juce

@@ -1,35 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_PROPERTYSET_JUCEHEADER__
-#define __JUCE_PROPERTYSET_JUCEHEADER__
-
-#include "../text/juce_StringPairArray.h"
-#include "../xml/juce_XmlElement.h"
-#include "../containers/juce_Variant.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -40,6 +32,8 @@
 
     See the PropertiesFile class for a subclass of this, which automatically broadcasts change
     messages and saves/loads the list from a file.
+
+    @tags{Core}
 */
 class JUCE_API  PropertySet
 {
@@ -70,8 +64,7 @@ public:
         @param keyName              the name of the property to retrieve
         @param defaultReturnValue   a value to return if the named property doesn't actually exist
     */
-    String getValue (const String& keyName,
-                     const String& defaultReturnValue = String::empty) const noexcept;
+    String getValue (StringRef keyName, const String& defaultReturnValue = String()) const noexcept;
 
     /** Returns one of the properties as an integer.
 
@@ -82,8 +75,7 @@ public:
         @param keyName              the name of the property to retrieve
         @param defaultReturnValue   a value to return if the named property doesn't actually exist
     */
-    int getIntValue (const String& keyName,
-                     const int defaultReturnValue = 0) const noexcept;
+    int getIntValue (StringRef keyName, int defaultReturnValue = 0) const noexcept;
 
     /** Returns one of the properties as an double.
 
@@ -94,8 +86,7 @@ public:
         @param keyName              the name of the property to retrieve
         @param defaultReturnValue   a value to return if the named property doesn't actually exist
     */
-    double getDoubleValue (const String& keyName,
-                           const double defaultReturnValue = 0.0) const noexcept;
+    double getDoubleValue (StringRef keyName, double defaultReturnValue = 0.0) const noexcept;
 
     /** Returns one of the properties as an boolean.
 
@@ -109,13 +100,12 @@ public:
         @param keyName              the name of the property to retrieve
         @param defaultReturnValue   a value to return if the named property doesn't actually exist
     */
-    bool getBoolValue (const String& keyName,
-                       const bool defaultReturnValue = false) const noexcept;
+    bool getBoolValue (StringRef keyName, bool defaultReturnValue = false) const noexcept;
 
     /** Returns one of the properties as an XML element.
 
-        The result will a new XMLElement object that the caller must delete. If may return 0 if the
-        key isn't found, or if the entry contains an string that isn't valid XML.
+        The result will a new XMLElement object. It may return nullptr if the key isn't found,
+        or if the entry contains an string that isn't valid XML.
 
         If the value isn't found in this set, then this will look for it in a fallback
         property set (if you've specified one with the setFallbackPropertySet() method),
@@ -123,7 +113,7 @@ public:
 
         @param keyName              the name of the property to retrieve
     */
-    XmlElement* getXmlValue (const String& keyName) const;
+    std::unique_ptr<XmlElement> getXmlValue (StringRef keyName) const;
 
     //==============================================================================
     /** Sets a named property.
@@ -131,16 +121,16 @@ public:
         @param keyName      the name of the property to set. (This mustn't be an empty string)
         @param value        the new value to set it to
     */
-    void setValue (const String& keyName, const var& value);
+    void setValue (StringRef keyName, const var& value);
 
     /** Sets a named property to an XML element.
 
         @param keyName      the name of the property to set. (This mustn't be an empty string)
-        @param xml          the new element to set it to. If this is zero, the value will be set to
-                            an empty string
+        @param xml          the new element to set it to. If this is a nullptr, the value will
+                            be set to an empty string
         @see getXmlValue
     */
-    void setValue (const String& keyName, const XmlElement* xml);
+    void setValue (StringRef keyName, const XmlElement* xml);
 
     /** This copies all the values from a source PropertySet to this one.
         This won't remove any existing settings, it just adds any that it finds in the source set.
@@ -151,10 +141,10 @@ public:
     /** Deletes a property.
         @param keyName      the name of the property to delete. (This mustn't be an empty string)
     */
-    void removeValue (const String& keyName);
+    void removeValue (StringRef keyName);
 
-    /** Returns true if the properies include the given key. */
-    bool containsKey (const String& keyName) const noexcept;
+    /** Returns true if the properties include the given key. */
+    bool containsKey (StringRef keyName) const noexcept;
 
     /** Removes all values. */
     void clear();
@@ -171,7 +161,7 @@ public:
         The string parameter is the tag name that should be used for the node.
         @see restoreFromXml
     */
-    XmlElement* createXml (const String& nodeName) const;
+    std::unique_ptr<XmlElement> createXml (const String& nodeName) const;
 
     /** Reloads a set of properties that were previously stored as XML.
         The node passed in must have been created by the createXml() method.
@@ -200,7 +190,7 @@ public:
     PropertySet* getFallbackPropertySet() const noexcept                { return fallbackProperties; }
 
 protected:
-    /** Subclasses can override this to be told when one of the properies has been changed. */
+    /** Subclasses can override this to be told when one of the properties has been changed. */
     virtual void propertyChanged();
 
 private:
@@ -212,5 +202,4 @@ private:
     JUCE_LEAK_DETECTOR (PropertySet)
 };
 
-
-#endif   // __JUCE_PROPERTYSET_JUCEHEADER__
+} // namespace juce

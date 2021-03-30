@@ -1,33 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_DIALOGWINDOW_JUCEHEADER__
-#define __JUCE_DIALOGWINDOW_JUCEHEADER__
-
-#include "juce_DocumentWindow.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -48,6 +45,8 @@
     button - for more info, see the DocumentWindow help.
 
     @see DocumentWindow, ResizableWindow
+
+    @tags{GUI}
 */
 class JUCE_API  DialogWindow   : public DocumentWindow
 {
@@ -65,14 +64,14 @@ public:
                                     desktop; if false, you can use it as a child component
     */
     DialogWindow (const String& name,
-                  const Colour& backgroundColour,
+                  Colour backgroundColour,
                   bool escapeKeyTriggersCloseButton,
                   bool addToDesktop = true);
 
     /** Destructor.
         If a content component has been set with setContentOwned(), it will be deleted.
     */
-    ~DialogWindow();
+    ~DialogWindow() override;
 
     //==============================================================================
     /** This class defines a collection of settings to be used to open a DialogWindow.
@@ -81,7 +80,7 @@ public:
         initialise its fields with the appropriate details, and then call its launchAsync()
         method to launch the dialog.
     */
-    struct LaunchOptions
+    struct JUCE_API  LaunchOptions
     {
         LaunchOptions() noexcept;
 
@@ -89,29 +88,29 @@ public:
         String dialogTitle;
 
         /** The background colour for the window. */
-        Colour dialogBackgroundColour;
+        Colour dialogBackgroundColour = Colours::lightgrey;
 
         /** The content component to show in the window. This must not be null!
             Using an OptionalScopedPointer to hold this pointer lets you indicate whether
             you'd like the dialog to automatically delete the component when the dialog
             has terminated.
         */
-        OptionalScopedPointer <Component> content;
+        OptionalScopedPointer<Component> content;
 
         /** If this is not a nullptr, it indicates a component that you'd like to position this
             dialog box in front of. See the DocumentWindow::centreAroundComponent() method for
             more info about this parameter.
         */
-        Component* componentToCentreAround;
+        Component* componentToCentreAround = nullptr;
 
         /** If true, then the escape key will trigger the dialog's close button. */
-        bool escapeKeyTriggersCloseButton;
+        bool escapeKeyTriggersCloseButton = true;
         /** If true, the dialog will use a native title bar. See TopLevelWindow::setUsingNativeTitleBar() */
-        bool useNativeTitleBar;
+        bool useNativeTitleBar = true;
         /** If true, the window will be resizable. See ResizableWindow::setResizable() */
-        bool resizable;
+        bool resizable = true;
         /** Indicates whether to use a border or corner resizer component. See ResizableWindow::setResizable() */
-        bool useBottomRightCornerResizer;
+        bool useBottomRightCornerResizer = false;
 
         /** Launches a new modal dialog window.
             This will create a dialog based on the settings in this structure,
@@ -119,15 +118,13 @@ public:
             will be automatically deleted when the modal state is terminated.
 
             When the dialog's close button is clicked, it'll automatically terminate its
-            modal state, but you can also do this programatically by calling
+            modal state, but you can also do this programmatically by calling
             exitModalState (returnValue) on the DialogWindow.
 
             If your content component needs to find the dialog window that it is
             contained in, a quick trick is to do this:
             @code
-            Dialogwindow* dw = contentComponent->findParentComponentOfClass<DialogWindow>();
-
-            if (dw != nullptr)
+            if (DialogWindow* dw = contentComponent->findParentComponentOfClass<DialogWindow>())
                 dw->exitModalState (1234);
             @endcode
         */
@@ -148,12 +145,14 @@ public:
         */
         int runModal();
        #endif
+
+        JUCE_DECLARE_NON_COPYABLE (LaunchOptions)
     };
 
     //==============================================================================
     /** Easy way of quickly showing a dialog box containing a given component.
 
-        Note: this method has been superceded by the DialogWindow::LaunchOptions structure,
+        Note: This method has been superseded by the DialogWindow::LaunchOptions structure,
         which does the same job with some extra flexibility. The showDialog method is here
         for backwards compatibility, but please use DialogWindow::LaunchOptions in new code.
 
@@ -162,13 +161,11 @@ public:
         you want to block and run a modal loop until the dialog is dismissed, use showModalDialog()
         instead.
 
-        To close the dialog programatically, you should call exitModalState (returnValue) on
+        To close the dialog programmatically, you should call exitModalState (returnValue) on
         the DialogWindow that is created. To find a pointer to this window from your
         contentComponent, you can do something like this:
         @code
-        Dialogwindow* dw = contentComponent->findParentComponentOfClass<DialogWindow>();
-
-        if (dw != nullptr)
+        if (DialogWindow* dw = contentComponent->findParentComponentOfClass<DialogWindow>())
             dw->exitModalState (1234);
         @endcode
 
@@ -178,7 +175,7 @@ public:
                                     be before calling this method. The component won't
                                     be deleted by this call, so you can re-use it or delete
                                     it afterwards
-        @param componentToCentreAround  if this is non-zero, it indicates a component that
+        @param componentToCentreAround  if this is not a nullptr, it indicates a component that
                                     you'd like to show this dialog box in front of. See the
                                     DocumentWindow::centreAroundComponent() method for more
                                     info on this parameter
@@ -193,7 +190,7 @@ public:
     static void showDialog (const String& dialogTitle,
                             Component* contentComponent,
                             Component* componentToCentreAround,
-                            const Colour& backgroundColour,
+                            Colour backgroundColour,
                             bool escapeKeyTriggersCloseButton,
                             bool shouldBeResizable = false,
                             bool useBottomRightCornerResizer = false);
@@ -201,7 +198,7 @@ public:
    #if JUCE_MODAL_LOOPS_PERMITTED || DOXYGEN
     /** Easy way of quickly showing a dialog box containing a given component.
 
-        Note: this method has been superceded by the DialogWindow::LaunchOptions structure,
+        Note: This method has been superseded by the DialogWindow::LaunchOptions structure,
         which does the same job with some extra flexibility. The showDialog method is here
         for backwards compatibility, but please use DialogWindow::LaunchOptions in new code.
 
@@ -210,13 +207,11 @@ public:
 
         It returns the value that was returned by the dialog box's runModalLoop() call.
 
-        To close the dialog programatically, you should call exitModalState (returnValue) on
+        To close the dialog programmatically, you should call exitModalState (returnValue) on
         the DialogWindow that is created. To find a pointer to this window from your
         contentComponent, you can do something like this:
         @code
-        Dialogwindow* dw = contentComponent->findParentComponentOfClass<DialogWindow>();
-
-        if (dw != nullptr)
+        if (DialogWindow* dw = contentComponent->findParentComponentOfClass<DialogWindow>())
             dw->exitModalState (1234);
         @endcode
 
@@ -226,7 +221,7 @@ public:
                                     be before calling this method. The component won't
                                     be deleted by this call, so you can re-use it or delete
                                     it afterwards
-        @param componentToCentreAround  if this is non-zero, it indicates a component that
+        @param componentToCentreAround  if this is not a nullptr, it indicates a component that
                                     you'd like to show this dialog box in front of. See the
                                     DocumentWindow::centreAroundComponent() method for more
                                     info on this parameter
@@ -241,19 +236,25 @@ public:
     static int showModalDialog (const String& dialogTitle,
                                 Component* contentComponent,
                                 Component* componentToCentreAround,
-                                const Colour& backgroundColour,
+                                Colour backgroundColour,
                                 bool escapeKeyTriggersCloseButton,
                                 bool shouldBeResizable = false,
                                 bool useBottomRightCornerResizer = false);
    #endif
 
 
+    /** Called when the escape key is pressed.
+        This can be overridden to do things other than the default behaviour, which is to hide
+        the window. Return true if the key has been used, or false if it was ignored.
+    */
+    virtual bool escapeKeyPressed();
+
 protected:
     //==============================================================================
     /** @internal */
-    void resized();
+    void resized() override;
     /** @internal */
-    bool keyPressed (const KeyPress&);
+    bool keyPressed (const KeyPress&) override;
 
 private:
     bool escapeKeyTriggersCloseButton;
@@ -261,4 +262,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DialogWindow)
 };
 
-#endif   // __JUCE_DIALOGWINDOW_JUCEHEADER__
+} // namespace juce

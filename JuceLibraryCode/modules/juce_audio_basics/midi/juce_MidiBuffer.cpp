@@ -1,227 +1,189 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 namespace MidiBufferHelpers
 {
-    inline int getEventTime (const void* const d) noexcept
+    inline int getEventTime (const void* d) noexcept
     {
-        return *static_cast <const int*> (d);
+        return readUnaligned<int32> (d);
     }
 
-    inline uint16 getEventDataSize (const void* const d) noexcept
+    inline uint16 getEventDataSize (const void* d) noexcept
     {
-        return *reinterpret_cast <const uint16*> (static_cast <const char*> (d) + sizeof (int));
+        return readUnaligned<uint16> (static_cast<const char*> (d) + sizeof (int32));
     }
 
-    inline uint16 getEventTotalSize (const void* const d) noexcept
+    inline uint16 getEventTotalSize (const void* d) noexcept
     {
-        return getEventDataSize (d) + sizeof (int) + sizeof (uint16);
+        return (uint16) (getEventDataSize (d) + sizeof (int32) + sizeof (uint16));
     }
 
-    static int findActualEventLength (const uint8* const data, const int maxBytes) noexcept
+    static int findActualEventLength (const uint8* data, int maxBytes) noexcept
     {
-        unsigned int byte = (unsigned int) *data;
-        int size = 0;
+        auto byte = (unsigned int) *data;
 
         if (byte == 0xf0 || byte == 0xf7)
         {
-            const uint8* d = data + 1;
+            int i = 1;
 
-            while (d < data + maxBytes)
-                if (*d++ == 0xf7)
+            while (i < maxBytes)
+                if (data[i++] == 0xf7)
                     break;
 
-            size = (int) (d - data);
-        }
-        else if (byte == 0xff)
-        {
-            int n;
-            const int bytesLeft = MidiMessage::readVariableLengthVal (data + 1, n);
-            size = jmin (maxBytes, n + 2 + bytesLeft);
-        }
-        else if (byte >= 0x80)
-        {
-            size = jmin (maxBytes, MidiMessage::getMessageLengthFromFirstByte ((uint8) byte));
+            return i;
         }
 
-        return size;
+        if (byte == 0xff)
+        {
+            if (maxBytes == 1)
+                return 1;
+
+            const auto var = MidiMessage::readVariableLengthValue (data + 1, maxBytes - 1);
+            return jmin (maxBytes, var.value + 2 + var.bytesUsed);
+        }
+
+        if (byte >= 0x80)
+            return jmin (maxBytes, MidiMessage::getMessageLengthFromFirstByte ((uint8) byte));
+
+        return 0;
+    }
+
+    static uint8* findEventAfter (uint8* d, uint8* endData, int samplePosition) noexcept
+    {
+        while (d < endData && getEventTime (d) <= samplePosition)
+            d += getEventTotalSize (d);
+
+        return d;
     }
 }
 
 //==============================================================================
-MidiBuffer::MidiBuffer() noexcept
-    : bytesUsed (0)
+MidiBufferIterator& MidiBufferIterator::operator++() noexcept
 {
+    data += sizeof (int32) + sizeof (uint16) + size_t (MidiBufferHelpers::getEventDataSize (data));
+    return *this;
 }
 
+MidiBufferIterator MidiBufferIterator::operator++ (int) noexcept
+{
+    auto copy = *this;
+    ++(*this);
+    return copy;
+}
+
+MidiBufferIterator::reference MidiBufferIterator::operator*() const noexcept
+{
+    return { data + sizeof (int32) + sizeof (uint16),
+             MidiBufferHelpers::getEventDataSize (data),
+             MidiBufferHelpers::getEventTime (data) };
+}
+
+//==============================================================================
 MidiBuffer::MidiBuffer (const MidiMessage& message) noexcept
-    : bytesUsed (0)
 {
     addEvent (message, 0);
 }
 
-MidiBuffer::MidiBuffer (const MidiBuffer& other) noexcept
-    : data (other.data),
-      bytesUsed (other.bytesUsed)
+void MidiBuffer::swapWith (MidiBuffer& other) noexcept      { data.swapWith (other.data); }
+void MidiBuffer::clear() noexcept                           { data.clearQuick(); }
+void MidiBuffer::ensureSize (size_t minimumNumBytes)        { data.ensureStorageAllocated ((int) minimumNumBytes); }
+bool MidiBuffer::isEmpty() const noexcept                   { return data.size() == 0; }
+
+void MidiBuffer::clear (int startSample, int numSamples)
 {
+    auto start = MidiBufferHelpers::findEventAfter (data.begin(), data.end(), startSample - 1);
+    auto end   = MidiBufferHelpers::findEventAfter (start,        data.end(), startSample + numSamples - 1);
+
+    data.removeRange ((int) (start - data.begin()), (int) (end - start));
 }
 
-MidiBuffer& MidiBuffer::operator= (const MidiBuffer& other) noexcept
-{
-    bytesUsed = other.bytesUsed;
-    data = other.data;
-
-    return *this;
-}
-
-void MidiBuffer::swapWith (MidiBuffer& other) noexcept
-{
-    data.swapWith (other.data);
-    std::swap (bytesUsed, other.bytesUsed);
-}
-
-MidiBuffer::~MidiBuffer()
-{
-}
-
-inline uint8* MidiBuffer::getData() const noexcept
-{
-    return static_cast <uint8*> (data.getData());
-}
-
-void MidiBuffer::clear() noexcept
-{
-    bytesUsed = 0;
-}
-
-void MidiBuffer::clear (const int startSample, const int numSamples)
-{
-    uint8* const start = findEventAfter (getData(), startSample - 1);
-    uint8* const end   = findEventAfter (start, startSample + numSamples - 1);
-
-    if (end > start)
-    {
-        const int bytesToMove = bytesUsed - (int) (end - getData());
-
-        if (bytesToMove > 0)
-            memmove (start, end, (size_t) bytesToMove);
-
-        bytesUsed -= (int) (end - start);
-    }
-}
-
-void MidiBuffer::addEvent (const MidiMessage& m, const int sampleNumber)
+void MidiBuffer::addEvent (const MidiMessage& m, int sampleNumber)
 {
     addEvent (m.getRawData(), m.getRawDataSize(), sampleNumber);
 }
 
-void MidiBuffer::addEvent (const void* const newData, const int maxBytes, const int sampleNumber)
+void MidiBuffer::addEvent (const void* newData, int maxBytes, int sampleNumber)
 {
-    const int numBytes = MidiBufferHelpers::findActualEventLength (static_cast <const uint8*> (newData), maxBytes);
+    auto numBytes = MidiBufferHelpers::findActualEventLength (static_cast<const uint8*> (newData), maxBytes);
 
     if (numBytes > 0)
     {
-        size_t spaceNeeded = (size_t) bytesUsed + (size_t) numBytes + sizeof (int) + sizeof (uint16);
-        data.ensureSize ((spaceNeeded + spaceNeeded / 2 + 8) & ~(size_t) 7);
+        auto newItemSize = (size_t) numBytes + sizeof (int32) + sizeof (uint16);
+        auto offset = (int) (MidiBufferHelpers::findEventAfter (data.begin(), data.end(), sampleNumber) - data.begin());
 
-        uint8* d = findEventAfter (getData(), sampleNumber);
-        const int bytesToMove = bytesUsed - (int) (d - getData());
+        data.insertMultiple (offset, 0, (int) newItemSize);
 
-        if (bytesToMove > 0)
-            memmove (d + numBytes + sizeof (int) + sizeof (uint16), d, (size_t) bytesToMove);
-
-        *reinterpret_cast <int*> (d) = sampleNumber;
-        d += sizeof (int);
-        *reinterpret_cast <uint16*> (d) = (uint16) numBytes;
+        auto* d = data.begin() + offset;
+        writeUnaligned<int32>  (d, sampleNumber);
+        d += sizeof (int32);
+        writeUnaligned<uint16> (d, static_cast<uint16> (numBytes));
         d += sizeof (uint16);
-
         memcpy (d, newData, (size_t) numBytes);
-
-        bytesUsed += sizeof (int) + sizeof (uint16) + (size_t) numBytes;
     }
 }
 
 void MidiBuffer::addEvents (const MidiBuffer& otherBuffer,
-                            const int startSample,
-                            const int numSamples,
-                            const int sampleDeltaToAdd)
+                            int startSample, int numSamples, int sampleDeltaToAdd)
 {
-    Iterator i (otherBuffer);
-    i.setNextSamplePosition (startSample);
-
-    const uint8* eventData;
-    int eventSize, position;
-
-    while (i.getNextEvent (eventData, eventSize, position)
-            && (position < startSample + numSamples || numSamples < 0))
+    for (auto i = otherBuffer.findNextSamplePosition (startSample); i != otherBuffer.cend(); ++i)
     {
-        addEvent (eventData, eventSize, position + sampleDeltaToAdd);
+        const auto metadata = *i;
+
+        if (metadata.samplePosition >= startSample + numSamples && numSamples >= 0)
+            break;
+
+        addEvent (metadata.data, metadata.numBytes, metadata.samplePosition + sampleDeltaToAdd);
     }
-}
-
-void MidiBuffer::ensureSize (size_t minimumNumBytes)
-{
-    data.ensureSize (minimumNumBytes);
-}
-
-bool MidiBuffer::isEmpty() const noexcept
-{
-    return bytesUsed == 0;
 }
 
 int MidiBuffer::getNumEvents() const noexcept
 {
     int n = 0;
-    const uint8* d = getData();
-    const uint8* const end = d + bytesUsed;
+    auto end = data.end();
 
-    while (d < end)
-    {
+    for (auto d = data.begin(); d < end; ++n)
         d += MidiBufferHelpers::getEventTotalSize (d);
-        ++n;
-    }
 
     return n;
 }
 
 int MidiBuffer::getFirstEventTime() const noexcept
 {
-    return bytesUsed > 0 ? MidiBufferHelpers::getEventTime (data.getData()) : 0;
+    return data.size() > 0 ? MidiBufferHelpers::getEventTime (data.begin()) : 0;
 }
 
 int MidiBuffer::getLastEventTime() const noexcept
 {
-    if (bytesUsed == 0)
+    if (data.size() == 0)
         return 0;
 
-    const uint8* d = getData();
-    const uint8* const endData = d + bytesUsed;
+    auto endData = data.end();
 
-    for (;;)
+    for (auto d = data.begin();;)
     {
-        const uint8* const nextOne = d + MidiBufferHelpers::getEventTotalSize (d);
+        auto nextOne = d + MidiBufferHelpers::getEventTotalSize (d);
 
         if (nextOne >= endData)
             return MidiBufferHelpers::getEventTime (d);
@@ -230,61 +192,117 @@ int MidiBuffer::getLastEventTime() const noexcept
     }
 }
 
-uint8* MidiBuffer::findEventAfter (uint8* d, const int samplePosition) const noexcept
+MidiBufferIterator MidiBuffer::findNextSamplePosition (int samplePosition) const noexcept
 {
-    const uint8* const endData = getData() + bytesUsed;
-
-    while (d < endData && MidiBufferHelpers::getEventTime (d) <= samplePosition)
-        d += MidiBufferHelpers::getEventTotalSize (d);
-
-    return d;
+    return std::find_if (cbegin(), cend(), [&] (const MidiMessageMetadata& metadata) noexcept
+    {
+        return metadata.samplePosition >= samplePosition;
+    });
 }
 
 //==============================================================================
-MidiBuffer::Iterator::Iterator (const MidiBuffer& buffer_) noexcept
-    : buffer (buffer_),
-      data (buffer_.getData())
+MidiBuffer::Iterator::Iterator (const MidiBuffer& b) noexcept
+    : buffer (b), iterator (b.data.begin())
 {
 }
 
-MidiBuffer::Iterator::~Iterator() noexcept
+MidiBuffer::Iterator::~Iterator() noexcept {}
+
+void MidiBuffer::Iterator::setNextSamplePosition (int samplePosition) noexcept
 {
+    iterator = buffer.findNextSamplePosition (samplePosition);
 }
 
-//==============================================================================
-void MidiBuffer::Iterator::setNextSamplePosition (const int samplePosition) noexcept
+bool MidiBuffer::Iterator::getNextEvent (const uint8*& midiData, int& numBytes, int& samplePosition) noexcept
 {
-    data = buffer.getData();
-    const uint8* dataEnd = data + buffer.bytesUsed;
-
-    while (data < dataEnd && MidiBufferHelpers::getEventTime (data) < samplePosition)
-        data += MidiBufferHelpers::getEventTotalSize (data);
-}
-
-bool MidiBuffer::Iterator::getNextEvent (const uint8* &midiData, int& numBytes, int& samplePosition) noexcept
-{
-    if (data >= buffer.getData() + buffer.bytesUsed)
+    if (iterator == buffer.cend())
         return false;
 
-    samplePosition = MidiBufferHelpers::getEventTime (data);
-    numBytes = MidiBufferHelpers::getEventDataSize (data);
-    data += sizeof (int) + sizeof (uint16);
-    midiData = data;
-    data += numBytes;
-
+    const auto metadata = *iterator++;
+    midiData = metadata.data;
+    numBytes = metadata.numBytes;
+    samplePosition = metadata.samplePosition;
     return true;
 }
 
 bool MidiBuffer::Iterator::getNextEvent (MidiMessage& result, int& samplePosition) noexcept
 {
-    if (data >= buffer.getData() + buffer.bytesUsed)
+    if (iterator == buffer.cend())
         return false;
 
-    samplePosition = MidiBufferHelpers::getEventTime (data);
-    const int numBytes = MidiBufferHelpers::getEventDataSize (data);
-    data += sizeof (int) + sizeof (uint16);
-    result = MidiMessage (data, numBytes, samplePosition);
-    data += numBytes;
-
+    const auto metadata = *iterator++;
+    result = metadata.getMessage();
+    samplePosition = metadata.samplePosition;
     return true;
 }
+
+//==============================================================================
+//==============================================================================
+#if JUCE_UNIT_TESTS
+
+struct MidiBufferTest  : public UnitTest
+{
+    MidiBufferTest()
+        : UnitTest ("MidiBuffer", UnitTestCategories::midi)
+    {}
+
+    void runTest() override
+    {
+        beginTest ("Clear messages");
+        {
+            const auto message = MidiMessage::noteOn (1, 64, 0.5f);
+
+            const auto testBuffer = [&]
+            {
+                MidiBuffer buffer;
+                buffer.addEvent (message, 0);
+                buffer.addEvent (message, 10);
+                buffer.addEvent (message, 20);
+                buffer.addEvent (message, 30);
+                return buffer;
+            }();
+
+            {
+                auto buffer = testBuffer;
+                buffer.clear (10, 0);
+                expectEquals (buffer.getNumEvents(), 4);
+            }
+
+            {
+                auto buffer = testBuffer;
+                buffer.clear (10, 1);
+                expectEquals (buffer.getNumEvents(), 3);
+            }
+
+            {
+                auto buffer = testBuffer;
+                buffer.clear (10, 10);
+                expectEquals (buffer.getNumEvents(), 3);
+            }
+
+            {
+                auto buffer = testBuffer;
+                buffer.clear (10, 20);
+                expectEquals (buffer.getNumEvents(), 2);
+            }
+
+            {
+                auto buffer = testBuffer;
+                buffer.clear (10, 30);
+                expectEquals (buffer.getNumEvents(), 1);
+            }
+
+            {
+                auto buffer = testBuffer;
+                buffer.clear (10, 300);
+                expectEquals (buffer.getNumEvents(), 1);
+            }
+        }
+    }
+};
+
+static MidiBufferTest midiBufferTest;
+
+#endif
+
+} // namespace juce

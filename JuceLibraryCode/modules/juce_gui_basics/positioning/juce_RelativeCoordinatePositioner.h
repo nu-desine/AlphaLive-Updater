@@ -1,78 +1,72 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_RELATIVECOORDINATEPOSITIONER_JUCEHEADER__
-#define __JUCE_RELATIVECOORDINATEPOSITIONER_JUCEHEADER__
-
-#include "juce_RelativePoint.h"
-#include "juce_MarkerList.h"
-#include "../components/juce_Component.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     Base class for Component::Positioners that are based upon relative coordinates.
+
+    @tags{GUI}
 */
 class JUCE_API  RelativeCoordinatePositionerBase  : public Component::Positioner,
                                                     public ComponentListener,
                                                     public MarkerList::Listener
 {
 public:
-    RelativeCoordinatePositionerBase (Component& component);
-    ~RelativeCoordinatePositionerBase();
+    RelativeCoordinatePositionerBase (Component&);
+    ~RelativeCoordinatePositionerBase() override;
 
-    void componentMovedOrResized (Component&, bool, bool);
-    void componentParentHierarchyChanged (Component&);
-    void componentChildrenChanged (Component& component);
-    void componentBeingDeleted (Component& component);
-    void markersChanged (MarkerList*);
-    void markerListBeingDeleted (MarkerList* markerList);
+    void componentMovedOrResized (Component&, bool, bool) override;
+    void componentParentHierarchyChanged (Component&) override;
+    void componentChildrenChanged (Component&) override;
+    void componentBeingDeleted (Component&) override;
+    void markersChanged (MarkerList*) override;
+    void markerListBeingDeleted (MarkerList*) override;
 
     void apply();
 
-    bool addCoordinate (const RelativeCoordinate& coord);
-    bool addPoint (const RelativePoint& point);
+    bool addCoordinate (const RelativeCoordinate&);
+    bool addPoint (const RelativePoint&);
 
     //==============================================================================
     /** Used for resolving a RelativeCoordinate expression in the context of a component. */
     class ComponentScope  : public Expression::Scope
     {
     public:
-        ComponentScope (Component& component);
+        ComponentScope (Component&);
 
-        Expression getSymbolValue (const String& symbol) const;
-        void visitRelativeScope (const String& scopeName, Visitor& visitor) const;
-        String getScopeUID() const;
+        Expression getSymbolValue (const String& symbol) const override;
+        void visitRelativeScope (const String& scopeName, Visitor&) const override;
+        String getScopeUID() const override;
 
     protected:
         Component& component;
 
         Component* findSiblingComponent (const String& componentID) const;
-
-    private:
-        JUCE_DECLARE_NON_COPYABLE (ComponentScope)
     };
 
 protected:
@@ -82,16 +76,15 @@ protected:
 private:
     class DependencyFinderScope;
     friend class DependencyFinderScope;
-    Array <Component*> sourceComponents;
-    Array <MarkerList*> sourceMarkerLists;
+    Array<Component*> sourceComponents;
+    Array<MarkerList*> sourceMarkerLists;
     bool registeredOk;
 
-    void registerComponentListener (Component& comp);
-    void registerMarkerListListener (MarkerList* const list);
+    void registerComponentListener (Component&);
+    void registerMarkerListListener (MarkerList*);
     void unregisterListeners();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RelativeCoordinatePositionerBase)
 };
 
-
-#endif   // __JUCE_RELATIVECOORDINATEPOSITIONER_JUCEHEADER__
+} // namespace juce

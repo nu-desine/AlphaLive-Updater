@@ -1,33 +1,36 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
 
 namespace RelativeRectangleHelpers
 {
     inline void skipComma (String::CharPointerType& s)
     {
-        s = s.findEndOfWhitespace();
+        s.incrementToEndOfWhitespace();
 
         if (*s == ',')
             ++s;
@@ -48,6 +51,11 @@ namespace RelativeRectangleHelpers
                 case RelativeCoordinate::StandardStrings::right:
                 case RelativeCoordinate::StandardStrings::top:
                 case RelativeCoordinate::StandardStrings::bottom:   return false;
+                case RelativeCoordinate::StandardStrings::width:
+                case RelativeCoordinate::StandardStrings::height:
+                case RelativeCoordinate::StandardStrings::parent:
+                case RelativeCoordinate::StandardStrings::unknown:
+
                 default: break;
             }
 
@@ -85,14 +93,15 @@ RelativeRectangle::RelativeRectangle (const Rectangle<float>& rect)
 
 RelativeRectangle::RelativeRectangle (const String& s)
 {
+    String error;
     String::CharPointerType text (s.getCharPointer());
-    left = RelativeCoordinate (Expression::parse (text));
+    left = RelativeCoordinate (Expression::parse (text, error));
     RelativeRectangleHelpers::skipComma (text);
-    top = RelativeCoordinate (Expression::parse (text));
+    top = RelativeCoordinate (Expression::parse (text, error));
     RelativeRectangleHelpers::skipComma (text);
-    right = RelativeCoordinate (Expression::parse (text));
+    right = RelativeCoordinate (Expression::parse (text, error));
     RelativeRectangleHelpers::skipComma (text);
-    bottom = RelativeCoordinate (Expression::parse (text));
+    bottom = RelativeCoordinate (Expression::parse (text, error));
 }
 
 bool RelativeRectangle::operator== (const RelativeRectangle& other) const noexcept
@@ -122,6 +131,10 @@ public:
             case RelativeCoordinate::StandardStrings::top:      return rect.top.getExpression();
             case RelativeCoordinate::StandardStrings::right:    return rect.right.getExpression();
             case RelativeCoordinate::StandardStrings::bottom:   return rect.bottom.getExpression();
+            case RelativeCoordinate::StandardStrings::width:
+            case RelativeCoordinate::StandardStrings::height:
+            case RelativeCoordinate::StandardStrings::parent:
+            case RelativeCoordinate::StandardStrings::unknown:
             default: break;
         }
 
@@ -187,13 +200,13 @@ void RelativeRectangle::renameSymbol (const Expression::Symbol& oldSymbol, const
 class RelativeRectangleComponentPositioner  : public RelativeCoordinatePositionerBase
 {
 public:
-    RelativeRectangleComponentPositioner (Component& component_, const RelativeRectangle& rectangle_)
-        : RelativeCoordinatePositionerBase (component_),
-          rectangle (rectangle_)
+    RelativeRectangleComponentPositioner (Component& comp, const RelativeRectangle& r)
+        : RelativeCoordinatePositionerBase (comp),
+          rectangle (r)
     {
     }
 
-    bool registerCoordinates()
+    bool registerCoordinates() override
     {
         bool ok = addCoordinate (rectangle.left);
         ok = addCoordinate (rectangle.right) && ok;
@@ -207,9 +220,9 @@ public:
         return rectangle == other;
     }
 
-    void applyToComponentBounds()
+    void applyToComponentBounds() override
     {
-        for (int i = 4; --i >= 0;)
+        for (int i = 32; --i >= 0;)
         {
             ComponentScope scope (getComponent());
             const Rectangle<int> newBounds (rectangle.resolve (&scope).getSmallestIntegerContainer());
@@ -223,7 +236,7 @@ public:
         jassertfalse; // Seems to be a recursive reference!
     }
 
-    void applyNewBounds (const Rectangle<int>& newBounds)
+    void applyNewBounds (const Rectangle<int>& newBounds) override
     {
         if (newBounds != getComponent().getBounds())
         {
@@ -244,7 +257,7 @@ void RelativeRectangle::applyToComponent (Component& component) const
 {
     if (isDynamic())
     {
-        RelativeRectangleComponentPositioner* current = dynamic_cast <RelativeRectangleComponentPositioner*> (component.getPositioner());
+        RelativeRectangleComponentPositioner* current = dynamic_cast<RelativeRectangleComponentPositioner*> (component.getPositioner());
 
         if (current == nullptr || ! current->isUsingRectangle (*this))
         {
@@ -260,3 +273,5 @@ void RelativeRectangle::applyToComponent (Component& component) const
         component.setBounds (resolve (nullptr).getSmallestIntegerContainer());
     }
 }
+
+} // namespace juce

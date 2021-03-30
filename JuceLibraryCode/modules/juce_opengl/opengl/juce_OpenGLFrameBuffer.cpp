@@ -1,27 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
 
 class OpenGLFrameBuffer::Pimpl
 {
@@ -42,19 +45,19 @@ public:
        #endif
 
         context.extensions.glGenFramebuffers (1, &frameBufferID);
-        context.extensions.glBindFramebuffer (GL_FRAMEBUFFER, frameBufferID);
-        JUCE_CHECK_OPENGL_ERROR
+        bind();
 
         glGenTextures (1, &textureID);
         glBindTexture (GL_TEXTURE_2D, textureID);
         JUCE_CHECK_OPENGL_ERROR
 
-        glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameterf (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        JUCE_CHECK_OPENGL_ERROR
 
-        glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+        glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
         JUCE_CHECK_OPENGL_ERROR
 
         context.extensions.glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
@@ -85,7 +88,7 @@ public:
             hasStencilBuffer = wantsStencilBuffer;
         }
 
-        context.extensions.glBindFramebuffer (GL_FRAMEBUFFER, 0);
+        unbind();
     }
 
     ~Pimpl()
@@ -118,7 +121,7 @@ public:
 
     void unbind()
     {
-        context.extensions.glBindFramebuffer (GL_FRAMEBUFFER, 0);
+        context.extensions.glBindFramebuffer (GL_FRAMEBUFFER, context.getFrameBufferID());
         JUCE_CHECK_OPENGL_ERROR
     }
 
@@ -163,7 +166,7 @@ public:
 
 private:
     const int width, height;
-    HeapBlock <PixelARGB> data;
+    HeapBlock<PixelARGB> data;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SavedState)
 };
@@ -176,11 +179,11 @@ bool OpenGLFrameBuffer::initialise (OpenGLContext& context, int width, int heigh
 {
     jassert (context.isActive()); // The context must be active when creating a framebuffer!
 
-    pimpl = nullptr;
-    pimpl = new Pimpl (context, width, height, false, false);
+    pimpl.reset();
+    pimpl.reset (new Pimpl (context, width, height, false, false));
 
     if (! pimpl->createdOk())
-        pimpl = nullptr;
+        pimpl.reset();
 
     return pimpl != nullptr;
 }
@@ -198,11 +201,11 @@ bool OpenGLFrameBuffer::initialise (OpenGLContext& context, const Image& image)
 
 bool OpenGLFrameBuffer::initialise (OpenGLFrameBuffer& other)
 {
-    const Pimpl* const p = other.pimpl;
+    auto* p = other.pimpl.get();
 
     if (p == nullptr)
     {
-        pimpl = nullptr;
+        pimpl.reset();
         return true;
     }
 
@@ -230,16 +233,16 @@ bool OpenGLFrameBuffer::initialise (OpenGLFrameBuffer& other)
 
 void OpenGLFrameBuffer::release()
 {
-    pimpl = nullptr;
-    savedState = nullptr;
+    pimpl.reset();
+    savedState.reset();
 }
 
 void OpenGLFrameBuffer::saveAndRelease()
 {
     if (pimpl != nullptr)
     {
-        savedState = new SavedState (*this, pimpl->width, pimpl->height);
-        pimpl = nullptr;
+        savedState.reset (new SavedState (*this, pimpl->width, pimpl->height));
+        pimpl.reset();
     }
 }
 
@@ -247,12 +250,13 @@ bool OpenGLFrameBuffer::reloadSavedCopy (OpenGLContext& context)
 {
     if (savedState != nullptr)
     {
-        ScopedPointer<SavedState> state (savedState);
+        std::unique_ptr<SavedState> state;
+        std::swap (state, savedState);
 
         if (state->restore (context, *this))
             return true;
 
-        savedState = state;
+        std::swap (state, savedState);
     }
 
     return false;
@@ -275,12 +279,12 @@ bool OpenGLFrameBuffer::makeCurrentRenderingTarget()
     return true;
 }
 
-GLuint OpenGLFrameBuffer::getFrameBufferID() const
+GLuint OpenGLFrameBuffer::getFrameBufferID() const noexcept
 {
     return pimpl != nullptr ? pimpl->frameBufferID : 0;
 }
 
-GLuint OpenGLFrameBuffer::getCurrentFrameBufferTarget()
+GLuint OpenGLFrameBuffer::getCurrentFrameBufferTarget() noexcept
 {
     GLint fb;
     glGetIntegerv (GL_FRAMEBUFFER_BINDING, &fb);
@@ -290,10 +294,10 @@ GLuint OpenGLFrameBuffer::getCurrentFrameBufferTarget()
 void OpenGLFrameBuffer::releaseAsRenderingTarget()
 {
     if (pimpl != nullptr)
-        pimpl->context.extensions.glBindFramebuffer (GL_FRAMEBUFFER, 0);
+        pimpl->unbind();
 }
 
-void OpenGLFrameBuffer::clear (const Colour& colour)
+void OpenGLFrameBuffer::clear (Colour colour)
 {
     if (makeCurrentRenderingTarget())
     {
@@ -319,8 +323,8 @@ bool OpenGLFrameBuffer::readPixels (PixelARGB* target, const Rectangle<int>& are
     glPixelStorei (GL_PACK_ALIGNMENT, 4);
     glReadPixels (area.getX(), area.getY(), area.getWidth(), area.getHeight(),
                   JUCE_RGBA_FORMAT, GL_UNSIGNED_BYTE, target);
-    pimpl->context.extensions.glBindFramebuffer (GL_FRAMEBUFFER, 0);
-    JUCE_CHECK_OPENGL_ERROR
+
+    pimpl->unbind();
     return true;
 }
 
@@ -335,20 +339,6 @@ bool OpenGLFrameBuffer::writePixels (const PixelARGB* data, const Rectangle<int>
     glDisable (GL_BLEND);
     JUCE_CHECK_OPENGL_ERROR
 
-   #if JUCE_OPENGL_ES && JUCE_USE_OPENGL_FIXED_FUNCTION
-    OpenGLTexture tex;
-    tex.loadARGBFlipped (data, area.getWidth(), area.getHeight());
-
-    const int texH = tex.getHeight();
-    tex.bind();
-    const GLint cropRect[4] = { 0, texH - area.getHeight(), area.getWidth(), area.getHeight() };
-    glTexParameteriv (GL_TEXTURE_2D, GL_TEXTURE_CROP_RECT_OES, cropRect);
-    glEnable (GL_TEXTURE_2D);
-    clearGLError();
-    glColor4f (1.0f, 1.0f, 1.0f, 1.0f);
-    glDrawTexiOES (area.getX(), area.getY(), 1, area.getWidth(), area.getHeight());
-    glBindTexture (GL_TEXTURE_2D, 0);
-   #else
     OpenGLTexture tex;
     tex.loadARGB (data, area.getWidth(), area.getHeight());
 
@@ -356,69 +346,9 @@ bool OpenGLFrameBuffer::writePixels (const PixelARGB* data, const Rectangle<int>
     pimpl->context.copyTexture (area, Rectangle<int> (area.getX(), area.getY(),
                                                       tex.getWidth(), tex.getHeight()),
                                 pimpl->width, pimpl->height, true);
-   #endif
 
     JUCE_CHECK_OPENGL_ERROR
     return true;
 }
 
-#if JUCE_USE_OPENGL_FIXED_FUNCTION
-void OpenGLFrameBuffer::draw2D (float x1, float y1,
-                                float x2, float y2,
-                                float x3, float y3,
-                                float x4, float y4,
-                                const Colour& colour) const
-{
-    if (pimpl != nullptr)
-    {
-        glBindTexture (GL_TEXTURE_2D, pimpl->textureID);
-        OpenGLHelpers::drawQuad2D (x1, y1, x2, y2, x3, y3, x4, y4, colour);
-        glBindTexture (GL_TEXTURE_2D, 0);
-    }
-}
-
-void OpenGLFrameBuffer::draw3D (float x1, float y1, float z1,
-                                float x2, float y2, float z2,
-                                float x3, float y3, float z3,
-                                float x4, float y4, float z4,
-                                const Colour& colour) const
-{
-    if (pimpl != nullptr)
-    {
-        glBindTexture (GL_TEXTURE_2D, pimpl->textureID);
-        OpenGLHelpers::drawQuad3D (x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4, colour);
-        glBindTexture (GL_TEXTURE_2D, 0);
-    }
-}
-
-void OpenGLFrameBuffer::drawAt (float x1, float y1) const
-{
-    if (pimpl != nullptr)
-    {
-       #if ! JUCE_ANDROID
-        glEnable (GL_TEXTURE_2D);
-        clearGLError();
-       #endif
-        glBindTexture (GL_TEXTURE_2D, pimpl->textureID);
-
-        glDisableClientState (GL_COLOR_ARRAY);
-        glDisableClientState (GL_NORMAL_ARRAY);
-
-        const GLfloat vertices[] = { x1, y1,
-                                     x1 + pimpl->width, y1,
-                                     x1, y1 + pimpl->height,
-                                     x1 + pimpl->width, y1 + pimpl->height };
-
-        const GLfloat textureCoords[] = { 0, 0, 1.0f, 0, 0, 1.0f, 1.0f, 1.0f };
-
-        glEnableClientState (GL_VERTEX_ARRAY);
-        glVertexPointer (2, GL_FLOAT, 0, vertices);
-
-        glEnableClientState (GL_TEXTURE_COORD_ARRAY);
-        glTexCoordPointer (2, GL_FLOAT, 0, textureCoords);
-
-        glDrawArrays (GL_TRIANGLE_STRIP, 0, 4);
-        glBindTexture (GL_TEXTURE_2D, 0);
-    }
-}
-#endif
+} // namespace juce

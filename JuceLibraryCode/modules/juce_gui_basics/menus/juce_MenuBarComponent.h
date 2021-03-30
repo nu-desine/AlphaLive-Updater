@@ -1,39 +1,38 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MENUBARCOMPONENT_JUCEHEADER__
-#define __JUCE_MENUBARCOMPONENT_JUCEHEADER__
-
-#include "juce_MenuBarModel.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     A menu bar component.
 
     @see MenuBarModel
+
+    @tags{GUI}
 */
 class JUCE_API  MenuBarComponent  : public Component,
                                     private MenuBarModel::Listener,
@@ -43,14 +42,14 @@ public:
     //==============================================================================
     /** Creates a menu bar.
 
-        @param model        the model object to use to control this bar. You can
-                            pass 0 into this if you like, and set the model later
-                            using the setModel() method
+        @param model    the model object to use to control this bar. You can
+                        pass omit the parameter or pass nullptr into this if you like,
+                        and set the model later using the setModel() method.
     */
-    MenuBarComponent (MenuBarModel* model);
+    MenuBarComponent (MenuBarModel* model = nullptr);
 
     /** Destructor. */
-    ~MenuBarComponent();
+    ~MenuBarComponent() override;
 
     //==============================================================================
     /** Changes the model object to use to control the bar.
@@ -60,8 +59,7 @@ public:
     */
     void setModel (MenuBarModel* newModel);
 
-    /** Returns the current menu bar model being used.
-    */
+    /** Returns the current menu bar model being used. */
     MenuBarModel* getModel() const noexcept;
 
     //==============================================================================
@@ -74,30 +72,29 @@ public:
 
     //==============================================================================
     /** @internal */
-    void paint (Graphics& g);
+    void paint (Graphics&) override;
     /** @internal */
-    void resized();
+    void resized() override;
     /** @internal */
-    void mouseEnter (const MouseEvent& e);
+    void mouseEnter (const MouseEvent&) override;
     /** @internal */
-    void mouseExit (const MouseEvent& e);
+    void mouseExit (const MouseEvent&) override;
     /** @internal */
-    void mouseDown (const MouseEvent& e);
+    void mouseDown (const MouseEvent&) override;
     /** @internal */
-    void mouseDrag (const MouseEvent& e);
+    void mouseDrag (const MouseEvent&) override;
     /** @internal */
-    void mouseUp (const MouseEvent& e);
+    void mouseUp (const MouseEvent&) override;
     /** @internal */
-    void mouseMove (const MouseEvent& e);
+    void mouseMove (const MouseEvent&) override;
     /** @internal */
-    void handleCommandMessage (int commandId);
+    void handleCommandMessage (int commandId) override;
     /** @internal */
-    bool keyPressed (const KeyPress& key);
+    bool keyPressed (const KeyPress&) override;
     /** @internal */
-    void menuBarItemsChanged (MenuBarModel* menuBarModel);
+    void menuBarItemsChanged (MenuBarModel*) override;
     /** @internal */
-    void menuCommandInvoked (MenuBarModel* menuBarModel,
-                             const ApplicationCommandTarget::InvocationInfo& info);
+    void menuCommandInvoked (MenuBarModel*, const ApplicationCommandTarget::InvocationInfo&) override;
 
 private:
     //==============================================================================
@@ -108,11 +105,11 @@ private:
     Point<int> lastMousePos;
     int itemUnderMouse, currentPopupIndex, topLevelIndexClicked;
 
-    int getItemAt (const Point<int>&);
+    int getItemAt (Point<int>);
     void setItemUnderMouse (int index);
     void setOpenItem (int index);
-    void updateItemUnderMouse (const Point<int>&);
-    void timerCallback();
+    void updateItemUnderMouse (Point<int>);
+    void timerCallback() override;
     void repaintMenuItem (int index);
     void menuDismissed (int topLevelIndex, int itemId);
     static void menuBarMenuDismissedCallback (int, MenuBarComponent*, int);
@@ -120,4 +117,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MenuBarComponent)
 };
 
-#endif   // __JUCE_MENUBARCOMPONENT_JUCEHEADER__
+} // namespace juce

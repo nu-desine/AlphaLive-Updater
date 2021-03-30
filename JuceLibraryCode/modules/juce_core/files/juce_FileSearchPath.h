@@ -1,40 +1,35 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_FILESEARCHPATH_JUCEHEADER__
-#define __JUCE_FILESEARCHPATH_JUCEHEADER__
-
-#include "juce_File.h"
-#include "../text/juce_StringArray.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
-    Encapsulates a set of folders that make up a search path.
+    Represents a set of folders that make up a search path.
 
     @see File
+
+    @tags{Core}
 */
 class JUCE_API  FileSearchPath
 {
@@ -53,7 +48,10 @@ public:
     FileSearchPath (const String& path);
 
     /** Creates a copy of another search path. */
-    FileSearchPath (const FileSearchPath& other);
+    FileSearchPath (const FileSearchPath&);
+
+    /** Copies another search path. */
+    FileSearchPath& operator= (const FileSearchPath&);
 
     /** Destructor. */
     ~FileSearchPath();
@@ -67,15 +65,12 @@ public:
 
     //==============================================================================
     /** Returns the number of folders in this search path.
-
         @see operator[]
     */
     int getNumPaths() const;
 
     /** Returns one of the folders in this search path.
-
         The file returned isn't guaranteed to actually be a valid directory.
-
         @see getNumPaths
     */
     File operator[] (int index) const;
@@ -92,17 +87,19 @@ public:
     void add (const File& directoryToAdd,
               int insertIndex = -1);
 
-    /** Adds a new directory to the search path if it's not already in there. */
-    void addIfNotAlreadyThere (const File& directoryToAdd);
+    /** Adds a new directory to the search path if it's not already in there.
+
+        @return true if the directory has been added, false otherwise.
+    */
+    bool addIfNotAlreadyThere (const File& directoryToAdd);
 
     /** Removes a directory from the search path. */
     void remove (int indexToRemove);
 
     /** Merges another search path into this one.
-
         This will remove any duplicate directories.
     */
-    void addPath (const FileSearchPath& other);
+    void addPath (const FileSearchPath&);
 
     /** Removes any directories that are actually subdirectories of one of the other directories in the search path.
 
@@ -119,16 +116,24 @@ public:
     //==============================================================================
     /** Searches the path for a wildcard.
 
-        This will search all the directories in the search path in order, adding any
-        matching files to the results array.
+        This will search all the directories in the search path in order and return
+        an array of the files that were found.
 
-        @param results                  an array to append the results to
         @param whatToLookFor            a value from the File::TypesOfFileToFind enum, specifying whether to
                                         return files, directories, or both.
         @param searchRecursively        whether to recursively search the subdirectories too
         @param wildCardPattern          a pattern to match against the filenames
         @returns the number of files added to the array
         @see File::findChildFiles
+    */
+    Array<File> findChildFiles (int whatToLookFor,
+                                bool searchRecursively,
+                                const String& wildCardPattern = "*") const;
+
+    /** Searches the path for a wildcard.
+        Note that there's a newer, better version of this method which returns the results
+        array, and in almost all cases, you should use that one instead! This one is kept around
+        mainly for legacy code to use.
     */
     int findChildFiles (Array<File>& results,
                         int whatToLookFor,
@@ -158,9 +163,9 @@ private:
     //==============================================================================
     StringArray directories;
 
-    void init (const String& path);
+    void init (const String&);
 
     JUCE_LEAK_DETECTOR (FileSearchPath)
 };
 
-#endif   // __JUCE_FILESEARCHPATH_JUCEHEADER__
+} // namespace juce

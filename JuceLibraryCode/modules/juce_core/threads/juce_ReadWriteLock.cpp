@@ -1,32 +1,29 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 ReadWriteLock::ReadWriteLock() noexcept
-    : numWaitingWriters (0),
-      numWriters (0),
-      writerThreadId (0)
 {
     readerThreads.ensureStorageAllocated (16);
 }
@@ -41,22 +38,20 @@ ReadWriteLock::~ReadWriteLock() noexcept
 void ReadWriteLock::enterRead() const noexcept
 {
     while (! tryEnterRead())
-        waitEvent.wait (100);
+        readWaitEvent.wait (100);
 }
 
 bool ReadWriteLock::tryEnterRead() const noexcept
 {
-    const Thread::ThreadID threadId = Thread::getCurrentThreadId();
+    auto threadId = Thread::getCurrentThreadId();
 
     const SpinLock::ScopedLockType sl (accessLock);
 
-    for (int i = 0; i < readerThreads.size(); ++i)
+    for (auto& readerThread : readerThreads)
     {
-        ThreadRecursionCount& trc = readerThreads.getReference(i);
-
-        if (trc.threadID == threadId)
+        if (readerThread.threadID == threadId)
         {
-            trc.count++;
+            readerThread.count++;
             return true;
         }
     }
@@ -64,8 +59,7 @@ bool ReadWriteLock::tryEnterRead() const noexcept
     if (numWriters + numWaitingWriters == 0
          || (threadId == writerThreadId && numWriters > 0))
     {
-        ThreadRecursionCount trc = { threadId, 1 };
-        readerThreads.add (trc);
+        readerThreads.add ({ threadId, 1 });
         return true;
     }
 
@@ -74,19 +68,21 @@ bool ReadWriteLock::tryEnterRead() const noexcept
 
 void ReadWriteLock::exitRead() const noexcept
 {
-    const Thread::ThreadID threadId = Thread::getCurrentThreadId();
+    auto threadId = Thread::getCurrentThreadId();
     const SpinLock::ScopedLockType sl (accessLock);
 
     for (int i = 0; i < readerThreads.size(); ++i)
     {
-        ThreadRecursionCount& trc = readerThreads.getReference(i);
+        auto& readerThread = readerThreads.getReference (i);
 
-        if (trc.threadID == threadId)
+        if (readerThread.threadID == threadId)
         {
-            if (--(trc.count) == 0)
+            if (--(readerThread.count) == 0)
             {
                 readerThreads.remove (i);
-                waitEvent.signal();
+
+                readWaitEvent.signal();
+                writeWaitEvent.signal();
             }
 
             return;
@@ -99,24 +95,14 @@ void ReadWriteLock::exitRead() const noexcept
 //==============================================================================
 void ReadWriteLock::enterWrite() const noexcept
 {
-    const Thread::ThreadID threadId = Thread::getCurrentThreadId();
+    auto threadId = Thread::getCurrentThreadId();
     const SpinLock::ScopedLockType sl (accessLock);
 
-    for (;;)
+    while (! tryEnterWriteInternal (threadId))
     {
-        if (readerThreads.size() + numWriters == 0
-             || threadId == writerThreadId
-             || (readerThreads.size() == 1
-                  && readerThreads.getReference(0).threadID == threadId))
-        {
-            writerThreadId = threadId;
-            ++numWriters;
-            break;
-        }
-
         ++numWaitingWriters;
         accessLock.exit();
-        waitEvent.wait (100);
+        writeWaitEvent.wait (100);
         accessLock.enter();
         --numWaitingWriters;
     }
@@ -124,13 +110,15 @@ void ReadWriteLock::enterWrite() const noexcept
 
 bool ReadWriteLock::tryEnterWrite() const noexcept
 {
-    const Thread::ThreadID threadId = Thread::getCurrentThreadId();
     const SpinLock::ScopedLockType sl (accessLock);
+    return tryEnterWriteInternal (Thread::getCurrentThreadId());
+}
 
+bool ReadWriteLock::tryEnterWriteInternal (Thread::ThreadID threadId) const noexcept
+{
     if (readerThreads.size() + numWriters == 0
          || threadId == writerThreadId
-         || (readerThreads.size() == 1
-              && readerThreads.getReference(0).threadID == threadId))
+         || (readerThreads.size() == 1 && readerThreads.getReference (0).threadID == threadId))
     {
         writerThreadId = threadId;
         ++numWriters;
@@ -149,7 +137,11 @@ void ReadWriteLock::exitWrite() const noexcept
 
     if (--numWriters == 0)
     {
-        writerThreadId = 0;
-        waitEvent.signal();
+        writerThreadId = {};
+
+        readWaitEvent.signal();
+        writeWaitEvent.signal();
     }
 }
+
+} // namespace juce

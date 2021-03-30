@@ -1,31 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-FileSearchPath::FileSearchPath()
+namespace juce
 {
-}
+
+FileSearchPath::FileSearchPath() {}
+FileSearchPath::~FileSearchPath() {}
 
 FileSearchPath::FileSearchPath (const String& path)
 {
@@ -33,12 +32,14 @@ FileSearchPath::FileSearchPath (const String& path)
 }
 
 FileSearchPath::FileSearchPath (const FileSearchPath& other)
-  : directories (other.directories)
+   : directories (other.directories)
 {
 }
 
-FileSearchPath::~FileSearchPath()
+FileSearchPath& FileSearchPath::operator= (const FileSearchPath& other)
 {
+    directories = other.directories;
+    return *this;
 }
 
 FileSearchPath& FileSearchPath::operator= (const String& path)
@@ -54,8 +55,8 @@ void FileSearchPath::init (const String& path)
     directories.trim();
     directories.removeEmptyStrings();
 
-    for (int i = directories.size(); --i >= 0;)
-        directories.set (i, directories[i].unquoted());
+    for (auto& d : directories)
+        d = d.unquoted();
 }
 
 int FileSearchPath::getNumPaths() const
@@ -63,36 +64,38 @@ int FileSearchPath::getNumPaths() const
     return directories.size();
 }
 
-File FileSearchPath::operator[] (const int index) const
+File FileSearchPath::operator[] (int index) const
 {
-    return File (directories [index]);
+    return File (directories[index]);
 }
 
 String FileSearchPath::toString() const
 {
-    StringArray directories2 (directories);
-    for (int i = directories2.size(); --i >= 0;)
-        if (directories2[i].containsChar (';'))
-            directories2.set (i, directories2[i].quoted());
+    auto dirs = directories;
 
-    return directories2.joinIntoString (";");
+    for (auto& d : dirs)
+        if (d.containsChar (';'))
+            d = d.quoted();
+
+    return dirs.joinIntoString (";");
 }
 
-void FileSearchPath::add (const File& dir, const int insertIndex)
+void FileSearchPath::add (const File& dir, int insertIndex)
 {
     directories.insert (insertIndex, dir.getFullPathName());
 }
 
-void FileSearchPath::addIfNotAlreadyThere (const File& dir)
+bool FileSearchPath::addIfNotAlreadyThere (const File& dir)
 {
-    for (int i = 0; i < directories.size(); ++i)
-        if (File (directories[i]) == dir)
-            return;
+    for (auto& d : directories)
+        if (File (d) == dir)
+            return false;
 
     add (dir);
+    return true;
 }
 
-void FileSearchPath::remove (const int index)
+void FileSearchPath::remove (int index)
 {
     directories.remove (index);
 }
@@ -113,7 +116,7 @@ void FileSearchPath::removeRedundantPaths()
         {
             const File d2 (directories[j]);
 
-            if ((i != j) && (d1.isAChildOf (d2) || d1 == d2))
+            if (i != j && (d1.isAChildOf (d2) || d1 == d2))
             {
                 directories.remove (i);
                 break;
@@ -129,18 +132,20 @@ void FileSearchPath::removeNonExistentPaths()
             directories.remove (i);
 }
 
-int FileSearchPath::findChildFiles (Array<File>& results,
-                                    const int whatToLookFor,
-                                    const bool searchRecursively,
-                                    const String& wildCardPattern) const
+Array<File> FileSearchPath::findChildFiles (int whatToLookFor, bool recurse, const String& wildcard) const
+{
+    Array<File> results;
+    findChildFiles (results, whatToLookFor, recurse, wildcard);
+    return results;
+}
+
+int FileSearchPath::findChildFiles (Array<File>& results, int whatToLookFor,
+                                    bool recurse, const String& wildcard) const
 {
     int total = 0;
 
-    for (int i = 0; i < directories.size(); ++i)
-        total += operator[] (i).findChildFiles (results,
-                                                whatToLookFor,
-                                                searchRecursively,
-                                                wildCardPattern);
+    for (auto& d : directories)
+        total += File (d).findChildFiles (results, whatToLookFor, recurse, wildcard);
 
     return total;
 }
@@ -148,21 +153,21 @@ int FileSearchPath::findChildFiles (Array<File>& results,
 bool FileSearchPath::isFileInPath (const File& fileToCheck,
                                    const bool checkRecursively) const
 {
-    for (int i = directories.size(); --i >= 0;)
+    for (auto& d : directories)
     {
-        const File d (directories[i]);
-
         if (checkRecursively)
         {
-            if (fileToCheck.isAChildOf (d))
+            if (fileToCheck.isAChildOf (File (d)))
                 return true;
         }
         else
         {
-            if (fileToCheck.getParentDirectory() == d)
+            if (fileToCheck.getParentDirectory() == File (d))
                 return true;
         }
     }
 
     return false;
 }
+
+} // namespace juce

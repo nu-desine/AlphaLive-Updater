@@ -1,29 +1,31 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-// (these functions are from juce_win32_Windowing.cpp)
+namespace juce
+{
+
 extern void* getUser32Function (const char*);
 
 namespace IconConverters
@@ -50,15 +52,14 @@ public:
         iconData.uCallbackMessage = WM_TRAYNOTIFY;
         iconData.hIcon = hicon;
 
-        Shell_NotifyIcon (NIM_ADD, &iconData);
+        notify (NIM_ADD);
 
         // In order to receive the "TaskbarCreated" message, we need to request that it's not filtered out.
         // (Need to load dynamically, as ChangeWindowMessageFilter is only available in Vista and later)
         typedef BOOL (WINAPI* ChangeWindowMessageFilterType) (UINT, DWORD);
-        ChangeWindowMessageFilterType changeWindowMessageFilter
-            = (ChangeWindowMessageFilterType) getUser32Function ("ChangeWindowMessageFilter");
 
-        if (changeWindowMessageFilter != nullptr)
+        if (ChangeWindowMessageFilterType changeWindowMessageFilter
+                = (ChangeWindowMessageFilterType) getUser32Function ("ChangeWindowMessageFilter"))
             changeWindowMessageFilter (taskbarCreatedMessage, 1 /* MSGFLT_ADD */);
     }
 
@@ -67,7 +68,7 @@ public:
         SetWindowLongPtr (iconData.hWnd, GWLP_WNDPROC, (LONG_PTR) originalWndProc);
 
         iconData.uFlags = 0;
-        Shell_NotifyIcon (NIM_DELETE, &iconData);
+        notify (NIM_DELETE);
         DestroyIcon (iconData.hIcon);
     }
 
@@ -77,7 +78,7 @@ public:
 
         iconData.hIcon = hicon;
         iconData.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-        Shell_NotifyIcon (NIM_MODIFY, &iconData);
+        notify (NIM_MODIFY);
 
         DestroyIcon (oldIcon);
     }
@@ -86,7 +87,7 @@ public:
     {
         iconData.uFlags = NIF_TIP;
         toolTip.copyToUTF16 (iconData.szTip, sizeof (iconData.szTip) - 1);
-        Shell_NotifyIcon (NIM_MODIFY, &iconData);
+        notify (NIM_MODIFY);
     }
 
     void handleTaskBarEvent (const LPARAM lParam)
@@ -94,17 +95,15 @@ public:
         if (owner.isCurrentlyBlockedByAnotherModalComponent())
         {
             if (lParam == WM_LBUTTONDOWN || lParam == WM_RBUTTONDOWN
-                 || lParam == WM_LBUTTONDBLCLK || lParam == WM_LBUTTONDBLCLK)
+                 || lParam == WM_LBUTTONDBLCLK || lParam == WM_RBUTTONDBLCLK)
             {
-                Component* const current = Component::getCurrentlyModalComponent();
-
-                if (current != nullptr)
+                if (auto* current = Component::getCurrentlyModalComponent())
                     current->inputAttemptWhenModal();
             }
         }
         else
         {
-            ModifierKeys eventMods (ModifierKeys::getCurrentModifiersRealtime());
+            ModifierKeys eventMods (ComponentPeer::getCurrentModifiersRealtime());
 
             if (lParam == WM_LBUTTONDOWN || lParam == WM_LBUTTONDBLCLK)
                 eventMods = eventMods.withFlags (ModifierKeys::leftButtonModifier);
@@ -113,9 +112,12 @@ public:
             else if (lParam == WM_LBUTTONUP || lParam == WM_RBUTTONUP)
                 eventMods = eventMods.withoutMouseButtons();
 
-            const MouseEvent e (Desktop::getInstance().getMainMouseSource(),
-                                Point<int>(), eventMods, &owner, &owner, Time (getMouseEventTime()),
-                                Point<int>(), Time (getMouseEventTime()), 1, false);
+            const Time eventTime (getMouseEventTime());
+
+            const MouseEvent e (Desktop::getInstance().getMainMouseSource(), {}, eventMods,
+                                MouseInputSource::invalidPressure, MouseInputSource::invalidOrientation,
+                                MouseInputSource::invalidRotation, MouseInputSource::invalidTiltX, MouseInputSource::invalidTiltY,
+                                &owner, &owner, eventTime, {}, eventTime, 1, false);
 
             if (lParam == WM_LBUTTONDOWN || lParam == WM_RBUTTONDOWN)
             {
@@ -127,7 +129,7 @@ public:
             {
                 owner.mouseUp (e);
             }
-            else if (lParam == WM_LBUTTONDBLCLK || lParam == WM_LBUTTONDBLCLK)
+            else if (lParam == WM_LBUTTONDBLCLK || lParam == WM_RBUTTONDBLCLK)
             {
                 owner.mouseDoubleClick (e);
             }
@@ -141,17 +143,9 @@ public:
     static Pimpl* getPimpl (HWND hwnd)
     {
         if (JuceWindowIdentifier::isJUCEWindow (hwnd))
-        {
-            ComponentPeer* peer = (ComponentPeer*) GetWindowLongPtr (hwnd, 8);
-
-            if (peer != nullptr)
-            {
-                SystemTrayIconComponent* const iconComp = dynamic_cast<SystemTrayIconComponent*> (&(peer->getComponent()));
-
-                if (iconComp != nullptr)
-                    return iconComp->pimpl;
-            }
-        }
+            if (ComponentPeer* peer = (ComponentPeer*) GetWindowLongPtr (hwnd, 8))
+                if (SystemTrayIconComponent* const iconComp = dynamic_cast<SystemTrayIconComponent*> (&(peer->getComponent())))
+                    return iconComp->pimpl.get();
 
         return nullptr;
     }
@@ -173,37 +167,48 @@ public:
         else if (message == taskbarCreatedMessage)
         {
             iconData.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-            Shell_NotifyIcon (NIM_ADD, &iconData);
+            notify (NIM_ADD);
         }
 
         return CallWindowProc (originalWndProc, hwnd, message, wParam, lParam);
     }
 
-private:
+    void showBubble (const String& title, const String& content)
+    {
+        iconData.uFlags = 0x10 /*NIF_INFO*/;
+        title.copyToUTF16 (iconData.szInfoTitle, sizeof (iconData.szInfoTitle) - 1);
+        content.copyToUTF16 (iconData.szInfo, sizeof (iconData.szInfo) - 1);
+        notify (NIM_MODIFY);
+    }
+
     SystemTrayIconComponent& owner;
     NOTIFYICONDATA iconData;
+
+private:
     WNDPROC originalWndProc;
     const DWORD taskbarCreatedMessage;
     enum { WM_TRAYNOTIFY = WM_USER + 100 };
+
+    void notify (DWORD message) noexcept    { Shell_NotifyIcon (message, &iconData); }
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Pimpl)
 };
 
 //==============================================================================
-void SystemTrayIconComponent::setIconImage (const Image& newImage)
+void SystemTrayIconComponent::setIconImage (const Image& colourImage, const Image&)
 {
-    if (newImage.isValid())
+    if (colourImage.isValid())
     {
-        HICON hicon = IconConverters::createHICONFromImage (newImage, TRUE, 0, 0);
+        HICON hicon = IconConverters::createHICONFromImage (colourImage, TRUE, 0, 0);
 
         if (pimpl == nullptr)
-            pimpl = new Pimpl (*this, hicon, (HWND) getWindowHandle());
+            pimpl.reset (new Pimpl (*this, hicon, (HWND) getWindowHandle()));
         else
             pimpl->updateIcon (hicon);
     }
     else
     {
-        pimpl = nullptr;
+        pimpl.reset();
     }
 }
 
@@ -212,3 +217,26 @@ void SystemTrayIconComponent::setIconTooltip (const String& tooltip)
     if (pimpl != nullptr)
         pimpl->setToolTip (tooltip);
 }
+
+void SystemTrayIconComponent::setHighlighted (bool)
+{
+    // N/A on Windows.
+}
+
+void SystemTrayIconComponent::showInfoBubble (const String& title, const String& content)
+{
+    if (pimpl != nullptr)
+        pimpl->showBubble (title, content);
+}
+
+void SystemTrayIconComponent::hideInfoBubble()
+{
+    showInfoBubble (String(), String());
+}
+
+void* SystemTrayIconComponent::getNativeHandle() const
+{
+    return pimpl != nullptr ? &(pimpl->iconData) : nullptr;
+}
+
+} // namespace juce

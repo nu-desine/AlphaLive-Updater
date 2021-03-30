@@ -1,58 +1,65 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_DATA_STRUCTURES_JUCEHEADER__
-#define __JUCE_DATA_STRUCTURES_JUCEHEADER__
 
-//=============================================================================
-#include "../juce_events/juce_events.h"
+/*******************************************************************************
+ The block below describes the properties of this module, and is read by
+ the Projucer to automatically generate project code that uses it.
+ For details about the syntax and how to create or use a module, see the
+ JUCE Module Format.md file.
 
-namespace juce
-{
 
-// START_AUTOINCLUDE values, undomanager, app_properties
-#ifndef __JUCE_VALUE_JUCEHEADER__
- #include "values/juce_Value.h"
-#endif
-#ifndef __JUCE_VALUETREE_JUCEHEADER__
- #include "values/juce_ValueTree.h"
-#endif
-#ifndef __JUCE_UNDOABLEACTION_JUCEHEADER__
- #include "undomanager/juce_UndoableAction.h"
-#endif
-#ifndef __JUCE_UNDOMANAGER_JUCEHEADER__
- #include "undomanager/juce_UndoManager.h"
-#endif
-#ifndef __JUCE_APPLICATIONPROPERTIES_JUCEHEADER__
- #include "app_properties/juce_ApplicationProperties.h"
-#endif
-#ifndef __JUCE_PROPERTIESFILE_JUCEHEADER__
- #include "app_properties/juce_PropertiesFile.h"
-#endif
-// END_AUTOINCLUDE
+ BEGIN_JUCE_MODULE_DECLARATION
 
-}
+  ID:                 juce_data_structures
+  vendor:             juce
+  version:            6.0.8
+  name:               JUCE data model helper classes
+  description:        Classes for undo/redo management, and smart data structures.
+  website:            http://www.juce.com/juce
+  license:            GPL/Commercial
 
-#endif   // __JUCE_DATA_STRUCTURES_JUCEHEADER__
+  dependencies:       juce_events
+
+ END_JUCE_MODULE_DECLARATION
+
+*******************************************************************************/
+
+
+#pragma once
+#define JUCE_DATA_STRUCTURES_H_INCLUDED
+
+//==============================================================================
+#include <juce_events/juce_events.h>
+
+#include "undomanager/juce_UndoableAction.h"
+#include "undomanager/juce_UndoManager.h"
+#include "values/juce_Value.h"
+#include "values/juce_ValueTree.h"
+#include "values/juce_ValueTreeSynchroniser.h"
+#include "values/juce_CachedValue.h"
+#include "values/juce_ValueWithDefault.h"
+#include "app_properties/juce_PropertiesFile.h"
+#include "app_properties/juce_ApplicationProperties.h"

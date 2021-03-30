@@ -1,33 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_LOWLEVELGRAPHICSSOFTWARERENDERER_JUCEHEADER__
-#define __JUCE_LOWLEVELGRAPHICSSOFTWARERENDERER_JUCEHEADER__
-
-#include "juce_LowLevelGraphicsContext.h"
-#include "../native/juce_RenderingHelpers.h"
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -36,61 +33,25 @@
 
     User code is not supposed to create instances of this class directly - do all your
     rendering via the Graphics class instead.
+
+    @tags{Graphics}
 */
-class JUCE_API  LowLevelGraphicsSoftwareRenderer    : public LowLevelGraphicsContext
+class JUCE_API  LowLevelGraphicsSoftwareRenderer    : public RenderingHelpers::StackBasedLowLevelGraphicsContext<RenderingHelpers::SoftwareRendererSavedState>
 {
 public:
     //==============================================================================
+    /** Creates a context to render into an image. */
     LowLevelGraphicsSoftwareRenderer (const Image& imageToRenderOnto);
-    LowLevelGraphicsSoftwareRenderer (const Image& imageToRenderOnto, const Point<int>& origin,
-                                      const RectangleList& initialClip);
-    ~LowLevelGraphicsSoftwareRenderer();
 
-    bool isVectorDevice() const;
-    void setOrigin (int x, int y);
-    void addTransform (const AffineTransform&);
-    float getScaleFactor();
-    bool clipToRectangle (const Rectangle<int>&);
-    bool clipToRectangleList (const RectangleList&);
-    void excludeClipRectangle (const Rectangle<int>&);
-    void clipToPath (const Path&, const AffineTransform&);
-    void clipToImageAlpha (const Image&, const AffineTransform&);
-    bool clipRegionIntersects (const Rectangle<int>&);
-    Rectangle<int> getClipBounds() const;
-    bool isClipEmpty() const;
+    /** Creates a context to render into a clipped subsection of an image. */
+    LowLevelGraphicsSoftwareRenderer (const Image& imageToRenderOnto, Point<int> origin,
+                                      const RectangleList<int>& initialClip);
 
-    void saveState();
-    void restoreState();
+    /** Destructor. */
+    ~LowLevelGraphicsSoftwareRenderer() override;
 
-    void beginTransparencyLayer (float opacity);
-    void endTransparencyLayer();
-
-    void setFill (const FillType&);
-    void setOpacity (float opacity);
-    void setInterpolationQuality (Graphics::ResamplingQuality);
-
-    void fillRect (const Rectangle<int>&, bool replaceExistingContents);
-    void fillPath (const Path&, const AffineTransform&);
-
-    void drawImage (const Image&, const AffineTransform&);
-
-    void drawLine (const Line <float>&);
-    void drawVerticalLine (int x, float top, float bottom);
-    void drawHorizontalLine (int x, float top, float bottom);
-
-    void setFont (const Font&);
-    const Font& getFont();
-    void drawGlyph (int glyphNumber, float x, float y);
-    void drawGlyph (int glyphNumber, const AffineTransform&);
-
-    const Image& getImage() const noexcept                                          { return savedState->image; }
-    const RenderingHelpers::TranslationOrTransform& getTransform() const noexcept   { return savedState->transform; }
-
-protected:
-    RenderingHelpers::SavedStateStack <RenderingHelpers::SoftwareRendererSavedState> savedState;
-
+private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LowLevelGraphicsSoftwareRenderer)
 };
 
-
-#endif   // __JUCE_LOWLEVELGRAPHICSSOFTWARERENDERER_JUCEHEADER__
+} // namespace juce

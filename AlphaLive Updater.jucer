@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="FtmW3q" name="AlphaLive Updater" projectType="guiapp" version="1.0.0"
-              bundleIdentifier="com.nu-desine.AlphaLiveUpdater" jucerVersion="3.0.0"
-              companyName="nu desine">
+<JUCERPROJECT id="FtmW3q" name="AlphaLive Updater" projectType="guiapp" version="1.1.0"
+              bundleIdentifier="com.nu-desine.AlphaLiveUpdater" companyName="nu desine"
+              jucerFormatVersion="1">
   <MAINGROUP id="rYklhM" name="AlphaLive Updater">
     <GROUP id="{C912814F-F56C-BDC0-99AC-07C263BE7964}" name="Source">
       <FILE id="OyTJMJ" name="MainComponent.cpp" compile="1" resource="0"
@@ -18,38 +18,46 @@
     </GROUP>
   </MAINGROUP>
   <MODULES>
-    <MODULE id="juce_core" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_events" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_gui_audio" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_cryptography" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_video" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="1"/>
-    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="1"/>
+    <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_audio_devices" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_audio_formats" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_audio_processors" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_core" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_cryptography" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_events" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_opengl" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
+    <MODULE id="juce_video" showAllCode="1" useLocalCopy="1" useGlobalPath="1"/>
   </MODULES>
   <EXPORTFORMATS>
-    <XCODE_MAC targetFolder="Builds/MacOSX" juceFolder="../../../Development/libs/JUCE/modules">
+    <XCODE_MAC targetFolder="Builds/MacOSX">
       <CONFIGURATIONS>
-        <CONFIGURATION name="Debug" osxSDK="default" osxCompatibility="default" osxArchitecture="default"
-                       isDebug="1" optimisation="1" targetName="AlphaLive Updater"/>
-        <CONFIGURATION name="Release" osxSDK="default" osxCompatibility="default" osxArchitecture="default"
-                       isDebug="0" optimisation="2" targetName="AlphaLive Updater"/>
+        <CONFIGURATION name="Debug" isDebug="1" optimisation="1" targetName="AlphaLive Updater"
+                       osxCompatibility="10.9 SDK" osxArchitecture="Native"/>
+        <CONFIGURATION name="Release" isDebug="0" targetName="AlphaLive Updater" osxCompatibility="10.9 SDK"/>
       </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_audio_processors" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_audio_formats" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_audio_devices" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_audio_basics" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_opengl" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_video" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_cryptography" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_gui_extra" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_gui_basics" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_data_structures" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_graphics" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_events" path="JuceLibraryCode/modules"/>
+        <MODULEPATH id="juce_core" path="JuceLibraryCode/modules"/>
+      </MODULEPATHS>
     </XCODE_MAC>
-    <VS2010 targetFolder="Builds/VisualStudio2010" libraryType="1" juceFolder="..\..\GitHub\JUCE\modules">
-      <CONFIGURATIONS>
-        <CONFIGURATION name="Debug" winWarningLevel="4" generateManifest="1" winArchitecture="32-bit"
-                       isDebug="1" optimisation="1" targetName="AlphaLive Updater"/>
-        <CONFIGURATION name="Release" winWarningLevel="4" generateManifest="1" winArchitecture="32-bit"
-                       isDebug="0" optimisation="2" targetName="AlphaLive Updater"/>
-      </CONFIGURATIONS>
-    </VS2010>
   </EXPORTFORMATS>
   <JUCEOPTIONS/>
+  <LIVE_SETTINGS>
+    <OSX/>
+  </LIVE_SETTINGS>
 </JUCERPROJECT>

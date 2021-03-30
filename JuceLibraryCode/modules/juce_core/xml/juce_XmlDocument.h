@@ -1,37 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_XMLDOCUMENT_JUCEHEADER__
-#define __JUCE_XMLDOCUMENT_JUCEHEADER__
-
-#include "juce_XmlElement.h"
-#include "../text/juce_StringArray.h"
-#include "../files/juce_File.h"
-#include "../memory/juce_ScopedPointer.h"
-class InputSource;
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -42,32 +32,33 @@ class InputSource;
 
     e.g.
     @code
-
     XmlDocument myDocument (File ("myfile.xml"));
-    XmlElement* mainElement = myDocument.getDocumentElement();
 
-    if (mainElement == nullptr)
-    {
-        String error = myDocument.getLastParseError();
-    }
-    else
+    if (auto mainElement = myDocument.getDocumentElement())
     {
         ..use the element
     }
-
+    else
+    {
+        String error = myDocument.getLastParseError();
+    }
     @endcode
 
-    Or you can use the static helper methods for quick parsing..
+    Or you can use the helper functions for much less verbose parsing..
 
     @code
-    XmlElement* xml = XmlDocument::parse (myXmlFile);
-
-    if (xml != nullptr && xml->hasTagName ("foobar"))
+    if (auto xml = parseXML (myXmlFile))
     {
-        ...etc
+        if (xml->hasTagName ("foobar"))
+        {
+            ...etc
+        }
+    }
     @endcode
 
     @see XmlElement
+
+    @tags{Core}
 */
 class JUCE_API  XmlDocument
 {
@@ -102,14 +93,18 @@ public:
                                                 allows quick checking of large files to
                                                 see if they contain the correct type of
                                                 tag, without having to parse the entire file
-        @returns    a new XmlElement which the caller will need to delete, or null if
-                    there was an error.
-        @see getLastParseError
+        @returns    a new XmlElement, or nullptr if there was an error.
+        @see getLastParseError, getDocumentElementIfTagMatches
     */
-    XmlElement* getDocumentElement (bool onlyReadOuterDocumentElement = false);
+    std::unique_ptr<XmlElement> getDocumentElement (bool onlyReadOuterDocumentElement = false);
+
+    /** Does an inexpensive check to see whether the outer element has the given tag name, and
+        then does a full parse if it matches.
+        If the tag is different, or the XML parse fails, this will return nullptr.
+    */
+    std::unique_ptr<XmlElement> getDocumentElementIfTagMatches (StringRef requiredTag);
 
     /** Returns the parsing error that occurred the last time getDocumentElement was called.
-
         @returns the error, or an empty string if there was no error.
     */
     const String& getLastParseError() const noexcept;
@@ -139,45 +134,76 @@ public:
     //==============================================================================
     /** A handy static method that parses a file.
         This is a shortcut for creating an XmlDocument object and calling getDocumentElement() on it.
-        @returns    a new XmlElement which the caller will need to delete, or null if there was an error.
+        An even better shortcut is the juce::parseXML() function, which returns a std::unique_ptr<XmlElement>!
+        @returns    a new XmlElement, or nullptr if there was an error.
     */
-    static XmlElement* parse (const File& file);
+    static std::unique_ptr<XmlElement> parse (const File& file);
 
     /** A handy static method that parses some XML data.
         This is a shortcut for creating an XmlDocument object and calling getDocumentElement() on it.
-        @returns    a new XmlElement which the caller will need to delete, or null if there was an error.
+        An even better shortcut is the juce::parseXML() function, which returns a std::unique_ptr<XmlElement>!
+        @returns    a new XmlElement, or nullptr if there was an error.
     */
-    static XmlElement* parse (const String& xmlData);
+    static std::unique_ptr<XmlElement> parse (const String& xmlData);
 
 
     //==============================================================================
 private:
     String originalText;
-    String::CharPointerType input;
-    bool outOfData, errorOccurred;
-
+    String::CharPointerType input { nullptr };
+    bool outOfData = false, errorOccurred = false;
     String lastError, dtdText;
     StringArray tokenisedDTD;
-    bool needToLoadDTD, ignoreEmptyTextElements;
-    ScopedPointer <InputSource> inputSource;
+    bool needToLoadDTD = false, ignoreEmptyTextElements = true;
+    std::unique_ptr<InputSource> inputSource;
 
-    void setLastError (const String& desc, bool carryOn);
-    void skipHeader();
+    std::unique_ptr<XmlElement> parseDocumentElement (String::CharPointerType, bool outer);
+    void setLastError (const String&, bool carryOn);
+    bool parseHeader();
+    bool parseDTD();
     void skipNextWhiteSpace();
     juce_wchar readNextChar() noexcept;
     XmlElement* readNextElement (bool alsoParseSubElements);
-    void readChildElements (XmlElement* parent);
-    int findNextTokenLength() noexcept;
-    void readQuotedString (String& result);
-    void readEntity (String& result);
+    void readChildElements (XmlElement&);
+    void readQuotedString (String&);
+    void readEntity (String&);
 
-    String getFileContents (const String& filename) const;
-    String expandEntity (const String& entity);
-    String expandExternalEntity (const String& entity);
-    String getParameterEntity (const String& entity);
+    String getFileContents (const String&) const;
+    String expandEntity (const String&);
+    String expandExternalEntity (const String&);
+    String getParameterEntity (const String&);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (XmlDocument)
 };
 
+//==============================================================================
+/** Attempts to parse some XML text, returning a new XmlElement if it was valid.
+    If the parse fails, this will return a nullptr - if you need more information about
+    errors or more parsing options, see the XmlDocument class instead.
+    @see XmlDocument, parseXMLIfTagMatches
+*/
+std::unique_ptr<XmlElement> parseXML (const String& textToParse);
 
-#endif   // __JUCE_XMLDOCUMENT_JUCEHEADER__
+/** Attempts to parse some XML text, returning a new XmlElement if it was valid.
+    If the parse fails, this will return a nullptr - if you need more information about
+    errors or more parsing options, see the XmlDocument class instead.
+    @see XmlDocument, parseXMLIfTagMatches
+*/
+std::unique_ptr<XmlElement> parseXML (const File& fileToParse);
+
+/** Does an inexpensive check to see whether the top-level element has the given tag
+    name, and if that's true, does a full parse and returns the result.
+    If the outer tag doesn't match, or the XML has errors, this will return nullptr;
+    @see parseXML
+*/
+std::unique_ptr<XmlElement> parseXMLIfTagMatches (const String& textToParse, StringRef requiredTag);
+
+/** Does an inexpensive check to see whether the top-level element has the given tag
+    name, and if that's true, does a full parse and returns the result.
+    If the outer tag doesn't match, or the XML has errors, this will return nullptr;
+    @see parseXML
+*/
+std::unique_ptr<XmlElement> parseXMLIfTagMatches (const File& fileToParse, StringRef requiredTag);
+
+
+} // namespace juce

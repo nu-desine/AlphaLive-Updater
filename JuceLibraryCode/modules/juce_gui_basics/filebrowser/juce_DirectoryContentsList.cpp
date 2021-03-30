@@ -1,34 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-DirectoryContentsList::DirectoryContentsList (const FileFilter* const fileFilter_,
-                                              TimeSliceThread& thread_)
-   : fileFilter (fileFilter_),
-     thread (thread_),
-     fileTypeFlags (File::ignoreHiddenFiles | File::findFiles),
-     shouldStop (true)
+namespace juce
+{
+
+DirectoryContentsList::DirectoryContentsList (const FileFilter* f, TimeSliceThread& t)
+   : fileFilter (f), thread (t)
 {
 }
 
@@ -49,29 +48,29 @@ bool DirectoryContentsList::ignoresHiddenFiles() const
 }
 
 //==============================================================================
-const File& DirectoryContentsList::getDirectory() const
-{
-    return root;
-}
-
 void DirectoryContentsList::setDirectory (const File& directory,
                                           const bool includeDirectories,
                                           const bool includeFiles)
 {
-    jassert (includeDirectories || includeFiles); // you have to speciify at least one of these!
+    jassert (includeDirectories || includeFiles); // you have to specify at least one of these!
 
     if (directory != root)
     {
         clear();
         root = directory;
+        changed();
 
         // (this forces a refresh when setTypeFlags() is called, rather than triggering two refreshes)
         fileTypeFlags &= ~(File::findDirectories | File::findFiles);
     }
 
-    int newFlags = fileTypeFlags;
-    if (includeDirectories) newFlags |= File::findDirectories;  else newFlags &= ~File::findDirectories;
-    if (includeFiles)       newFlags |= File::findFiles;        else newFlags &= ~File::findFiles;
+    auto newFlags = fileTypeFlags;
+
+    if (includeDirectories) newFlags |= File::findDirectories;
+    else                    newFlags &= ~File::findDirectories;
+
+    if (includeFiles)       newFlags |= File::findFiles;
+    else                    newFlags &= ~File::findFiles;
 
     setTypeFlags (newFlags);
 }
@@ -96,7 +95,7 @@ void DirectoryContentsList::clear()
 {
     stopSearching();
 
-    if (files.size() > 0)
+    if (! files.isEmpty())
     {
         files.clear();
         changed();
@@ -105,28 +104,36 @@ void DirectoryContentsList::clear()
 
 void DirectoryContentsList::refresh()
 {
-    clear();
+    stopSearching();
+    wasEmpty = files.isEmpty();
+    files.clear();
 
     if (root.isDirectory())
     {
-        fileFindHandle = new DirectoryIterator (root, false, "*", fileTypeFlags);
+        fileFindHandle = std::make_unique<RangedDirectoryIterator> (root, false, "*", fileTypeFlags);
         shouldStop = false;
         thread.addTimeSliceClient (this);
     }
 }
 
-//==============================================================================
-int DirectoryContentsList::getNumFiles() const
+void DirectoryContentsList::setFileFilter (const FileFilter* newFileFilter)
 {
+    const ScopedLock sl (fileListLock);
+    fileFilter = newFileFilter;
+}
+
+//==============================================================================
+int DirectoryContentsList::getNumFiles() const noexcept
+{
+    const ScopedLock sl (fileListLock);
     return files.size();
 }
 
-bool DirectoryContentsList::getFileInfo (const int index,
-                                         FileInfo& result) const
+bool DirectoryContentsList::getFileInfo (const int index, FileInfo& result) const
 {
     const ScopedLock sl (fileListLock);
 
-    if (const FileInfo* const info = files [index])
+    if (auto* info = files [index])
     {
         result = *info;
         return true;
@@ -139,10 +146,10 @@ File DirectoryContentsList::getFile (const int index) const
 {
     const ScopedLock sl (fileListLock);
 
-    if (const FileInfo* const info = files [index])
+    if (auto* info = files [index])
         return root.getChildFile (info->filename);
 
-    return File::nonexistent;
+    return {};
 }
 
 bool DirectoryContentsList::contains (const File& targetFile) const
@@ -169,7 +176,7 @@ void DirectoryContentsList::changed()
 //==============================================================================
 int DirectoryContentsList::useTimeSlice()
 {
-    const uint32 startTime = Time::getApproximateMillisecondCounter();
+    auto startTime = Time::getApproximateMillisecondCounter();
     bool hasChanged = false;
 
     for (int i = 100; --i >= 0;)
@@ -196,15 +203,16 @@ bool DirectoryContentsList::checkNextFile (bool& hasChanged)
 {
     if (fileFindHandle != nullptr)
     {
-        bool fileFoundIsDir, isHidden, isReadOnly;
-        int64 fileSize;
-        Time modTime, creationTime;
-
-        if (fileFindHandle->next (&fileFoundIsDir, &isHidden, &fileSize,
-                                  &modTime, &creationTime, &isReadOnly))
+        if (*fileFindHandle != RangedDirectoryIterator())
         {
-            if (addFile (fileFindHandle->getFile(), fileFoundIsDir,
-                         fileSize, modTime, creationTime, isReadOnly))
+            const auto entry = *(*fileFindHandle)++;
+
+            if (addFile (entry.getFile(),
+                         entry.isDirectory(),
+                         entry.getFileSize(),
+                         entry.getModificationTime(),
+                         entry.getCreationTime(),
+                         entry.isReadOnly()))
             {
                 hasChanged = true;
             }
@@ -213,51 +221,54 @@ bool DirectoryContentsList::checkNextFile (bool& hasChanged)
         }
 
         fileFindHandle = nullptr;
+
+        if (! wasEmpty && files.isEmpty())
+            hasChanged = true;
     }
 
     return false;
 }
 
-int DirectoryContentsList::compareElements (const DirectoryContentsList::FileInfo* const first,
-                                            const DirectoryContentsList::FileInfo* const second)
-{
-   #if JUCE_WINDOWS
-    if (first->isDirectory != second->isDirectory)
-        return first->isDirectory ? -1 : 1;
-   #endif
-
-    return first->filename.compareIgnoreCase (second->filename);
-}
-
-bool DirectoryContentsList::addFile (const File& file,
-                                     const bool isDir,
+bool DirectoryContentsList::addFile (const File& file, const bool isDir,
                                      const int64 fileSize,
-                                     const Time& modTime,
-                                     const Time& creationTime,
+                                     Time modTime, Time creationTime,
                                      const bool isReadOnly)
 {
+    const ScopedLock sl (fileListLock);
+
     if (fileFilter == nullptr
          || ((! isDir) && fileFilter->isFileSuitable (file))
          || (isDir && fileFilter->isDirectorySuitable (file)))
     {
-        ScopedPointer <FileInfo> info (new FileInfo());
+        auto info = std::make_unique<FileInfo>();
 
-        info->filename = file.getFileName();
-        info->fileSize = fileSize;
+        info->filename         = file.getFileName();
+        info->fileSize         = fileSize;
         info->modificationTime = modTime;
-        info->creationTime = creationTime;
-        info->isDirectory = isDir;
-        info->isReadOnly = isReadOnly;
-
-        const ScopedLock sl (fileListLock);
+        info->creationTime     = creationTime;
+        info->isDirectory      = isDir;
+        info->isReadOnly       = isReadOnly;
 
         for (int i = files.size(); --i >= 0;)
             if (files.getUnchecked(i)->filename == info->filename)
                 return false;
 
-        files.addSorted (*this, info.release());
+        files.add (std::move (info));
+
+        std::sort (files.begin(), files.end(), [] (const FileInfo* a, const FileInfo* b)
+        {
+           #if JUCE_WINDOWS
+            if (a->isDirectory != b->isDirectory)
+                return a->isDirectory;
+           #endif
+
+            return a->filename.compareNatural (b->filename) < 0;
+        });
+
         return true;
     }
 
     return false;
 }
+
+} // namespace juce

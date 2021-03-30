@@ -1,106 +1,122 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_AUDIO_BASICS_JUCEHEADER__
-#define __JUCE_AUDIO_BASICS_JUCEHEADER__
 
-#include "../juce_core/juce_core.h"
+/*******************************************************************************
+ The block below describes the properties of this module, and is read by
+ the Projucer to automatically generate project code that uses it.
+ For details about the syntax and how to create or use a module, see the
+ JUCE Module Format.md file.
 
-//=============================================================================
-namespace juce
-{
 
-// START_AUTOINCLUDE buffers, effects, midi, sources, synthesisers
-#ifndef __JUCE_AUDIODATACONVERTERS_JUCEHEADER__
- #include "buffers/juce_AudioDataConverters.h"
-#endif
-#ifndef __JUCE_AUDIOSAMPLEBUFFER_JUCEHEADER__
- #include "buffers/juce_AudioSampleBuffer.h"
-#endif
-#ifndef __JUCE_FLOATVECTOROPERATIONS_JUCEHEADER__
- #include "buffers/juce_FloatVectorOperations.h"
-#endif
-#ifndef __JUCE_DECIBELS_JUCEHEADER__
- #include "effects/juce_Decibels.h"
-#endif
-#ifndef __JUCE_IIRFILTER_JUCEHEADER__
- #include "effects/juce_IIRFilter.h"
-#endif
-#ifndef __JUCE_LAGRANGEINTERPOLATOR_JUCEHEADER__
- #include "effects/juce_LagrangeInterpolator.h"
-#endif
-#ifndef __JUCE_REVERB_JUCEHEADER__
- #include "effects/juce_Reverb.h"
-#endif
-#ifndef __JUCE_MIDIBUFFER_JUCEHEADER__
- #include "midi/juce_MidiBuffer.h"
-#endif
-#ifndef __JUCE_MIDIFILE_JUCEHEADER__
- #include "midi/juce_MidiFile.h"
-#endif
-#ifndef __JUCE_MIDIKEYBOARDSTATE_JUCEHEADER__
- #include "midi/juce_MidiKeyboardState.h"
-#endif
-#ifndef __JUCE_MIDIMESSAGE_JUCEHEADER__
- #include "midi/juce_MidiMessage.h"
-#endif
-#ifndef __JUCE_MIDIMESSAGESEQUENCE_JUCEHEADER__
- #include "midi/juce_MidiMessageSequence.h"
-#endif
-#ifndef __JUCE_AUDIOSOURCE_JUCEHEADER__
- #include "sources/juce_AudioSource.h"
-#endif
-#ifndef __JUCE_BUFFERINGAUDIOSOURCE_JUCEHEADER__
- #include "sources/juce_BufferingAudioSource.h"
-#endif
-#ifndef __JUCE_CHANNELREMAPPINGAUDIOSOURCE_JUCEHEADER__
- #include "sources/juce_ChannelRemappingAudioSource.h"
-#endif
-#ifndef __JUCE_IIRFILTERAUDIOSOURCE_JUCEHEADER__
- #include "sources/juce_IIRFilterAudioSource.h"
-#endif
-#ifndef __JUCE_MIXERAUDIOSOURCE_JUCEHEADER__
- #include "sources/juce_MixerAudioSource.h"
-#endif
-#ifndef __JUCE_POSITIONABLEAUDIOSOURCE_JUCEHEADER__
- #include "sources/juce_PositionableAudioSource.h"
-#endif
-#ifndef __JUCE_RESAMPLINGAUDIOSOURCE_JUCEHEADER__
- #include "sources/juce_ResamplingAudioSource.h"
-#endif
-#ifndef __JUCE_REVERBAUDIOSOURCE_JUCEHEADER__
- #include "sources/juce_ReverbAudioSource.h"
-#endif
-#ifndef __JUCE_TONEGENERATORAUDIOSOURCE_JUCEHEADER__
- #include "sources/juce_ToneGeneratorAudioSource.h"
-#endif
-#ifndef __JUCE_SYNTHESISER_JUCEHEADER__
- #include "synthesisers/juce_Synthesiser.h"
-#endif
-// END_AUTOINCLUDE
+ BEGIN_JUCE_MODULE_DECLARATION
 
-}
+  ID:                 juce_audio_basics
+  vendor:             juce
+  version:            6.0.8
+  name:               JUCE audio and MIDI data classes
+  description:        Classes for audio buffer manipulation, midi message handling, synthesis, etc.
+  website:            http://www.juce.com/juce
+  license:            ISC
 
-#endif   // __JUCE_AUDIO_BASICS_JUCEHEADER__
+  dependencies:       juce_core
+  OSXFrameworks:      Accelerate
+  iOSFrameworks:      Accelerate
+
+ END_JUCE_MODULE_DECLARATION
+
+*******************************************************************************/
+
+
+#pragma once
+#define JUCE_AUDIO_BASICS_H_INCLUDED
+
+#include <juce_core/juce_core.h>
+
+//==============================================================================
+#undef Complex  // apparently some C libraries actually define these symbols (!)
+#undef Factor
+
+//==============================================================================
+#if JUCE_MINGW && ! defined (__SSE2__)
+ #define JUCE_USE_SSE_INTRINSICS 0
+#endif
+
+#ifndef JUCE_USE_SSE_INTRINSICS
+ #define JUCE_USE_SSE_INTRINSICS 1
+#endif
+
+#if ! JUCE_INTEL
+ #undef JUCE_USE_SSE_INTRINSICS
+#endif
+
+#if __ARM_NEON__ && ! (JUCE_USE_VDSP_FRAMEWORK || defined (JUCE_USE_ARM_NEON))
+ #define JUCE_USE_ARM_NEON 1
+#endif
+
+#if TARGET_IPHONE_SIMULATOR
+ #ifdef JUCE_USE_ARM_NEON
+  #undef JUCE_USE_ARM_NEON
+ #endif
+ #define JUCE_USE_ARM_NEON 0
+#endif
+
+//==============================================================================
+#include "buffers/juce_AudioDataConverters.h"
+#include "buffers/juce_FloatVectorOperations.h"
+#include "buffers/juce_AudioSampleBuffer.h"
+#include "buffers/juce_AudioChannelSet.h"
+#include "buffers/juce_AudioProcessLoadMeasurer.h"
+#include "utilities/juce_Decibels.h"
+#include "utilities/juce_IIRFilter.h"
+#include "utilities/juce_GenericInterpolator.h"
+#include "utilities/juce_Interpolators.h"
+#include "utilities/juce_SmoothedValue.h"
+#include "utilities/juce_Reverb.h"
+#include "utilities/juce_ADSR.h"
+#include "midi/juce_MidiMessage.h"
+#include "midi/juce_MidiBuffer.h"
+#include "midi/juce_MidiMessageSequence.h"
+#include "midi/juce_MidiFile.h"
+#include "midi/juce_MidiKeyboardState.h"
+#include "midi/juce_MidiRPN.h"
+#include "mpe/juce_MPEValue.h"
+#include "mpe/juce_MPENote.h"
+#include "mpe/juce_MPEZoneLayout.h"
+#include "mpe/juce_MPEInstrument.h"
+#include "mpe/juce_MPEMessages.h"
+#include "mpe/juce_MPESynthesiserBase.h"
+#include "mpe/juce_MPESynthesiserVoice.h"
+#include "mpe/juce_MPESynthesiser.h"
+#include "mpe/juce_MPEUtils.h"
+#include "sources/juce_AudioSource.h"
+#include "sources/juce_PositionableAudioSource.h"
+#include "sources/juce_BufferingAudioSource.h"
+#include "sources/juce_ChannelRemappingAudioSource.h"
+#include "sources/juce_IIRFilterAudioSource.h"
+#include "sources/juce_MemoryAudioSource.h"
+#include "sources/juce_MixerAudioSource.h"
+#include "sources/juce_ResamplingAudioSource.h"
+#include "sources/juce_ReverbAudioSource.h"
+#include "sources/juce_ToneGeneratorAudioSource.h"
+#include "synthesisers/juce_Synthesiser.h"
+#include "audio_play_head/juce_AudioPlayHead.h"

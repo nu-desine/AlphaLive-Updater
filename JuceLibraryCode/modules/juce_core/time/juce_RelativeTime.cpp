@@ -1,133 +1,157 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-RelativeTime::RelativeTime (const double secs) noexcept           : seconds (secs) {}
-RelativeTime::RelativeTime (const RelativeTime& other) noexcept   : seconds (other.seconds) {}
+namespace juce
+{
+
+RelativeTime::RelativeTime (const double secs) noexcept           : numSeconds (secs) {}
+RelativeTime::RelativeTime (const RelativeTime& other) noexcept   : numSeconds (other.numSeconds) {}
 RelativeTime::~RelativeTime() noexcept {}
 
 //==============================================================================
-const RelativeTime RelativeTime::milliseconds (const int milliseconds) noexcept   { return RelativeTime (milliseconds * 0.001); }
-const RelativeTime RelativeTime::milliseconds (const int64 milliseconds) noexcept { return RelativeTime (milliseconds * 0.001); }
-const RelativeTime RelativeTime::minutes (const double numberOfMinutes) noexcept  { return RelativeTime (numberOfMinutes * 60.0); }
-const RelativeTime RelativeTime::hours (const double numberOfHours) noexcept      { return RelativeTime (numberOfHours * (60.0 * 60.0)); }
-const RelativeTime RelativeTime::days (const double numberOfDays) noexcept        { return RelativeTime (numberOfDays  * (60.0 * 60.0 * 24.0)); }
-const RelativeTime RelativeTime::weeks (const double numberOfWeeks) noexcept      { return RelativeTime (numberOfWeeks * (60.0 * 60.0 * 24.0 * 7.0)); }
+RelativeTime RelativeTime::milliseconds (int milliseconds) noexcept         { return RelativeTime ((double) milliseconds * 0.001); }
+RelativeTime RelativeTime::milliseconds (int64 milliseconds) noexcept       { return RelativeTime ((double) milliseconds * 0.001); }
+RelativeTime RelativeTime::seconds (double s) noexcept                      { return RelativeTime (s); }
+RelativeTime RelativeTime::minutes (double numberOfMinutes) noexcept        { return RelativeTime (numberOfMinutes * 60.0); }
+RelativeTime RelativeTime::hours (double numberOfHours) noexcept            { return RelativeTime (numberOfHours * (60.0 * 60.0)); }
+RelativeTime RelativeTime::days (double numberOfDays) noexcept              { return RelativeTime (numberOfDays  * (60.0 * 60.0 * 24.0)); }
+RelativeTime RelativeTime::weeks (double numberOfWeeks) noexcept            { return RelativeTime (numberOfWeeks * (60.0 * 60.0 * 24.0 * 7.0)); }
 
 //==============================================================================
-int64 RelativeTime::inMilliseconds() const noexcept { return (int64) (seconds * 1000.0); }
-double RelativeTime::inMinutes() const noexcept     { return seconds / 60.0; }
-double RelativeTime::inHours() const noexcept       { return seconds / (60.0 * 60.0); }
-double RelativeTime::inDays() const noexcept        { return seconds / (60.0 * 60.0 * 24.0); }
-double RelativeTime::inWeeks() const noexcept       { return seconds / (60.0 * 60.0 * 24.0 * 7.0); }
+int64 RelativeTime::inMilliseconds() const noexcept { return (int64) (numSeconds * 1000.0); }
+double RelativeTime::inMinutes() const noexcept     { return numSeconds / 60.0; }
+double RelativeTime::inHours() const noexcept       { return numSeconds / (60.0 * 60.0); }
+double RelativeTime::inDays() const noexcept        { return numSeconds / (60.0 * 60.0 * 24.0); }
+double RelativeTime::inWeeks() const noexcept       { return numSeconds / (60.0 * 60.0 * 24.0 * 7.0); }
 
 //==============================================================================
-RelativeTime& RelativeTime::operator= (const RelativeTime& other) noexcept      { seconds = other.seconds; return *this; }
+RelativeTime& RelativeTime::operator= (const RelativeTime& other) noexcept      { numSeconds = other.numSeconds; return *this; }
 
-const RelativeTime& RelativeTime::operator+= (const RelativeTime& t) noexcept   { seconds += t.seconds; return *this; }
-const RelativeTime& RelativeTime::operator-= (const RelativeTime& t) noexcept   { seconds -= t.seconds; return *this; }
-const RelativeTime& RelativeTime::operator+= (const double secs) noexcept       { seconds += secs; return *this; }
-const RelativeTime& RelativeTime::operator-= (const double secs) noexcept       { seconds -= secs; return *this; }
+RelativeTime RelativeTime::operator+= (RelativeTime t) noexcept     { numSeconds += t.numSeconds; return *this; }
+RelativeTime RelativeTime::operator-= (RelativeTime t) noexcept     { numSeconds -= t.numSeconds; return *this; }
+RelativeTime RelativeTime::operator+= (double secs) noexcept        { numSeconds += secs; return *this; }
+RelativeTime RelativeTime::operator-= (double secs) noexcept        { numSeconds -= secs; return *this; }
 
-RelativeTime operator+ (const RelativeTime& t1, const RelativeTime& t2) noexcept   { RelativeTime t (t1); return t += t2; }
-RelativeTime operator- (const RelativeTime& t1, const RelativeTime& t2) noexcept   { RelativeTime t (t1); return t -= t2; }
+JUCE_API RelativeTime JUCE_CALLTYPE operator+ (RelativeTime t1, RelativeTime t2) noexcept  { return t1 += t2; }
+JUCE_API RelativeTime JUCE_CALLTYPE operator- (RelativeTime t1, RelativeTime t2) noexcept  { return t1 -= t2; }
 
-bool operator== (const RelativeTime& t1, const RelativeTime& t2) noexcept       { return t1.inSeconds() == t2.inSeconds(); }
-bool operator!= (const RelativeTime& t1, const RelativeTime& t2) noexcept       { return t1.inSeconds() != t2.inSeconds(); }
-bool operator>  (const RelativeTime& t1, const RelativeTime& t2) noexcept       { return t1.inSeconds() >  t2.inSeconds(); }
-bool operator<  (const RelativeTime& t1, const RelativeTime& t2) noexcept       { return t1.inSeconds() <  t2.inSeconds(); }
-bool operator>= (const RelativeTime& t1, const RelativeTime& t2) noexcept       { return t1.inSeconds() >= t2.inSeconds(); }
-bool operator<= (const RelativeTime& t1, const RelativeTime& t2) noexcept       { return t1.inSeconds() <= t2.inSeconds(); }
+JUCE_API bool JUCE_CALLTYPE operator== (RelativeTime t1, RelativeTime t2) noexcept       { return t1.inSeconds() == t2.inSeconds(); }
+JUCE_API bool JUCE_CALLTYPE operator!= (RelativeTime t1, RelativeTime t2) noexcept       { return t1.inSeconds() != t2.inSeconds(); }
+JUCE_API bool JUCE_CALLTYPE operator>  (RelativeTime t1, RelativeTime t2) noexcept       { return t1.inSeconds() >  t2.inSeconds(); }
+JUCE_API bool JUCE_CALLTYPE operator<  (RelativeTime t1, RelativeTime t2) noexcept       { return t1.inSeconds() <  t2.inSeconds(); }
+JUCE_API bool JUCE_CALLTYPE operator>= (RelativeTime t1, RelativeTime t2) noexcept       { return t1.inSeconds() >= t2.inSeconds(); }
+JUCE_API bool JUCE_CALLTYPE operator<= (RelativeTime t1, RelativeTime t2) noexcept       { return t1.inSeconds() <= t2.inSeconds(); }
 
 //==============================================================================
+static String translateTimeField (int n, const char* singular, const char* plural)
+{
+    return TRANS (n == 1 ? singular : plural).replace (n == 1 ? "1" : "2", String (n));
+}
+
+static String describeYears   (int n)      { return translateTimeField (n, NEEDS_TRANS("1 year"),  NEEDS_TRANS("2 years")); }
+static String describeMonths  (int n)      { return translateTimeField (n, NEEDS_TRANS("1 month"), NEEDS_TRANS("2 months")); }
+static String describeWeeks   (int n)      { return translateTimeField (n, NEEDS_TRANS("1 week"),  NEEDS_TRANS("2 weeks")); }
+static String describeDays    (int n)      { return translateTimeField (n, NEEDS_TRANS("1 day"),   NEEDS_TRANS("2 days")); }
+static String describeHours   (int n)      { return translateTimeField (n, NEEDS_TRANS("1 hr"),    NEEDS_TRANS("2 hrs")); }
+static String describeMinutes (int n)      { return translateTimeField (n, NEEDS_TRANS("1 min"),   NEEDS_TRANS("2 mins")); }
+static String describeSeconds (int n)      { return translateTimeField (n, NEEDS_TRANS("1 sec"),   NEEDS_TRANS("2 secs")); }
+
+String RelativeTime::getApproximateDescription() const
+{
+    if (numSeconds <= 1.0)
+        return "< 1 sec";
+
+    auto weeks = (int) inWeeks();
+
+    if (weeks > 52)   return describeYears (weeks / 52);
+    if (weeks > 8)    return describeMonths ((weeks * 12) / 52);
+    if (weeks > 1)    return describeWeeks (weeks);
+
+    auto days = (int) inWeeks();
+
+    if (days > 1)
+        return describeDays (days);
+
+    auto hours = (int) inHours();
+
+    if (hours > 0)
+        return describeHours (hours);
+
+    auto minutes = (int) inMinutes();
+
+    if (minutes > 0)
+        return describeMinutes (minutes);
+
+    return describeSeconds ((int) numSeconds);
+}
+
 String RelativeTime::getDescription (const String& returnValueForZeroTime) const
 {
-    if (seconds < 0.001 && seconds > -0.001)
+    if (std::abs (numSeconds) < 0.001)
         return returnValueForZeroTime;
 
-    String result;
-    result.preallocateBytes (32);
+    if (numSeconds < 0)
+        return "-" + RelativeTime (-numSeconds).getDescription();
 
-    if (seconds < 0)
-        result << '-';
+    StringArray fields;
 
-    int fieldsShown = 0;
-    int n = std::abs ((int) inWeeks());
+    auto n = (int) inWeeks();
+
     if (n > 0)
-    {
-        result << n << TRANS (n == 1 ? " week "
-                                     : " weeks ");
-        ++fieldsShown;
-    }
+        fields.add (describeWeeks (n));
 
-    n = std::abs ((int) inDays()) % 7;
+    n = ((int) inDays()) % 7;
+
     if (n > 0)
-    {
-        result << n << TRANS (n == 1 ? " day "
-                                     : " days ");
-        ++fieldsShown;
-    }
+        fields.add (describeDays (n));
 
-    if (fieldsShown < 2)
+    if (fields.size() < 2)
     {
-        n = std::abs ((int) inHours()) % 24;
+        n = ((int) inHours()) % 24;
+
         if (n > 0)
-        {
-            result << n << TRANS (n == 1 ? " hr "
-                                         : " hrs ");
-            ++fieldsShown;
-        }
+            fields.add (describeHours (n));
 
-        if (fieldsShown < 2)
+        if (fields.size() < 2)
         {
-            n = std::abs ((int) inMinutes()) % 60;
+            n = ((int) inMinutes()) % 60;
+
             if (n > 0)
-            {
-                result << n << TRANS (n == 1 ? " min "
-                                             : " mins ");
-                ++fieldsShown;
-            }
+                fields.add (describeMinutes (n));
 
-            if (fieldsShown < 2)
+            if (fields.size() < 2)
             {
-                n = std::abs ((int) inSeconds()) % 60;
+                n = ((int) inSeconds()) % 60;
+
                 if (n > 0)
-                {
-                    result << n << TRANS (n == 1 ? " sec "
-                                                 : " secs ");
-                    ++fieldsShown;
-                }
+                    fields.add (describeSeconds (n));
 
-                if (fieldsShown == 0)
-                {
-                    n = std::abs ((int) inMilliseconds()) % 1000;
-                    if (n > 0)
-                        result << n << TRANS (" ms");
-                }
+                if (fields.isEmpty())
+                    fields.add (String (((int) inMilliseconds()) % 1000) + " " + TRANS ("ms"));
             }
         }
     }
 
-    return result.trimEnd();
+    return fields.joinIntoString (" ");
 }
+
+} // namespace juce

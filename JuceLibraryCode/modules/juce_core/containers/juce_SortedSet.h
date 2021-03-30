@@ -1,39 +1,29 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_SORTEDSET_JUCEHEADER__
-#define __JUCE_SORTEDSET_JUCEHEADER__
+namespace juce
+{
 
-#include "juce_ArrayAllocationBase.h"
-#include "../threads/juce_CriticalSection.h"
-
-#if JUCE_MSVC
-  #pragma warning (push)
-  #pragma warning (disable: 4512)
-#endif
-
+JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4512)
 
 //==============================================================================
 /**
@@ -56,6 +46,8 @@
     TypeOfCriticalSectionToUse parameter, instead of the default DummyCriticalSection.
 
     @see Array, OwnedArray, ReferenceCountedArray, StringArray, CriticalSection
+
+    @tags{Core}
 */
 template <class ElementType, class TypeOfCriticalSectionToUse = DummyCriticalSection>
 class SortedSet
@@ -63,31 +55,22 @@ class SortedSet
 public:
     //==============================================================================
     /** Creates an empty set. */
-    SortedSet() noexcept
-    {
-    }
+    SortedSet() = default;
 
-    /** Creates a copy of another set.
-        @param other    the set to copy
-    */
-    SortedSet (const SortedSet& other)
-        : data (other.data)
-    {
-    }
+    /** Creates a copy of another set. */
+    SortedSet (const SortedSet&) = default;
+
+    /** Creates a copy of another set. */
+    SortedSet (SortedSet&&) noexcept = default;
+
+    /** Makes a copy of another set. */
+    SortedSet& operator= (const SortedSet&) = default;
+
+    /** Makes a copy of another set. */
+    SortedSet& operator= (SortedSet&&) noexcept = default;
 
     /** Destructor. */
-    ~SortedSet() noexcept
-    {
-    }
-
-    /** Copies another set over this one.
-        @param other    the set to copy
-    */
-    SortedSet& operator= (const SortedSet& other) noexcept
-    {
-        data = other.data;
-        return *this;
-    }
+    ~SortedSet() = default;
 
     //==============================================================================
     /** Compares this set to another one.
@@ -123,7 +106,6 @@ public:
     }
 
     /** Removes all elements from the set without freeing the array's allocated storage.
-
         @see clear
     */
     void clearQuick() noexcept
@@ -132,11 +114,16 @@ public:
     }
 
     //==============================================================================
-    /** Returns the current number of elements in the set.
-    */
+    /** Returns the current number of elements in the set. */
     inline int size() const noexcept
     {
         return data.size();
+    }
+
+    /** Returns true if the set is empty, false otherwise. */
+    inline bool isEmpty() const noexcept
+    {
+        return size() == 0;
     }
 
     /** Returns one of the elements in the set.
@@ -176,13 +163,21 @@ public:
 
         @param index    the index of the element being requested (0 is the first element in the array)
     */
-    inline ElementType& getReference (const int index) const noexcept
+    inline ElementType& getReference (const int index) noexcept
+    {
+        return data.getReference (index);
+    }
+
+    /** Returns a direct reference to one of the elements in the set, without checking the index passed in.
+
+        @param index    the index of the element being requested (0 is the first element in the array)
+    */
+    inline const ElementType& getReference (const int index) const noexcept
     {
         return data.getReference (index);
     }
 
     /** Returns the first element in the set, or 0 if the set is empty.
-
         @see operator[], getUnchecked, getLast
     */
     inline ElementType getFirst() const noexcept
@@ -191,7 +186,6 @@ public:
     }
 
     /** Returns the last element in the set, or 0 if the set is empty.
-
         @see operator[], getUnchecked, getFirst
     */
     inline ElementType getLast() const noexcept
@@ -203,7 +197,7 @@ public:
     /** Returns a pointer to the first element in the set.
         This method is provided for compatibility with standard C++ iteration mechanisms.
     */
-    inline ElementType* begin() const noexcept
+    inline const ElementType* begin() const noexcept
     {
         return data.begin();
     }
@@ -211,7 +205,7 @@ public:
     /** Returns a pointer to the element which follows the last element in the set.
         This method is provided for compatibility with standard C++ iteration mechanisms.
     */
-    inline ElementType* end() const noexcept
+    inline const ElementType* end() const noexcept
     {
         return data.end();
     }
@@ -240,11 +234,12 @@ public:
             if (elementToLookFor == data.getReference (s))
                 return s;
 
-            const int halfway = (s + e) / 2;
+            auto halfway = (s + e) / 2;
 
             if (halfway == s)
                 return -1;
-            else if (elementToLookFor < data.getReference (halfway))
+
+            if (elementToLookFor < data.getReference (halfway))
                 e = halfway;
             else
                 s = halfway;
@@ -282,15 +277,16 @@ public:
 
         while (s < e)
         {
-            ElementType& elem = data.getReference (s);
+            auto& elem = data.getReference (s);
+
             if (newElement == elem)
             {
                 elem = newElement; // force an update in case operator== permits differences.
                 return false;
             }
 
-            const int halfway = (s + e) / 2;
-            const bool isBeforeHalfway = (newElement < data.getReference (halfway));
+            auto halfway = (s + e) / 2;
+            bool isBeforeHalfway = (newElement < data.getReference (halfway));
 
             if (halfway == s)
             {
@@ -299,7 +295,8 @@ public:
 
                 break;
             }
-            else if (isBeforeHalfway)
+
+            if (isBeforeHalfway)
                 e = halfway;
             else
                 s = halfway;
@@ -339,25 +336,22 @@ public:
                  int numElementsToAdd = -1) noexcept
     {
         const typename OtherSetType::ScopedLockType lock1 (setToAddFrom.getLock());
+        const ScopedLockType lock2 (getLock());
+        jassert (this != &setToAddFrom);
 
+        if (this != &setToAddFrom)
         {
-            const ScopedLockType lock2 (getLock());
-            jassert (this != &setToAddFrom);
-
-            if (this != &setToAddFrom)
+            if (startIndex < 0)
             {
-                if (startIndex < 0)
-                {
-                    jassertfalse;
-                    startIndex = 0;
-                }
-
-                if (numElementsToAdd < 0 || startIndex + numElementsToAdd > setToAddFrom.size())
-                    numElementsToAdd = setToAddFrom.size() - startIndex;
-
-                if (numElementsToAdd > 0)
-                    addArray (&setToAddFrom.data.getReference (startIndex), numElementsToAdd);
+                jassertfalse;
+                startIndex = 0;
             }
+
+            if (numElementsToAdd < 0 || startIndex + numElementsToAdd > setToAddFrom.size())
+                numElementsToAdd = setToAddFrom.size() - startIndex;
+
+            if (numElementsToAdd > 0)
+                addArray (&setToAddFrom.data.getReference (startIndex), numElementsToAdd);
         }
     }
 
@@ -373,7 +367,7 @@ public:
     */
     ElementType remove (const int indexToRemove) noexcept
     {
-        return data.remove (indexToRemove);
+        return data.removeAndReturn (indexToRemove);
     }
 
     /** Removes an item from the set.
@@ -383,7 +377,7 @@ public:
         @param valueToRemove   the object to try to remove
         @see remove, removeRange
     */
-    void removeValue (const ElementType valueToRemove) noexcept
+    void removeValue (const ElementType& valueToRemove) noexcept
     {
         const ScopedLockType lock (getLock());
         data.remove (indexOf (valueToRemove));
@@ -404,7 +398,7 @@ public:
         {
             clear();
         }
-        else if (otherSet.size() > 0)
+        else if (! otherSet.isEmpty())
         {
             for (int i = data.size(); --i >= 0;)
                 if (otherSet.contains (data.getReference (i)))
@@ -427,7 +421,7 @@ public:
 
         if (this != &otherSet)
         {
-            if (otherSet.size() <= 0)
+            if (otherSet.isEmpty())
             {
                 clear();
             }
@@ -445,9 +439,10 @@ public:
         If you need to exchange two arrays, this is vastly quicker than using copy-by-value
         because it just swaps their internal pointers.
     */
-    void swapWith (SortedSet& otherSet) noexcept
+    template <class OtherSetType>
+    void swapWith (OtherSetType& otherSet) noexcept
     {
-        data.swapWithArray (otherSet.data);
+        data.swapWith (otherSet.data);
     }
 
     //==============================================================================
@@ -481,16 +476,14 @@ public:
     inline const TypeOfCriticalSectionToUse& getLock() const noexcept      { return data.getLock(); }
 
     /** Returns the type of scoped lock to use for locking this array */
-    typedef typename TypeOfCriticalSectionToUse::ScopedLockType ScopedLockType;
+    using ScopedLockType = typename TypeOfCriticalSectionToUse::ScopedLockType;
 
 
 private:
     //==============================================================================
-    Array <ElementType, TypeOfCriticalSectionToUse> data;
+    Array<ElementType, TypeOfCriticalSectionToUse> data;
 };
 
-#if JUCE_MSVC
-  #pragma warning (pop)
-#endif
+JUCE_END_IGNORE_WARNINGS_MSVC
 
-#endif   // __JUCE_SORTEDSET_JUCEHEADER__
+} // namespace juce

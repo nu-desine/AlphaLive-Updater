@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_LOCALISEDSTRINGS_JUCEHEADER__
-#define __JUCE_LOCALISEDSTRINGS_JUCEHEADER__
-
-#include "juce_StringPairArray.h"
-#include "../files/juce_File.h"
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -67,10 +61,12 @@
     printSomething (TRANS("hello"));
     @endcode
 
-    This macro is used in the Juce classes themselves, so your application has a chance to
-    intercept and translate any internal Juce text strings that might be shown. (You can easily
-    get a list of all the messages by searching for the TRANS() macro in the Juce source
+    This macro is used in the JUCE classes themselves, so your application has a chance to
+    intercept and translate any internal JUCE text strings that might be shown. (You can easily
+    get a list of all the messages by searching for the TRANS() macro in the JUCE source
     code).
+
+    @tags{Core}
 */
 class JUCE_API  LocalisedStrings
 {
@@ -81,14 +77,17 @@ public:
         When you create one of these, you can call setCurrentMappings() to make it
         the set of mappings that the system's using.
     */
-    LocalisedStrings (const String& fileContents);
+    LocalisedStrings (const String& fileContents, bool ignoreCaseOfKeys);
 
     /** Creates a set of translations from a file.
 
         When you create one of these, you can call setCurrentMappings() to make it
         the set of mappings that the system's using.
     */
-    LocalisedStrings (const File& fileToLoad);
+    LocalisedStrings (const File& fileToLoad, bool ignoreCaseOfKeys);
+
+    LocalisedStrings (const LocalisedStrings&);
+    LocalisedStrings& operator= (const LocalisedStrings&);
 
     /** Destructor. */
     ~LocalisedStrings();
@@ -97,7 +96,7 @@ public:
     /** Selects the current set of mappings to be used by the system.
 
         The object you pass in will be automatically deleted when no longer needed, so
-        don't keep a pointer to it. You can also pass in zero to remove the current
+        don't keep a pointer to it. You can also pass in nullptr to remove the current
         mappings.
 
         See also the TRANS() macro, which uses the current set to do its translation.
@@ -109,7 +108,7 @@ public:
     /** Returns the currently selected set of mappings.
 
         This is the object that was last passed to setCurrentMappings(). It may
-        be 0 if none has been created.
+        be nullptr if none has been created.
     */
     static LocalisedStrings* getCurrentMappings();
 
@@ -162,24 +161,38 @@ public:
         countries: fr be mc ch lu
         @endcode
 
-        The country codes are supposed to be 2-character ISO complient codes.
+        The country codes are supposed to be 2-character ISO compliant codes.
     */
     const StringArray& getCountryCodes() const            { return countryCodes; }
 
+    /** Provides access to the actual list of mappings. */
+    const StringPairArray& getMappings() const            { return translations; }
 
     //==============================================================================
-    /** Indicates whether to use a case-insensitive search when looking up a string.
-        This defaults to true.
+    /** Adds and merges another set of translations into this set.
+
+        Note that the language name and country codes of the new LocalisedStrings
+        object must match that of this object - an assertion will be thrown if they
+        don't match.
+
+        Any existing values will have their mappings overwritten by the new ones.
     */
-    void setIgnoresCase (bool shouldIgnoreCase);
+    void addStrings (const LocalisedStrings&);
+
+    /** Gives this object a set of strings to use as a fallback if a string isn't found.
+        The object that is passed-in will be owned and deleted by this object
+        when no longer needed. It can be nullptr to clear the existing fallback object.
+    */
+    void setFallback (LocalisedStrings* fallbackStrings);
 
 private:
     //==============================================================================
     String languageName;
     StringArray countryCodes;
     StringPairArray translations;
+    std::unique_ptr<LocalisedStrings> fallback;
 
-    void loadFromText (const String& fileContents);
+    void loadFromText (const String&, bool ignoreCase);
 
     JUCE_LEAK_DETECTOR (LocalisedStrings)
 };
@@ -195,20 +208,33 @@ private:
  #define TRANS(stringLiteral) juce::translate (stringLiteral)
 #endif
 
+/** A dummy version of the TRANS macro, used to indicate a string literal that should be
+    added to the translation file by source-code scanner tools.
+
+    Wrapping a string literal in this macro has no effect, but by using it around strings
+    that your app needs to translate at a later stage, it lets automatic code-scanning tools
+    find this string and add it to the list of strings that need translation.
+*/
+#define NEEDS_TRANS(stringLiteral) (stringLiteral)
+
 /** Uses the LocalisedStrings class to translate the given string literal.
     @see LocalisedStrings
 */
-String translate (const String& stringLiteral);
+JUCE_API String translate (const String& stringLiteral);
 
 /** Uses the LocalisedStrings class to translate the given string literal.
     @see LocalisedStrings
 */
-String translate (const char* stringLiteral);
+JUCE_API String translate (const char* stringLiteral);
 
 /** Uses the LocalisedStrings class to translate the given string literal.
     @see LocalisedStrings
 */
-String translate (const String& stringLiteral, const String& resultIfNotFound);
+JUCE_API String translate (CharPointer_UTF8 stringLiteral);
 
+/** Uses the LocalisedStrings class to translate the given string literal.
+    @see LocalisedStrings
+*/
+JUCE_API String translate (const String& stringLiteral, const String& resultIfNotFound);
 
-#endif   // __JUCE_LOCALISEDSTRINGS_JUCEHEADER__
+} // namespace juce

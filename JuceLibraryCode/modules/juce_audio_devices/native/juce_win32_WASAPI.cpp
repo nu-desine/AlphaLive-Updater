@@ -1,27 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
 
 #ifndef JUCE_WASAPI_LOGGING
  #define JUCE_WASAPI_LOGGING 0
@@ -33,9 +33,9 @@ namespace WasapiClasses
 
 void logFailure (HRESULT hr)
 {
-    (void) hr;
-    jassert (hr != 0x800401f0); // If you hit this, it means you're trying to call from
-                                // a thread which hasn't been initialised with CoInitialize().
+    ignoreUnused (hr);
+    jassert (hr != (HRESULT) 0x800401f0); // If you hit this, it means you're trying to call from
+                                          // a thread which hasn't been initialised with CoInitialize().
 
    #if JUCE_WASAPI_LOGGING
     if (FAILED (hr))
@@ -44,36 +44,39 @@ void logFailure (HRESULT hr)
 
         switch (hr)
         {
-            case E_POINTER:                                 m = "E_POINTER"; break;
-            case E_INVALIDARG:                              m = "E_INVALIDARG"; break;
-            case AUDCLNT_E_NOT_INITIALIZED:                 m = "AUDCLNT_E_NOT_INITIALIZED"; break;
-            case AUDCLNT_E_ALREADY_INITIALIZED:             m = "AUDCLNT_E_ALREADY_INITIALIZED"; break;
-            case AUDCLNT_E_WRONG_ENDPOINT_TYPE:             m = "AUDCLNT_E_WRONG_ENDPOINT_TYPE"; break;
-            case AUDCLNT_E_DEVICE_INVALIDATED:              m = "AUDCLNT_E_DEVICE_INVALIDATED"; break;
-            case AUDCLNT_E_NOT_STOPPED:                     m = "AUDCLNT_E_NOT_STOPPED"; break;
-            case AUDCLNT_E_BUFFER_TOO_LARGE:                m = "AUDCLNT_E_BUFFER_TOO_LARGE"; break;
-            case AUDCLNT_E_OUT_OF_ORDER:                    m = "AUDCLNT_E_OUT_OF_ORDER"; break;
-            case AUDCLNT_E_UNSUPPORTED_FORMAT:              m = "AUDCLNT_E_UNSUPPORTED_FORMAT"; break;
-            case AUDCLNT_E_INVALID_SIZE:                    m = "AUDCLNT_E_INVALID_SIZE"; break;
-            case AUDCLNT_E_DEVICE_IN_USE:                   m = "AUDCLNT_E_DEVICE_IN_USE"; break;
-            case AUDCLNT_E_BUFFER_OPERATION_PENDING:        m = "AUDCLNT_E_BUFFER_OPERATION_PENDING"; break;
-            case AUDCLNT_E_THREAD_NOT_REGISTERED:           m = "AUDCLNT_E_THREAD_NOT_REGISTERED"; break;
-            case AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED:      m = "AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED"; break;
-            case AUDCLNT_E_ENDPOINT_CREATE_FAILED:          m = "AUDCLNT_E_ENDPOINT_CREATE_FAILED"; break;
-            case AUDCLNT_E_SERVICE_NOT_RUNNING:             m = "AUDCLNT_E_SERVICE_NOT_RUNNING"; break;
-            case AUDCLNT_E_EVENTHANDLE_NOT_EXPECTED:        m = "AUDCLNT_E_EVENTHANDLE_NOT_EXPECTED"; break;
-            case AUDCLNT_E_EXCLUSIVE_MODE_ONLY:             m = "AUDCLNT_E_EXCLUSIVE_MODE_ONLY"; break;
-            case AUDCLNT_E_BUFDURATION_PERIOD_NOT_EQUAL:    m = "AUDCLNT_E_BUFDURATION_PERIOD_NOT_EQUAL"; break;
-            case AUDCLNT_E_EVENTHANDLE_NOT_SET:             m = "AUDCLNT_E_EVENTHANDLE_NOT_SET"; break;
-            case AUDCLNT_E_INCORRECT_BUFFER_SIZE:           m = "AUDCLNT_E_INCORRECT_BUFFER_SIZE"; break;
-            case AUDCLNT_E_BUFFER_SIZE_ERROR:               m = "AUDCLNT_E_BUFFER_SIZE_ERROR"; break;
-            case AUDCLNT_E_CPUUSAGE_EXCEEDED:               m = "AUDCLNT_E_CPUUSAGE_EXCEEDED"; break;
-            case AUDCLNT_E_BUFFER_ERROR:                    m = "AUDCLNT_E_BUFFER_ERROR"; break;
-            case AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED:         m = "AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED"; break;
-            case AUDCLNT_E_INVALID_DEVICE_PERIOD:           m = "AUDCLNT_E_INVALID_DEVICE_PERIOD"; break;
-            case AUDCLNT_S_BUFFER_EMPTY:                    m = "AUDCLNT_S_BUFFER_EMPTY"; break;
-            case AUDCLNT_S_THREAD_ALREADY_REGISTERED:       m = "AUDCLNT_S_THREAD_ALREADY_REGISTERED"; break;
-            default:                                        break;
+            case E_POINTER:     m = "E_POINTER"; break;
+            case E_INVALIDARG:  m = "E_INVALIDARG"; break;
+            case E_NOINTERFACE: m = "E_NOINTERFACE"; break;
+
+            #define JUCE_WASAPI_ERR(desc, n) \
+                case MAKE_HRESULT(1, 0x889, n): m = #desc; break;
+
+            JUCE_WASAPI_ERR (AUDCLNT_E_NOT_INITIALIZED, 0x001)
+            JUCE_WASAPI_ERR (AUDCLNT_E_ALREADY_INITIALIZED, 0x002)
+            JUCE_WASAPI_ERR (AUDCLNT_E_WRONG_ENDPOINT_TYPE, 0x003)
+            JUCE_WASAPI_ERR (AUDCLNT_E_DEVICE_INVALIDATED, 0x004)
+            JUCE_WASAPI_ERR (AUDCLNT_E_NOT_STOPPED, 0x005)
+            JUCE_WASAPI_ERR (AUDCLNT_E_BUFFER_TOO_LARGE, 0x006)
+            JUCE_WASAPI_ERR (AUDCLNT_E_OUT_OF_ORDER, 0x007)
+            JUCE_WASAPI_ERR (AUDCLNT_E_UNSUPPORTED_FORMAT, 0x008)
+            JUCE_WASAPI_ERR (AUDCLNT_E_INVALID_SIZE, 0x009)
+            JUCE_WASAPI_ERR (AUDCLNT_E_DEVICE_IN_USE, 0x00a)
+            JUCE_WASAPI_ERR (AUDCLNT_E_BUFFER_OPERATION_PENDING, 0x00b)
+            JUCE_WASAPI_ERR (AUDCLNT_E_THREAD_NOT_REGISTERED, 0x00c)
+            JUCE_WASAPI_ERR (AUDCLNT_E_EXCLUSIVE_MODE_NOT_ALLOWED, 0x00e)
+            JUCE_WASAPI_ERR (AUDCLNT_E_ENDPOINT_CREATE_FAILED, 0x00f)
+            JUCE_WASAPI_ERR (AUDCLNT_E_SERVICE_NOT_RUNNING, 0x010)
+            JUCE_WASAPI_ERR (AUDCLNT_E_EVENTHANDLE_NOT_EXPECTED, 0x011)
+            JUCE_WASAPI_ERR (AUDCLNT_E_EXCLUSIVE_MODE_ONLY, 0x012)
+            JUCE_WASAPI_ERR (AUDCLNT_E_BUFDURATION_PERIOD_NOT_EQUAL, 0x013)
+            JUCE_WASAPI_ERR (AUDCLNT_E_EVENTHANDLE_NOT_SET, 0x014)
+            JUCE_WASAPI_ERR (AUDCLNT_E_INCORRECT_BUFFER_SIZE, 0x015)
+            JUCE_WASAPI_ERR (AUDCLNT_E_BUFFER_SIZE_ERROR, 0x016)
+            JUCE_WASAPI_ERR (AUDCLNT_E_CPUUSAGE_EXCEEDED, 0x017)
+            JUCE_WASAPI_ERR (AUDCLNT_E_BUFFER_ERROR, 0x018)
+            JUCE_WASAPI_ERR (AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED, 0x019)
+            JUCE_WASAPI_ERR (AUDCLNT_E_INVALID_DEVICE_PERIOD, 0x020)
+            default: break;
         }
 
         Logger::writeToLog ("WASAPI error: " + (m != nullptr ? String (m)
@@ -91,65 +94,251 @@ bool check (HRESULT hr)
 }
 
 //==============================================================================
-namespace
-{
-    enum EDataFlow
-    {
-        eRender = 0,
-        eCapture = (eRender + 1),
-        eAll = (eCapture + 1)
-    };
-
-    enum { DEVICE_STATE_ACTIVE = 1 };
-
-    struct __declspec (uuid ("D666063F-1587-4E43-81F1-B948E807363F")) IMMDevice : public IUnknown
-    {
-        virtual HRESULT STDMETHODCALLTYPE Activate(REFIID, DWORD, PROPVARIANT*, void**) = 0;
-        virtual HRESULT STDMETHODCALLTYPE OpenPropertyStore(DWORD, IPropertyStore**) = 0;
-        virtual HRESULT STDMETHODCALLTYPE GetId(LPWSTR*) = 0;
-        virtual HRESULT STDMETHODCALLTYPE GetState(DWORD*) = 0;
-    };
-
-    struct __declspec (uuid ("1BE09788-6894-4089-8586-9A2A6C265AC5")) IMMEndpoint : public IUnknown
-    {
-        virtual HRESULT STDMETHODCALLTYPE GetDataFlow(EDataFlow*) = 0;
-    };
-
-    struct IMMDeviceCollection : public IUnknown
-    {
-        virtual HRESULT STDMETHODCALLTYPE GetCount(UINT*) = 0;
-        virtual HRESULT STDMETHODCALLTYPE Item(UINT, IMMDevice**) = 0;
-    };
-
-    enum ERole
-    {
-        eConsole = 0,
-        eMultimedia = (eConsole + 1),
-        eCommunications = (eMultimedia + 1)
-    };
-
-    struct __declspec (uuid ("7991EEC9-7E89-4D85-8390-6C703CEC60C0")) IMMNotificationClient : public IUnknown
-    {
-        virtual HRESULT STDMETHODCALLTYPE OnDeviceStateChanged(LPCWSTR, DWORD) = 0;
-        virtual HRESULT STDMETHODCALLTYPE OnDeviceAdded(LPCWSTR) = 0;
-        virtual HRESULT STDMETHODCALLTYPE OnDeviceRemoved(LPCWSTR) = 0;
-        virtual HRESULT STDMETHODCALLTYPE OnDefaultDeviceChanged(EDataFlow, ERole, LPCWSTR) = 0;
-        virtual HRESULT STDMETHODCALLTYPE OnPropertyValueChanged(LPCWSTR, const PROPERTYKEY) = 0;
-    };
-
-    struct __declspec (uuid ("A95664D2-9614-4F35-A746-DE8DB63617E6")) IMMDeviceEnumerator : public IUnknown
-    {
-        virtual HRESULT STDMETHODCALLTYPE EnumAudioEndpoints(EDataFlow, DWORD, IMMDeviceCollection**) = 0;
-        virtual HRESULT STDMETHODCALLTYPE GetDefaultAudioEndpoint(EDataFlow, ERole, IMMDevice**) = 0;
-        virtual HRESULT STDMETHODCALLTYPE GetDevice(LPCWSTR, IMMDevice**) = 0;
-        virtual HRESULT STDMETHODCALLTYPE RegisterEndpointNotificationCallback(IMMNotificationClient*) = 0;
-        virtual HRESULT STDMETHODCALLTYPE UnregisterEndpointNotificationCallback(IMMNotificationClient*) = 0;
-    };
-
-    struct __declspec (uuid ("BCDE0395-E52F-467C-8E3D-C4579291692E")) MMDeviceEnumerator;
 }
 
-String getDeviceID (IMMDevice* const device)
+#if JUCE_MINGW
+ struct PROPERTYKEY
+ {
+    GUID fmtid;
+    DWORD pid;
+ };
+
+ WINOLEAPI PropVariantClear (PROPVARIANT*);
+#endif
+
+#if JUCE_MINGW && defined (KSDATAFORMAT_SUBTYPE_PCM)
+ #undef KSDATAFORMAT_SUBTYPE_PCM
+ #undef KSDATAFORMAT_SUBTYPE_IEEE_FLOAT
+#endif
+
+#ifndef KSDATAFORMAT_SUBTYPE_PCM
+ #define KSDATAFORMAT_SUBTYPE_PCM         uuidFromString ("00000001-0000-0010-8000-00aa00389b71")
+ #define KSDATAFORMAT_SUBTYPE_IEEE_FLOAT  uuidFromString ("00000003-0000-0010-8000-00aa00389b71")
+#endif
+
+enum EDataFlow
+{
+    eRender = 0,
+    eCapture = (eRender + 1),
+    eAll = (eCapture + 1)
+};
+
+enum
+{
+    DEVICE_STATE_ACTIVE = 1
+};
+
+enum
+{
+    AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY = 1,
+    AUDCLNT_BUFFERFLAGS_SILENT = 2
+};
+
+JUCE_IUNKNOWNCLASS (IPropertyStore, "886d8eeb-8cf2-4446-8d02-cdba1dbdcf99")
+{
+    JUCE_COMCALL GetCount (DWORD*) = 0;
+    JUCE_COMCALL GetAt (DWORD, PROPERTYKEY*) = 0;
+    JUCE_COMCALL GetValue (const PROPERTYKEY&, PROPVARIANT*) = 0;
+    JUCE_COMCALL SetValue (const PROPERTYKEY&, const PROPVARIANT&) = 0;
+    JUCE_COMCALL Commit() = 0;
+};
+
+JUCE_IUNKNOWNCLASS (IMMDevice, "D666063F-1587-4E43-81F1-B948E807363F")
+{
+    JUCE_COMCALL Activate (REFIID, DWORD, PROPVARIANT*, void**) = 0;
+    JUCE_COMCALL OpenPropertyStore (DWORD, IPropertyStore**) = 0;
+    JUCE_COMCALL GetId (LPWSTR*) = 0;
+    JUCE_COMCALL GetState (DWORD*) = 0;
+};
+
+JUCE_IUNKNOWNCLASS (IMMEndpoint, "1BE09788-6894-4089-8586-9A2A6C265AC5")
+{
+    JUCE_COMCALL GetDataFlow (EDataFlow*) = 0;
+};
+
+struct IMMDeviceCollection : public IUnknown
+{
+    JUCE_COMCALL GetCount (UINT*) = 0;
+    JUCE_COMCALL Item (UINT, IMMDevice**) = 0;
+};
+
+enum ERole
+{
+    eConsole = 0,
+    eMultimedia = (eConsole + 1),
+    eCommunications = (eMultimedia + 1)
+};
+
+JUCE_IUNKNOWNCLASS (IMMNotificationClient, "7991EEC9-7E89-4D85-8390-6C703CEC60C0")
+{
+    JUCE_COMCALL OnDeviceStateChanged (LPCWSTR, DWORD) = 0;
+    JUCE_COMCALL OnDeviceAdded (LPCWSTR) = 0;
+    JUCE_COMCALL OnDeviceRemoved (LPCWSTR) = 0;
+    JUCE_COMCALL OnDefaultDeviceChanged (EDataFlow, ERole, LPCWSTR) = 0;
+    JUCE_COMCALL OnPropertyValueChanged (LPCWSTR, const PROPERTYKEY) = 0;
+};
+
+JUCE_IUNKNOWNCLASS (IMMDeviceEnumerator, "A95664D2-9614-4F35-A746-DE8DB63617E6")
+{
+    JUCE_COMCALL EnumAudioEndpoints (EDataFlow, DWORD, IMMDeviceCollection**) = 0;
+    JUCE_COMCALL GetDefaultAudioEndpoint (EDataFlow, ERole, IMMDevice**) = 0;
+    JUCE_COMCALL GetDevice (LPCWSTR, IMMDevice**) = 0;
+    JUCE_COMCALL RegisterEndpointNotificationCallback (IMMNotificationClient*) = 0;
+    JUCE_COMCALL UnregisterEndpointNotificationCallback (IMMNotificationClient*) = 0;
+};
+
+JUCE_COMCLASS (MMDeviceEnumerator, "BCDE0395-E52F-467C-8E3D-C4579291692E");
+
+using REFERENCE_TIME = LONGLONG;
+
+enum AVRT_PRIORITY
+{
+    AVRT_PRIORITY_LOW = -1,
+    AVRT_PRIORITY_NORMAL,
+    AVRT_PRIORITY_HIGH,
+    AVRT_PRIORITY_CRITICAL
+};
+
+enum AUDCLNT_SHAREMODE
+{
+    AUDCLNT_SHAREMODE_SHARED,
+    AUDCLNT_SHAREMODE_EXCLUSIVE
+};
+
+enum AUDIO_STREAM_CATEGORY
+{
+    AudioCategory_Other = 0,
+    AudioCategory_ForegroundOnlyMedia,
+    AudioCategory_BackgroundCapableMedia,
+    AudioCategory_Communications,
+    AudioCategory_Alerts,
+    AudioCategory_SoundEffects,
+    AudioCategory_GameEffects,
+    AudioCategory_GameMedia,
+    AudioCategory_GameChat,
+    AudioCategory_Speech,
+    AudioCategory_Movie,
+    AudioCategory_Media
+};
+
+struct AudioClientProperties
+{
+    UINT32                  cbSize;
+    BOOL                    bIsOffload;
+    AUDIO_STREAM_CATEGORY   eCategory;
+};
+
+JUCE_IUNKNOWNCLASS (IAudioClient, "1CB9AD4C-DBFA-4c32-B178-C2F568A703B2")
+{
+    JUCE_COMCALL Initialize (AUDCLNT_SHAREMODE, DWORD, REFERENCE_TIME, REFERENCE_TIME, const WAVEFORMATEX*, LPCGUID) = 0;
+    JUCE_COMCALL GetBufferSize (UINT32*) = 0;
+    JUCE_COMCALL GetStreamLatency (REFERENCE_TIME*) = 0;
+    JUCE_COMCALL GetCurrentPadding (UINT32*) = 0;
+    JUCE_COMCALL IsFormatSupported (AUDCLNT_SHAREMODE, const WAVEFORMATEX*, WAVEFORMATEX**) = 0;
+    JUCE_COMCALL GetMixFormat (WAVEFORMATEX**) = 0;
+    JUCE_COMCALL GetDevicePeriod (REFERENCE_TIME*, REFERENCE_TIME*) = 0;
+    JUCE_COMCALL Start() = 0;
+    JUCE_COMCALL Stop() = 0;
+    JUCE_COMCALL Reset() = 0;
+    JUCE_COMCALL SetEventHandle (HANDLE) = 0;
+    JUCE_COMCALL GetService (REFIID, void**) = 0;
+};
+
+JUCE_COMCLASS (IAudioClient2, "726778CD-F60A-4eda-82DE-E47610CD78AA") : public IAudioClient
+{
+    JUCE_COMCALL IsOffloadCapable (AUDIO_STREAM_CATEGORY, BOOL*) = 0;
+    JUCE_COMCALL SetClientProperties (const AudioClientProperties*) = 0;
+    JUCE_COMCALL GetBufferSizeLimits (const WAVEFORMATEX*, BOOL, REFERENCE_TIME*, REFERENCE_TIME*) = 0;
+};
+
+JUCE_COMCLASS (IAudioClient3, "1CB9AD4C-DBFA-4c32-B178-C2F568A703B2") : public IAudioClient2
+{
+    JUCE_COMCALL GetSharedModeEnginePeriod (const WAVEFORMATEX*, UINT32*, UINT32*, UINT32*, UINT32*) = 0;
+    JUCE_COMCALL GetCurrentSharedModeEnginePeriod (WAVEFORMATEX**, UINT32*) = 0;
+    JUCE_COMCALL InitializeSharedAudioStream (DWORD, UINT32, const WAVEFORMATEX*, LPCGUID) = 0;
+};
+
+JUCE_IUNKNOWNCLASS (IAudioCaptureClient, "C8ADBD64-E71E-48a0-A4DE-185C395CD317")
+{
+    JUCE_COMCALL GetBuffer (BYTE**, UINT32*, DWORD*, UINT64*, UINT64*) = 0;
+    JUCE_COMCALL ReleaseBuffer (UINT32) = 0;
+    JUCE_COMCALL GetNextPacketSize (UINT32*) = 0;
+};
+
+JUCE_IUNKNOWNCLASS (IAudioRenderClient, "F294ACFC-3146-4483-A7BF-ADDCA7C260E2")
+{
+    JUCE_COMCALL GetBuffer (UINT32, BYTE**) = 0;
+    JUCE_COMCALL ReleaseBuffer (UINT32, DWORD) = 0;
+};
+
+JUCE_IUNKNOWNCLASS (IAudioEndpointVolume, "5CDF2C82-841E-4546-9722-0CF74078229A")
+{
+    JUCE_COMCALL RegisterControlChangeNotify (void*) = 0;
+    JUCE_COMCALL UnregisterControlChangeNotify (void*) = 0;
+    JUCE_COMCALL GetChannelCount (UINT*) = 0;
+    JUCE_COMCALL SetMasterVolumeLevel (float, LPCGUID) = 0;
+    JUCE_COMCALL SetMasterVolumeLevelScalar (float, LPCGUID) = 0;
+    JUCE_COMCALL GetMasterVolumeLevel (float*) = 0;
+    JUCE_COMCALL GetMasterVolumeLevelScalar (float*) = 0;
+    JUCE_COMCALL SetChannelVolumeLevel (UINT, float, LPCGUID) = 0;
+    JUCE_COMCALL SetChannelVolumeLevelScalar (UINT, float, LPCGUID) = 0;
+    JUCE_COMCALL GetChannelVolumeLevel (UINT, float*) = 0;
+    JUCE_COMCALL GetChannelVolumeLevelScalar (UINT, float*) = 0;
+    JUCE_COMCALL SetMute (BOOL, LPCGUID) = 0;
+    JUCE_COMCALL GetMute (BOOL*) = 0;
+    JUCE_COMCALL GetVolumeStepInfo (UINT*, UINT*) = 0;
+    JUCE_COMCALL VolumeStepUp (LPCGUID) = 0;
+    JUCE_COMCALL VolumeStepDown (LPCGUID) = 0;
+    JUCE_COMCALL QueryHardwareSupport (DWORD*) = 0;
+    JUCE_COMCALL GetVolumeRange (float*, float*, float*) = 0;
+};
+
+enum AudioSessionDisconnectReason
+{
+    DisconnectReasonDeviceRemoval         = 0,
+    DisconnectReasonServerShutdown        = 1,
+    DisconnectReasonFormatChanged         = 2,
+    DisconnectReasonSessionLogoff         = 3,
+    DisconnectReasonSessionDisconnected   = 4,
+    DisconnectReasonExclusiveModeOverride = 5
+};
+
+enum AudioSessionState
+{
+    AudioSessionStateInactive = 0,
+    AudioSessionStateActive   = 1,
+    AudioSessionStateExpired  = 2
+};
+
+JUCE_IUNKNOWNCLASS (IAudioSessionEvents, "24918ACC-64B3-37C1-8CA9-74A66E9957A8")
+{
+    JUCE_COMCALL OnDisplayNameChanged (LPCWSTR, LPCGUID) = 0;
+    JUCE_COMCALL OnIconPathChanged (LPCWSTR, LPCGUID) = 0;
+    JUCE_COMCALL OnSimpleVolumeChanged (float, BOOL, LPCGUID) = 0;
+    JUCE_COMCALL OnChannelVolumeChanged (DWORD, float*, DWORD, LPCGUID) = 0;
+    JUCE_COMCALL OnGroupingParamChanged (LPCGUID, LPCGUID) = 0;
+    JUCE_COMCALL OnStateChanged (AudioSessionState) = 0;
+    JUCE_COMCALL OnSessionDisconnected (AudioSessionDisconnectReason) = 0;
+};
+
+JUCE_IUNKNOWNCLASS (IAudioSessionControl, "F4B1A599-7266-4319-A8CA-E70ACB11E8CD")
+{
+    JUCE_COMCALL GetState (AudioSessionState*) = 0;
+    JUCE_COMCALL GetDisplayName (LPWSTR*) = 0;
+    JUCE_COMCALL SetDisplayName (LPCWSTR, LPCGUID) = 0;
+    JUCE_COMCALL GetIconPath (LPWSTR*) = 0;
+    JUCE_COMCALL SetIconPath (LPCWSTR, LPCGUID) = 0;
+    JUCE_COMCALL GetGroupingParam (GUID*) = 0;
+    JUCE_COMCALL SetGroupingParam (LPCGUID, LPCGUID) = 0;
+    JUCE_COMCALL RegisterAudioSessionNotification (IAudioSessionEvents*) = 0;
+    JUCE_COMCALL UnregisterAudioSessionNotification (IAudioSessionEvents*) = 0;
+};
+
+//==============================================================================
+namespace WasapiClasses
+{
+
+String getDeviceID (IMMDevice* device)
 {
     String s;
     WCHAR* deviceId = nullptr;
@@ -163,85 +352,79 @@ String getDeviceID (IMMDevice* const device)
     return s;
 }
 
-EDataFlow getDataFlow (const ComSmartPtr<IMMDevice>& device)
+static EDataFlow getDataFlow (const ComSmartPtr<IMMDevice>& device)
 {
     EDataFlow flow = eRender;
-    ComSmartPtr <IMMEndpoint> endPoint;
-    if (check (device.QueryInterface (endPoint)))
-        (void) check (endPoint->GetDataFlow (&flow));
+    if (auto endpoint = device.getInterface<IMMEndpoint>())
+        (void) check (endpoint->GetDataFlow (&flow));
 
     return flow;
 }
 
-int refTimeToSamples (const REFERENCE_TIME& t, const double sampleRate) noexcept
+static int refTimeToSamples (const REFERENCE_TIME& t, double sampleRate) noexcept
 {
-    return roundDoubleToInt (sampleRate * ((double) t) * 0.0000001);
+    return roundToInt (sampleRate * ((double) t) * 0.0000001);
 }
 
-void copyWavFormat (WAVEFORMATEXTENSIBLE& dest, const WAVEFORMATEX* const src) noexcept
+static REFERENCE_TIME samplesToRefTime (int numSamples, double sampleRate) noexcept
+{
+    return (REFERENCE_TIME) ((numSamples * 10000.0 * 1000.0 / sampleRate) + 0.5);
+}
+
+static void copyWavFormat (WAVEFORMATEXTENSIBLE& dest, const WAVEFORMATEX* src) noexcept
 {
     memcpy (&dest, src, src->wFormatTag == WAVE_FORMAT_EXTENSIBLE ? sizeof (WAVEFORMATEXTENSIBLE)
                                                                   : sizeof (WAVEFORMATEX));
+}
+
+static bool isExclusiveMode (WASAPIDeviceMode deviceMode) noexcept
+{
+    return deviceMode == WASAPIDeviceMode::exclusive;
+}
+
+static bool isLowLatencyMode (WASAPIDeviceMode deviceMode) noexcept
+{
+    return deviceMode == WASAPIDeviceMode::sharedLowLatency;
+}
+
+static bool supportsSampleRateConversion (WASAPIDeviceMode deviceMode) noexcept
+{
+    return deviceMode == WASAPIDeviceMode::shared;
 }
 
 //==============================================================================
 class WASAPIDeviceBase
 {
 public:
-    WASAPIDeviceBase (const ComSmartPtr <IMMDevice>& d, const bool exclusiveMode)
+    WASAPIDeviceBase (const ComSmartPtr<IMMDevice>& d, WASAPIDeviceMode mode)
         : device (d),
-          sampleRate (0),
-          defaultSampleRate (0),
-          numChannels (0),
-          actualNumChannels (0),
-          minBufferSize (0),
-          defaultBufferSize (0),
-          latencySamples (0),
-          useExclusiveMode (exclusiveMode),
-          sampleRateHasChanged (false)
+          deviceMode (mode)
     {
-        clientEvent = CreateEvent (0, false, false, _T("JuceWASAPI"));
+        clientEvent = CreateEvent (nullptr, false, false, nullptr);
 
-        ComSmartPtr <IAudioClient> tempClient (createClient());
+        ComSmartPtr<IAudioClient> tempClient (createClient());
+
         if (tempClient == nullptr)
             return;
 
-        REFERENCE_TIME defaultPeriod, minPeriod;
-        if (! check (tempClient->GetDevicePeriod (&defaultPeriod, &minPeriod)))
-            return;
-
-        WAVEFORMATEX* mixFormat = nullptr;
-        if (! check (tempClient->GetMixFormat (&mixFormat)))
-            return;
-
         WAVEFORMATEXTENSIBLE format;
-        copyWavFormat (format, mixFormat);
-        CoTaskMemFree (mixFormat);
+
+        if (! getClientMixFormat (tempClient, format))
+            return;
 
         actualNumChannels = numChannels = format.Format.nChannels;
         defaultSampleRate = format.Format.nSamplesPerSec;
-        minBufferSize = refTimeToSamples (minPeriod, defaultSampleRate);
-        defaultBufferSize = refTimeToSamples (defaultPeriod, defaultSampleRate);
-
         rates.addUsingDefaultSort (defaultSampleRate);
+        mixFormatChannelMask = format.dwChannelMask;
 
-        static const int ratesToTest[] = { 44100, 48000, 88200, 96000, 176400, 192000 };
+        if (isExclusiveMode (deviceMode))
+            findSupportedFormat (tempClient, defaultSampleRate, mixFormatChannelMask, format);
 
-        for (int i = 0; i < numElementsInArray (ratesToTest); ++i)
-        {
-            if (ratesToTest[i] == defaultSampleRate)
-                continue;
-
-            format.Format.nSamplesPerSec = (DWORD) ratesToTest[i];
-
-            if (SUCCEEDED (tempClient->IsFormatSupported (useExclusiveMode ? AUDCLNT_SHAREMODE_EXCLUSIVE : AUDCLNT_SHAREMODE_SHARED,
-                                                          (WAVEFORMATEX*) &format, 0)))
-                if (! rates.contains (ratesToTest[i]))
-                    rates.addUsingDefaultSort (ratesToTest[i]);
-        }
+        querySupportedBufferSizes (format, tempClient);
+        querySupportedSampleRates (format, tempClient);
     }
 
-    ~WASAPIDeviceBase()
+    virtual ~WASAPIDeviceBase()
     {
         device = nullptr;
         CloseHandle (clientEvent);
@@ -249,7 +432,7 @@ public:
 
     bool isOk() const noexcept   { return defaultBufferSize > 0 && defaultSampleRate > 0; }
 
-    bool openClient (const double newSampleRate, const BigInteger& newChannels)
+    bool openClient (const double newSampleRate, const BigInteger& newChannels, const int bufferSizeSamples)
     {
         sampleRate = newSampleRate;
         channels = newChannels;
@@ -262,24 +445,24 @@ public:
         client = createClient();
 
         if (client != nullptr
-             && (tryInitialisingWithFormat (true, 4) || tryInitialisingWithFormat (false, 4)
-                  || tryInitialisingWithFormat (false, 3) || tryInitialisingWithFormat (false, 2)))
+             && tryInitialisingWithBufferSize (bufferSizeSamples))
         {
             sampleRateHasChanged = false;
+            shouldShutdown = false;
 
             channelMaps.clear();
+
             for (int i = 0; i <= channels.getHighestBit(); ++i)
                 if (channels[i])
                     channelMaps.add (i);
 
             REFERENCE_TIME latency;
+
             if (check (client->GetStreamLatency (&latency)))
                 latencySamples = refTimeToSamples (latency, sampleRate);
 
             (void) check (client->GetBufferSize (&actualBufferSize));
-
             createSessionEventCallback();
-
             return check (client->SetEventHandle (clientEvent));
         }
 
@@ -291,6 +474,10 @@ public:
         if (client != nullptr)
             client->Stop();
 
+        // N.B. this is needed to prevent a double-deletion of the IAudioSessionEvents object
+        // on older versions of Windows
+        Thread::sleep (5);
+
         deleteSessionEventCallback();
         client = nullptr;
         ResetEvent (clientEvent);
@@ -301,36 +488,71 @@ public:
         sampleRateHasChanged = true;
     }
 
+    void deviceSessionBecameInactive()
+    {
+        isActive = false;
+    }
+
+    void deviceSessionExpired()
+    {
+        shouldShutdown = true;
+    }
+
+    void deviceSessionBecameActive()
+    {
+        isActive = true;
+    }
+
     //==============================================================================
-    ComSmartPtr <IMMDevice> device;
-    ComSmartPtr <IAudioClient> client;
-    double sampleRate, defaultSampleRate;
-    int numChannels, actualNumChannels;
-    int minBufferSize, defaultBufferSize, latencySamples;
-    const bool useExclusiveMode;
-    Array <double> rates;
-    HANDLE clientEvent;
+    ComSmartPtr<IMMDevice> device;
+    ComSmartPtr<IAudioClient> client;
+
+    WASAPIDeviceMode deviceMode;
+
+    double sampleRate = 0, defaultSampleRate = 0;
+    int numChannels = 0, actualNumChannels = 0;
+    int minBufferSize = 0, defaultBufferSize = 0, latencySamples = 0;
+    int lowLatencyBufferSizeMultiple = 0, lowLatencyMaxBufferSize = 0;
+    DWORD mixFormatChannelMask = 0;
+    Array<double> rates;
+    HANDLE clientEvent = {};
     BigInteger channels;
-    Array <int> channelMaps;
-    UINT32 actualBufferSize;
-    int bytesPerSample;
-    bool sampleRateHasChanged;
+    Array<int> channelMaps;
+    UINT32 actualBufferSize = 0;
+    int bytesPerSample = 0, bytesPerFrame = 0;
+    std::atomic<bool> sampleRateHasChanged { false }, shouldShutdown { false }, isActive { true };
 
     virtual void updateFormat (bool isFloat) = 0;
 
 private:
     //==============================================================================
-    class SessionEventCallback  : public ComBaseClassHelper <IAudioSessionEvents>
+    struct SessionEventCallback  : public ComBaseClassHelper<IAudioSessionEvents>
     {
-    public:
-        SessionEventCallback (WASAPIDeviceBase& owner_) : owner (owner_) {}
+        SessionEventCallback (WASAPIDeviceBase& d) : owner (d) {}
 
         JUCE_COMRESULT OnDisplayNameChanged (LPCWSTR, LPCGUID)                 { return S_OK; }
         JUCE_COMRESULT OnIconPathChanged (LPCWSTR, LPCGUID)                    { return S_OK; }
         JUCE_COMRESULT OnSimpleVolumeChanged (float, BOOL, LPCGUID)            { return S_OK; }
         JUCE_COMRESULT OnChannelVolumeChanged (DWORD, float*, DWORD, LPCGUID)  { return S_OK; }
         JUCE_COMRESULT OnGroupingParamChanged (LPCGUID, LPCGUID)               { return S_OK; }
-        JUCE_COMRESULT OnStateChanged (AudioSessionState)                      { return S_OK; }
+
+        JUCE_COMRESULT OnStateChanged (AudioSessionState state)
+        {
+            switch (state)
+            {
+            case AudioSessionStateInactive:
+                owner.deviceSessionBecameInactive();
+                break;
+            case AudioSessionStateExpired:
+                owner.deviceSessionExpired();
+                break;
+            case AudioSessionStateActive:
+                owner.deviceSessionBecameActive();
+                break;
+            }
+
+            return S_OK;
+        }
 
         JUCE_COMRESULT OnSessionDisconnected (AudioSessionDisconnectReason reason)
         {
@@ -340,14 +562,12 @@ private:
             return S_OK;
         }
 
-    private:
         WASAPIDeviceBase& owner;
-
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SessionEventCallback)
     };
 
-    ComSmartPtr <IAudioSessionControl> audioSessionControl;
-    ComSmartPtr <SessionEventCallback> sessionEventCallback;
+    ComSmartPtr<IAudioSessionControl> audioSessionControl;
+    ComSmartPtr<SessionEventCallback> sessionEventCallback;
 
     void createSessionEventCallback()
     {
@@ -373,25 +593,108 @@ private:
     }
 
     //==============================================================================
-    const ComSmartPtr <IAudioClient> createClient()
+    ComSmartPtr<IAudioClient> createClient()
     {
-        ComSmartPtr <IAudioClient> client;
+        ComSmartPtr<IAudioClient> newClient;
 
         if (device != nullptr)
-        {
-            HRESULT hr = device->Activate (__uuidof (IAudioClient), CLSCTX_INPROC_SERVER,
-                                           nullptr, (void**) client.resetAndGetPointerAddress());
-            logFailure (hr);
-        }
+            logFailure (device->Activate (__uuidof (IAudioClient), CLSCTX_INPROC_SERVER,
+                                          nullptr, (void**) newClient.resetAndGetPointerAddress()));
 
-        return client;
+        return newClient;
     }
 
-    bool tryInitialisingWithFormat (const bool useFloat, const int bytesPerSampleToTry)
+    static bool getClientMixFormat (ComSmartPtr<IAudioClient>& client, WAVEFORMATEXTENSIBLE& format)
     {
-        WAVEFORMATEXTENSIBLE format = { 0 };
+        WAVEFORMATEX* mixFormat = nullptr;
 
-        if (numChannels <= 2 && bytesPerSampleToTry <= 2)
+        if (! check (client->GetMixFormat (&mixFormat)))
+            return false;
+
+        copyWavFormat (format, mixFormat);
+        CoTaskMemFree (mixFormat);
+
+        return true;
+    }
+
+    //==============================================================================
+    void querySupportedBufferSizes (WAVEFORMATEXTENSIBLE format, ComSmartPtr<IAudioClient>& audioClient)
+    {
+        if (isLowLatencyMode (deviceMode))
+        {
+            if (auto audioClient3 = audioClient.getInterface<IAudioClient3>())
+            {
+                UINT32 defaultPeriod = 0, fundamentalPeriod = 0, minPeriod = 0, maxPeriod = 0;
+
+                if (check (audioClient3->GetSharedModeEnginePeriod ((WAVEFORMATEX*) &format,
+                                                                    &defaultPeriod,
+                                                                    &fundamentalPeriod,
+                                                                    &minPeriod,
+                                                                    &maxPeriod)))
+                {
+                    minBufferSize = minPeriod;
+                    defaultBufferSize = defaultPeriod;
+                    lowLatencyMaxBufferSize = maxPeriod;
+                    lowLatencyBufferSizeMultiple = fundamentalPeriod;
+                }
+            }
+        }
+        else
+        {
+            REFERENCE_TIME defaultPeriod, minPeriod;
+
+            if (! check (audioClient->GetDevicePeriod (&defaultPeriod, &minPeriod)))
+                return;
+
+            minBufferSize = refTimeToSamples (minPeriod, defaultSampleRate);
+            defaultBufferSize = refTimeToSamples (defaultPeriod, defaultSampleRate);
+        }
+    }
+
+    void querySupportedSampleRates (WAVEFORMATEXTENSIBLE format, ComSmartPtr<IAudioClient>& audioClient)
+    {
+        for (auto rate : { 8000, 11025, 16000, 22050, 32000,
+                           44100, 48000, 88200, 96000, 176400,
+                           192000, 352800, 384000, 705600, 768000 })
+        {
+            if (rates.contains (rate))
+                continue;
+
+            format.Format.nSamplesPerSec  = (DWORD) rate;
+            format.Format.nAvgBytesPerSec = (DWORD) (format.Format.nSamplesPerSec * format.Format.nChannels * format.Format.wBitsPerSample / 8);
+
+            WAVEFORMATEX* nearestFormat = nullptr;
+
+            if (SUCCEEDED (audioClient->IsFormatSupported (isExclusiveMode (deviceMode) ? AUDCLNT_SHAREMODE_EXCLUSIVE
+                                                                                        : AUDCLNT_SHAREMODE_SHARED,
+                                                           (WAVEFORMATEX*) &format,
+                                                           isExclusiveMode (deviceMode) ? nullptr
+                                                                                        : &nearestFormat)))
+            {
+                if (nearestFormat != nullptr)
+                    rate = nearestFormat->nSamplesPerSec;
+
+                if (! rates.contains (rate))
+                    rates.addUsingDefaultSort (rate);
+            }
+
+            CoTaskMemFree (nearestFormat);
+        }
+    }
+
+    struct AudioSampleFormat
+    {
+        bool useFloat;
+        int  bitsPerSampleToTry;
+        int  bytesPerSampleContainer;
+    };
+
+    bool tryFormat (const AudioSampleFormat sampleFormat, IAudioClient* clientToUse, double newSampleRate,
+                    DWORD newMixFormatChannelMask, WAVEFORMATEXTENSIBLE& format) const
+    {
+        zerostruct (format);
+
+        if (numChannels <= 2 && sampleFormat.bitsPerSampleToTry <= 16)
         {
             format.Format.wFormatTag = WAVE_FORMAT_PCM;
         }
@@ -401,54 +704,150 @@ private:
             format.Format.cbSize = sizeof (WAVEFORMATEXTENSIBLE) - sizeof (WAVEFORMATEX);
         }
 
-        format.Format.nSamplesPerSec = (DWORD) roundDoubleToInt (sampleRate);
-        format.Format.nChannels = (WORD) numChannels;
-        format.Format.wBitsPerSample = (WORD) (8 * bytesPerSampleToTry);
-        format.Format.nAvgBytesPerSec = (DWORD) (format.Format.nSamplesPerSec * numChannels * bytesPerSampleToTry);
-        format.Format.nBlockAlign = (WORD) (numChannels * bytesPerSampleToTry);
-        format.SubFormat = useFloat ? KSDATAFORMAT_SUBTYPE_IEEE_FLOAT : KSDATAFORMAT_SUBTYPE_PCM;
-        format.Samples.wValidBitsPerSample = format.Format.wBitsPerSample;
+        format.Format.nSamplesPerSec       = (DWORD) newSampleRate;
+        format.Format.nChannels            = (WORD) numChannels;
+        format.Format.wBitsPerSample       = (WORD) (8 * sampleFormat.bytesPerSampleContainer);
+        format.Samples.wValidBitsPerSample = (WORD) (sampleFormat.bitsPerSampleToTry);
+        format.Format.nBlockAlign          = (WORD) (format.Format.nChannels * format.Format.wBitsPerSample / 8);
+        format.Format.nAvgBytesPerSec      = (DWORD) (format.Format.nSamplesPerSec * format.Format.nBlockAlign);
+        format.SubFormat                   = sampleFormat.useFloat ? KSDATAFORMAT_SUBTYPE_IEEE_FLOAT : KSDATAFORMAT_SUBTYPE_PCM;
+        format.dwChannelMask               = newMixFormatChannelMask;
 
-        switch (numChannels)
-        {
-            case 1:     format.dwChannelMask = SPEAKER_FRONT_CENTER; break;
-            case 2:     format.dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT; break;
-            case 4:     format.dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | SPEAKER_BACK_LEFT | SPEAKER_BACK_RIGHT; break;
-            case 6:     format.dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | SPEAKER_FRONT_CENTER | SPEAKER_LOW_FREQUENCY | SPEAKER_BACK_LEFT | SPEAKER_BACK_RIGHT; break;
-            case 8:     format.dwChannelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT | SPEAKER_FRONT_CENTER | SPEAKER_LOW_FREQUENCY | SPEAKER_BACK_LEFT | SPEAKER_BACK_RIGHT | SPEAKER_FRONT_LEFT_OF_CENTER | SPEAKER_FRONT_RIGHT_OF_CENTER; break;
-            default:    break;
-        }
+        WAVEFORMATEX* nearestFormat = nullptr;
 
-        WAVEFORMATEXTENSIBLE* nearestFormat = nullptr;
-
-        HRESULT hr = client->IsFormatSupported (useExclusiveMode ? AUDCLNT_SHAREMODE_EXCLUSIVE : AUDCLNT_SHAREMODE_SHARED,
-                                                (WAVEFORMATEX*) &format, useExclusiveMode ? nullptr : (WAVEFORMATEX**) &nearestFormat);
+        HRESULT hr = clientToUse->IsFormatSupported (isExclusiveMode (deviceMode) ? AUDCLNT_SHAREMODE_EXCLUSIVE
+                                                                                  : AUDCLNT_SHAREMODE_SHARED,
+                                                     (WAVEFORMATEX*) &format,
+                                                     isExclusiveMode (deviceMode) ? nullptr
+                                                                                  : &nearestFormat);
         logFailure (hr);
 
-        if (hr == S_FALSE && format.Format.nSamplesPerSec == nearestFormat->Format.nSamplesPerSec)
+        auto supportsSRC = supportsSampleRateConversion (deviceMode);
+
+        if (hr == S_FALSE
+            && nearestFormat != nullptr
+            && (format.Format.nSamplesPerSec == nearestFormat->nSamplesPerSec
+                || supportsSRC))
         {
-            copyWavFormat (format, (WAVEFORMATEX*) nearestFormat);
+            copyWavFormat (format, nearestFormat);
+
+            if (supportsSRC)
+            {
+                format.Format.nSamplesPerSec  = (DWORD) newSampleRate;
+                format.Format.nAvgBytesPerSec = (DWORD) (format.Format.nSamplesPerSec * format.Format.nBlockAlign);
+            }
+
             hr = S_OK;
         }
 
         CoTaskMemFree (nearestFormat);
+        return hr == S_OK;
+    }
 
-        REFERENCE_TIME defaultPeriod = 0, minPeriod = 0;
-        if (useExclusiveMode)
-            check (client->GetDevicePeriod (&defaultPeriod, &minPeriod));
-
-        GUID session;
-        if (hr == S_OK
-             && check (client->Initialize (useExclusiveMode ? AUDCLNT_SHAREMODE_EXCLUSIVE : AUDCLNT_SHAREMODE_SHARED,
-                                           AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-                                           defaultPeriod, defaultPeriod, (WAVEFORMATEX*) &format, &session)))
+    bool findSupportedFormat (IAudioClient* clientToUse, double newSampleRate,
+                              DWORD newMixFormatChannelMask, WAVEFORMATEXTENSIBLE& format) const
+    {
+        static const AudioSampleFormat formats[] =
         {
-            actualNumChannels = format.Format.nChannels;
-            const bool isFloat = format.Format.wFormatTag == WAVE_FORMAT_EXTENSIBLE && format.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
-            bytesPerSample = format.Format.wBitsPerSample / 8;
+            { true,  32, 4 },
+            { false, 32, 4 },
+            { false, 24, 4 },
+            { false, 24, 3 },
+            { false, 20, 4 },
+            { false, 20, 3 },
+            { false, 16, 2 }
+        };
 
-            updateFormat (isFloat);
-            return true;
+        for (int i = 0; i < numElementsInArray (formats); ++i)
+            if (tryFormat (formats[i], clientToUse, newSampleRate, newMixFormatChannelMask, format))
+                return true;
+
+        return false;
+    }
+
+    DWORD getStreamFlags()
+    {
+        DWORD streamFlags = 0x40000; /*AUDCLNT_STREAMFLAGS_EVENTCALLBACK*/
+
+        if (supportsSampleRateConversion (deviceMode))
+            streamFlags |= (0x80000000    /*AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM*/
+                            | 0x8000000); /*AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY*/
+
+        return streamFlags;
+    }
+
+    bool initialiseLowLatencyClient (int bufferSizeSamples, WAVEFORMATEXTENSIBLE format)
+    {
+        if (auto audioClient3 = client.getInterface<IAudioClient3>())
+            return check (audioClient3->InitializeSharedAudioStream (getStreamFlags(),
+                                                                     bufferSizeSamples,
+                                                                     (WAVEFORMATEX*) &format,
+                                                                     nullptr));
+
+        return false;
+    }
+
+    bool initialiseStandardClient (int bufferSizeSamples, WAVEFORMATEXTENSIBLE format)
+    {
+        REFERENCE_TIME defaultPeriod = 0, minPeriod = 0;
+
+        check (client->GetDevicePeriod (&defaultPeriod, &minPeriod));
+
+        if (isExclusiveMode (deviceMode) && bufferSizeSamples > 0)
+            defaultPeriod = jmax (minPeriod, samplesToRefTime (bufferSizeSamples, format.Format.nSamplesPerSec));
+
+        for (;;)
+        {
+            GUID session;
+            auto hr = client->Initialize (isExclusiveMode (deviceMode) ? AUDCLNT_SHAREMODE_EXCLUSIVE
+                                                                       : AUDCLNT_SHAREMODE_SHARED,
+                                          getStreamFlags(),
+                                          defaultPeriod,
+                                          isExclusiveMode (deviceMode) ? defaultPeriod : 0,
+                                          (WAVEFORMATEX*) &format,
+                                          &session);
+
+            if (check (hr))
+                return true;
+
+            // Handle the "alignment dance" : http://msdn.microsoft.com/en-us/library/windows/desktop/dd370875(v=vs.85).aspx (see Remarks)
+            if (hr != MAKE_HRESULT (1, 0x889, 0x19)) // AUDCLNT_E_BUFFER_SIZE_NOT_ALIGNED
+                break;
+
+            UINT32 numFrames = 0;
+            if (! check (client->GetBufferSize (&numFrames)))
+                break;
+
+            // Recreate client
+            client = nullptr;
+            client = createClient();
+
+            defaultPeriod = samplesToRefTime (numFrames, format.Format.nSamplesPerSec);
+        }
+
+        return false;
+    }
+
+    bool tryInitialisingWithBufferSize (int bufferSizeSamples)
+    {
+        WAVEFORMATEXTENSIBLE format;
+
+        if (findSupportedFormat (client, sampleRate, mixFormatChannelMask, format))
+        {
+            auto isInitialised = isLowLatencyMode (deviceMode) ? initialiseLowLatencyClient (bufferSizeSamples, format)
+                                                               : initialiseStandardClient   (bufferSizeSamples, format);
+
+            if (isInitialised)
+            {
+                actualNumChannels  = format.Format.nChannels;
+                const bool isFloat = format.Format.wFormatTag == WAVE_FORMAT_EXTENSIBLE && format.SubFormat == KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
+                bytesPerSample     = format.Format.wBitsPerSample / 8;
+                bytesPerFrame      = format.Format.nBlockAlign;
+
+                updateFormat (isFloat);
+
+                return true;
+            }
         }
 
         return false;
@@ -461,9 +860,8 @@ private:
 class WASAPIInputDevice  : public WASAPIDeviceBase
 {
 public:
-    WASAPIInputDevice (const ComSmartPtr <IMMDevice>& d, const bool exclusiveMode)
-        : WASAPIDeviceBase (d, exclusiveMode),
-          reservoir (1, 1)
+    WASAPIInputDevice (const ComSmartPtr<IMMDevice>& d, WASAPIDeviceMode mode)
+        : WASAPIDeviceBase (d, mode)
     {
     }
 
@@ -472,12 +870,9 @@ public:
         close();
     }
 
-    bool open (const double newSampleRate, const BigInteger& newChannels)
+    bool open (double newSampleRate, const BigInteger& newChannels, int bufferSizeSamples)
     {
-        reservoirSize = 0;
-        reservoirCapacity = 16384;
-        reservoir.setSize (actualNumChannels * reservoirCapacity * sizeof (float));
-        return openClient (newSampleRate, newChannels)
+        return openClient (newSampleRate, newChannels, bufferSizeSamples)
                 && (numChannels == 0 || check (client->GetService (__uuidof (IAudioCaptureClient),
                                                                    (void**) captureClient.resetAndGetPointerAddress())));
     }
@@ -486,90 +881,139 @@ public:
     {
         closeClient();
         captureClient = nullptr;
-        reservoir.setSize (0);
+        reservoir.reset();
+        reservoirReadPos = 0;
+        reservoirWritePos = 0;
     }
 
     template <class SourceType>
-    void updateFormatWithType (SourceType*)
+    void updateFormatWithType (SourceType*) noexcept
     {
-        typedef AudioData::Pointer <AudioData::Float32, AudioData::NativeEndian, AudioData::NonInterleaved, AudioData::NonConst> NativeType;
-        converter = new AudioData::ConverterInstance <AudioData::Pointer <SourceType, AudioData::LittleEndian, AudioData::Interleaved, AudioData::Const>, NativeType> (actualNumChannels, 1);
+        using NativeType = AudioData::Pointer<AudioData::Float32, AudioData::NativeEndian, AudioData::NonInterleaved, AudioData::NonConst>;
+        converter.reset (new AudioData::ConverterInstance<AudioData::Pointer<SourceType, AudioData::LittleEndian, AudioData::Interleaved, AudioData::Const>, NativeType> (actualNumChannels, 1));
     }
 
-    void updateFormat (bool isFloat)
+    void updateFormat (bool isFloat) override
     {
-        if (isFloat)                    updateFormatWithType ((AudioData::Float32*) 0);
-        else if (bytesPerSample == 4)   updateFormatWithType ((AudioData::Int32*) 0);
-        else if (bytesPerSample == 3)   updateFormatWithType ((AudioData::Int24*) 0);
-        else                            updateFormatWithType ((AudioData::Int16*) 0);
+        if (isFloat)                    updateFormatWithType ((AudioData::Float32*) nullptr);
+        else if (bytesPerSample == 4)   updateFormatWithType ((AudioData::Int32*)   nullptr);
+        else if (bytesPerSample == 3)   updateFormatWithType ((AudioData::Int24*)   nullptr);
+        else                            updateFormatWithType ((AudioData::Int16*)   nullptr);
     }
 
-    void copyBuffers (float** destBuffers, int numDestBuffers, int bufferSize, Thread& thread)
+    bool start (int userBufferSize)
+    {
+        reservoirSize = actualBufferSize + userBufferSize;
+        reservoirMask = nextPowerOfTwo (reservoirSize) - 1;
+        reservoir.setSize ((reservoirMask + 1) * bytesPerFrame, true);
+        reservoirReadPos = 0;
+        reservoirWritePos = 0;
+        xruns = 0;
+
+        if (! check (client->Start()))
+            return false;
+
+        purgeInputBuffers();
+        isActive = true;
+
+        return true;
+    }
+
+    void purgeInputBuffers()
+    {
+        uint8* inputData;
+        UINT32 numSamplesAvailable;
+        DWORD flags;
+
+        while (captureClient->GetBuffer (&inputData, &numSamplesAvailable, &flags, nullptr, nullptr)
+                  != MAKE_HRESULT (0, 0x889, 0x1) /* AUDCLNT_S_BUFFER_EMPTY */)
+            captureClient->ReleaseBuffer (numSamplesAvailable);
+    }
+
+    int getNumSamplesInReservoir() const noexcept    { return reservoirWritePos.load() - reservoirReadPos.load(); }
+
+    void handleDeviceBuffer()
     {
         if (numChannels <= 0)
             return;
 
-        int offset = 0;
+        uint8* inputData;
+        UINT32 numSamplesAvailable;
+        DWORD flags;
 
-        while (bufferSize > 0)
+        while (check (captureClient->GetBuffer (&inputData, &numSamplesAvailable, &flags, nullptr, nullptr)) && numSamplesAvailable > 0)
         {
-            if (reservoirSize > 0)  // There's stuff in the reservoir, so use that...
+            if ((flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) != 0)
+                xruns++;
+
+            int samplesLeft = (int) numSamplesAvailable;
+
+            while (samplesLeft > 0)
             {
-                const int samplesToDo = jmin (bufferSize, (int) reservoirSize);
+                auto localWrite = reservoirWritePos.load() & reservoirMask;
+                auto samplesToDo = jmin (samplesLeft, reservoirMask + 1 - localWrite);
+                auto samplesToDoBytes = samplesToDo * bytesPerFrame;
 
-                for (int i = 0; i < numDestBuffers; ++i)
-                    converter->convertSamples (destBuffers[i] + offset, 0, reservoir.getData(), channelMaps.getUnchecked(i), samplesToDo);
+                void* reservoirPtr = addBytesToPointer (reservoir.getData(), localWrite * bytesPerFrame);
 
-                bufferSize -= samplesToDo;
-                offset += samplesToDo;
-                reservoirSize = 0;
+                if ((flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0)
+                    zeromem (reservoirPtr, samplesToDoBytes);
+                else
+                    memcpy (reservoirPtr, inputData, samplesToDoBytes);
+
+                reservoirWritePos += samplesToDo;
+                inputData += samplesToDoBytes;
+                samplesLeft -= samplesToDo;
             }
-            else
-            {
-                UINT32 packetLength = 0;
-                if (! check (captureClient->GetNextPacketSize (&packetLength)))
-                    break;
 
-                if (packetLength == 0)
-                {
-                    if (thread.threadShouldExit()
-                         || WaitForSingleObject (clientEvent, 1000) == WAIT_TIMEOUT)
-                        break;
+            if (getNumSamplesInReservoir() > reservoirSize)
+                reservoirReadPos = reservoirWritePos.load() - reservoirSize;
 
-                    continue;
-                }
-
-                uint8* inputData;
-                UINT32 numSamplesAvailable;
-                DWORD flags;
-
-                if (check (captureClient->GetBuffer (&inputData, &numSamplesAvailable, &flags, 0, 0)))
-                {
-                    const int samplesToDo = jmin (bufferSize, (int) numSamplesAvailable);
-
-                    for (int i = 0; i < numDestBuffers; ++i)
-                        converter->convertSamples (destBuffers[i] + offset, 0, inputData, channelMaps.getUnchecked(i), samplesToDo);
-
-                    bufferSize -= samplesToDo;
-                    offset += samplesToDo;
-
-                    if (samplesToDo < (int) numSamplesAvailable)
-                    {
-                        reservoirSize = jmin ((int) (numSamplesAvailable - samplesToDo), reservoirCapacity);
-                        memcpy ((uint8*) reservoir.getData(), inputData + bytesPerSample * actualNumChannels * samplesToDo,
-                                (size_t) (bytesPerSample * actualNumChannels * reservoirSize));
-                    }
-
-                    captureClient->ReleaseBuffer (numSamplesAvailable);
-                }
-            }
+            captureClient->ReleaseBuffer (numSamplesAvailable);
         }
     }
 
-    ComSmartPtr <IAudioCaptureClient> captureClient;
+    void copyBuffersFromReservoir (float** destBuffers, int numDestBuffers, int bufferSize)
+    {
+        if ((numChannels <= 0 && bufferSize == 0) || reservoir.getSize() == 0)
+            return;
+
+        int offset = jmax (0, bufferSize - getNumSamplesInReservoir());
+
+        if (offset > 0)
+        {
+            for (int i = 0; i < numDestBuffers; ++i)
+                zeromem (destBuffers[i], offset * sizeof (float));
+
+            bufferSize -= offset;
+            reservoirReadPos -= offset / 2;
+        }
+
+        while (bufferSize > 0)
+        {
+            auto localRead = reservoirReadPos.load() & reservoirMask;
+            auto samplesToDo = jmin (bufferSize, getNumSamplesInReservoir(), reservoirMask + 1 - localRead);
+
+            if (samplesToDo <= 0)
+                break;
+
+            auto reservoirOffset = localRead * bytesPerFrame;
+
+            for (int i = 0; i < numDestBuffers; ++i)
+                converter->convertSamples (destBuffers[i] + offset, 0, addBytesToPointer (reservoir.getData(), reservoirOffset), channelMaps.getUnchecked(i), samplesToDo);
+
+            bufferSize -= samplesToDo;
+            offset += samplesToDo;
+            reservoirReadPos += samplesToDo;
+        }
+    }
+
+    ComSmartPtr<IAudioCaptureClient> captureClient;
     MemoryBlock reservoir;
-    int reservoirSize, reservoirCapacity;
-    ScopedPointer <AudioData::Converter> converter;
+    int reservoirSize, reservoirMask, xruns;
+    std::atomic<int> reservoirReadPos, reservoirWritePos;
+
+    std::unique_ptr<AudioData::Converter> converter;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WASAPIInputDevice)
@@ -579,8 +1023,8 @@ private:
 class WASAPIOutputDevice  : public WASAPIDeviceBase
 {
 public:
-    WASAPIOutputDevice (const ComSmartPtr <IMMDevice>& d, const bool exclusiveMode)
-        : WASAPIDeviceBase (d, exclusiveMode)
+    WASAPIOutputDevice (const ComSmartPtr<IMMDevice>& d, WASAPIDeviceMode mode)
+        : WASAPIDeviceBase (d, mode)
     {
     }
 
@@ -589,10 +1033,11 @@ public:
         close();
     }
 
-    bool open (const double newSampleRate, const BigInteger& newChannels)
+    bool open (double newSampleRate, const BigInteger& newChannels, int bufferSizeSamples)
     {
-        return openClient (newSampleRate, newChannels)
-            && (numChannels == 0 || check (client->GetService (__uuidof (IAudioRenderClient), (void**) renderClient.resetAndGetPointerAddress())));
+        return openClient (newSampleRate, newChannels, bufferSizeSamples)
+                && (numChannels == 0 || check (client->GetService (__uuidof (IAudioRenderClient),
+                                                                   (void**) renderClient.resetAndGetPointerAddress())));
     }
 
     void close()
@@ -604,19 +1049,52 @@ public:
     template <class DestType>
     void updateFormatWithType (DestType*)
     {
-        typedef AudioData::Pointer <AudioData::Float32, AudioData::NativeEndian, AudioData::NonInterleaved, AudioData::Const> NativeType;
-        converter = new AudioData::ConverterInstance <NativeType, AudioData::Pointer <DestType, AudioData::LittleEndian, AudioData::Interleaved, AudioData::NonConst> > (1, actualNumChannels);
+        using NativeType = AudioData::Pointer<AudioData::Float32, AudioData::NativeEndian, AudioData::NonInterleaved, AudioData::Const>;
+        converter.reset (new AudioData::ConverterInstance<NativeType, AudioData::Pointer<DestType, AudioData::LittleEndian, AudioData::Interleaved, AudioData::NonConst>> (1, actualNumChannels));
     }
 
-    void updateFormat (bool isFloat)
+    void updateFormat (bool isFloat) override
     {
-        if (isFloat)                    updateFormatWithType ((AudioData::Float32*) 0);
-        else if (bytesPerSample == 4)   updateFormatWithType ((AudioData::Int32*) 0);
-        else if (bytesPerSample == 3)   updateFormatWithType ((AudioData::Int24*) 0);
-        else                            updateFormatWithType ((AudioData::Int16*) 0);
+        if (isFloat)                    updateFormatWithType ((AudioData::Float32*) nullptr);
+        else if (bytesPerSample == 4)   updateFormatWithType ((AudioData::Int32*)   nullptr);
+        else if (bytesPerSample == 3)   updateFormatWithType ((AudioData::Int24*)   nullptr);
+        else                            updateFormatWithType ((AudioData::Int16*)   nullptr);
     }
 
-    void copyBuffers (const float** const srcBuffers, const int numSrcBuffers, int bufferSize, Thread& thread)
+    bool start()
+    {
+        auto samplesToDo = getNumSamplesAvailableToCopy();
+        uint8* outputData;
+
+        if (check (renderClient->GetBuffer (samplesToDo, &outputData)))
+            renderClient->ReleaseBuffer (samplesToDo, AUDCLNT_BUFFERFLAGS_SILENT);
+
+        if (! check (client->Start()))
+            return false;
+
+        isActive = true;
+
+        return true;
+    }
+
+    int getNumSamplesAvailableToCopy() const
+    {
+        if (numChannels <= 0)
+            return 0;
+
+        if (! isExclusiveMode (deviceMode))
+        {
+            UINT32 padding = 0;
+
+            if (check (client->GetCurrentPadding (&padding)))
+                return actualBufferSize - (int) padding;
+        }
+
+        return actualBufferSize;
+    }
+
+    void copyBuffers (const float** srcBuffers, int numSrcBuffers, int bufferSize,
+                      WASAPIInputDevice* inputDevice, Thread& thread)
     {
         if (numChannels <= 0)
             return;
@@ -625,21 +1103,24 @@ public:
 
         while (bufferSize > 0)
         {
-            UINT32 padding = 0;
-            if (! check (client->GetCurrentPadding (&padding)))
-                return;
+            // This is needed in order not to drop any input data if the output device endpoint buffer was full
+            if ((! isExclusiveMode (deviceMode)) && inputDevice != nullptr
+                  && WaitForSingleObject (inputDevice->clientEvent, 0) == WAIT_OBJECT_0)
+                inputDevice->handleDeviceBuffer();
 
-            int samplesToDo = useExclusiveMode ? bufferSize
-                                               : jmin ((int) (actualBufferSize - padding), bufferSize);
+            int samplesToDo = jmin (getNumSamplesAvailableToCopy(), bufferSize);
 
-            if (samplesToDo <= 0)
+            if (samplesToDo == 0)
             {
-                if (thread.threadShouldExit()
-                     || WaitForSingleObject (clientEvent, 1000) == WAIT_TIMEOUT)
-                    break;
+                // This can ONLY occur in non-exclusive mode
+                if (! thread.threadShouldExit() && WaitForSingleObject (clientEvent, 1000) == WAIT_OBJECT_0)
+                    continue;
 
-                continue;
+                break;
             }
+
+            if (isExclusiveMode (deviceMode) && WaitForSingleObject (clientEvent, 1000) == WAIT_TIMEOUT)
+                break;
 
             uint8* outputData = nullptr;
             if (check (renderClient->GetBuffer ((UINT32) samplesToDo, &outputData)))
@@ -648,15 +1129,15 @@ public:
                     converter->convertSamples (outputData, channelMaps.getUnchecked(i), srcBuffers[i] + offset, 0, samplesToDo);
 
                 renderClient->ReleaseBuffer ((UINT32) samplesToDo, 0);
-
-                offset += samplesToDo;
-                bufferSize -= samplesToDo;
             }
+
+            bufferSize -= samplesToDo;
+            offset += samplesToDo;
         }
     }
 
-    ComSmartPtr <IAudioRenderClient> renderClient;
-    ScopedPointer <AudioData::Converter> converter;
+    ComSmartPtr<IAudioRenderClient> renderClient;
+    std::unique_ptr<AudioData::Converter> converter;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WASAPIOutputDevice)
@@ -669,65 +1150,106 @@ class WASAPIAudioIODevice  : public AudioIODevice,
 {
 public:
     WASAPIAudioIODevice (const String& deviceName,
-                         const String& outputDeviceId_,
-                         const String& inputDeviceId_,
-                         const bool exclusiveMode)
-        : AudioIODevice (deviceName, "Windows Audio"),
-          Thread ("Juce WASAPI"),
-          outputDeviceId (outputDeviceId_),
-          inputDeviceId (inputDeviceId_),
-          useExclusiveMode (exclusiveMode),
-          isOpen_ (false),
-          isStarted (false),
-          currentBufferSizeSamples (0),
-          currentSampleRate (0),
-          callback (nullptr)
+                         const String& typeName,
+                         const String& outputDeviceID,
+                         const String& inputDeviceID,
+                         WASAPIDeviceMode mode)
+        : AudioIODevice (deviceName, typeName),
+          Thread ("JUCE WASAPI"),
+          outputDeviceId (outputDeviceID),
+          inputDeviceId (inputDeviceID),
+          deviceMode (mode)
     {
     }
 
     ~WASAPIAudioIODevice()
     {
+        cancelPendingUpdate();
         close();
     }
 
     bool initialise()
     {
         latencyIn = latencyOut = 0;
-        Array <double> ratesIn, ratesOut;
+        Array<double> ratesIn, ratesOut;
 
         if (createDevices())
         {
             jassert (inputDevice != nullptr || outputDevice != nullptr);
 
+            sampleRates.clear();
+
             if (inputDevice != nullptr && outputDevice != nullptr)
             {
                 defaultSampleRate = jmin (inputDevice->defaultSampleRate, outputDevice->defaultSampleRate);
-                minBufferSize = jmin (inputDevice->minBufferSize, outputDevice->minBufferSize);
+                minBufferSize = jmax (inputDevice->minBufferSize, outputDevice->minBufferSize);
                 defaultBufferSize = jmax (inputDevice->defaultBufferSize, outputDevice->defaultBufferSize);
-                sampleRates = inputDevice->rates;
-                sampleRates.removeValuesNotIn (outputDevice->rates);
+
+                if (isLowLatencyMode (deviceMode))
+                {
+                    lowLatencyMaxBufferSize = jmin (inputDevice->lowLatencyMaxBufferSize, outputDevice->lowLatencyMaxBufferSize);
+                    lowLatencyBufferSizeMultiple = jmax (inputDevice->lowLatencyBufferSizeMultiple, outputDevice->lowLatencyBufferSizeMultiple);
+                }
+
+                sampleRates.addArray (inputDevice->rates);
+
+                if (supportsSampleRateConversion (deviceMode))
+                {
+                    for (auto r : outputDevice->rates)
+                        if (! sampleRates.contains (r))
+                            sampleRates.addUsingDefaultSort (r);
+                }
+                else
+                {
+                    sampleRates.removeValuesNotIn (outputDevice->rates);
+                }
             }
             else
             {
-                WASAPIDeviceBase* d = inputDevice != nullptr ? static_cast<WASAPIDeviceBase*> (inputDevice)
-                                                             : static_cast<WASAPIDeviceBase*> (outputDevice);
+                auto* d = inputDevice != nullptr ? static_cast<WASAPIDeviceBase*> (inputDevice.get())
+                                                 : static_cast<WASAPIDeviceBase*> (outputDevice.get());
+
                 defaultSampleRate = d->defaultSampleRate;
                 minBufferSize = d->minBufferSize;
                 defaultBufferSize = d->defaultBufferSize;
+
+                if (isLowLatencyMode (deviceMode))
+                {
+                    lowLatencyMaxBufferSize = d->lowLatencyMaxBufferSize;
+                    lowLatencyBufferSizeMultiple = d->lowLatencyBufferSizeMultiple;
+                }
+
                 sampleRates = d->rates;
             }
 
+            bufferSizes.clear();
             bufferSizes.addUsingDefaultSort (defaultBufferSize);
+
             if (minBufferSize != defaultBufferSize)
                 bufferSizes.addUsingDefaultSort (minBufferSize);
 
-            int n = 64;
-            for (int i = 0; i < 40; ++i)
+            if (isLowLatencyMode (deviceMode))
             {
-                if (n >= minBufferSize && n <= 2048 && ! bufferSizes.contains (n))
-                    bufferSizes.addUsingDefaultSort (n);
+                auto size = minBufferSize;
 
-                n += (n < 512) ? 32 : (n < 1024 ? 64 : 128);
+                while (size < lowLatencyMaxBufferSize)
+                {
+                    size += lowLatencyBufferSizeMultiple;
+
+                    if (! bufferSizes.contains (size))
+                        bufferSizes.addUsingDefaultSort (size);
+                }
+            }
+            else
+            {
+                int n = 64;
+                for (int i = 0; i < 40; ++i)
+                {
+                    if (n >= minBufferSize && n <= 2048 && ! bufferSizes.contains (n))
+                        bufferSizes.addUsingDefaultSort (n);
+
+                    n += (n < 512) ? 32 : (n < 1024 ? 64 : 128);
+                }
             }
 
             return true;
@@ -736,7 +1258,7 @@ public:
         return false;
     }
 
-    StringArray getOutputChannelNames()
+    StringArray getOutputChannelNames() override
     {
         StringArray outChannels;
 
@@ -747,7 +1269,7 @@ public:
         return outChannels;
     }
 
-    StringArray getInputChannelNames()
+    StringArray getInputChannelNames() override
     {
         StringArray inChannels;
 
@@ -758,31 +1280,29 @@ public:
         return inChannels;
     }
 
-    int getNumSampleRates()                             { return sampleRates.size(); }
-    double getSampleRate (int index)                    { return sampleRates [index]; }
-    int getNumBufferSizesAvailable()                    { return bufferSizes.size(); }
-    int getBufferSizeSamples (int index)                { return bufferSizes [index]; }
-    int getDefaultBufferSize()                          { return defaultBufferSize; }
+    Array<double> getAvailableSampleRates() override        { return sampleRates; }
+    Array<int> getAvailableBufferSizes() override           { return bufferSizes; }
+    int getDefaultBufferSize() override                     { return defaultBufferSize; }
 
-    int getCurrentBufferSizeSamples()                   { return currentBufferSizeSamples; }
-    double getCurrentSampleRate()                       { return currentSampleRate; }
-    int getCurrentBitDepth()                            { return 32; }
-    int getOutputLatencyInSamples()                     { return latencyOut; }
-    int getInputLatencyInSamples()                      { return latencyIn; }
-    BigInteger getActiveOutputChannels() const          { return outputDevice != nullptr ? outputDevice->channels : BigInteger(); }
-    BigInteger getActiveInputChannels() const           { return inputDevice  != nullptr ? inputDevice->channels  : BigInteger(); }
-    String getLastError()                               { return lastError; }
-
+    int getCurrentBufferSizeSamples() override              { return currentBufferSizeSamples; }
+    double getCurrentSampleRate() override                  { return currentSampleRate; }
+    int getCurrentBitDepth() override                       { return 32; }
+    int getOutputLatencyInSamples() override                { return latencyOut; }
+    int getInputLatencyInSamples() override                 { return latencyIn; }
+    BigInteger getActiveOutputChannels() const override     { return outputDevice != nullptr ? outputDevice->channels : BigInteger(); }
+    BigInteger getActiveInputChannels() const override      { return inputDevice  != nullptr ? inputDevice->channels  : BigInteger(); }
+    String getLastError() override                          { return lastError; }
+    int getXRunCount() const noexcept override              { return inputDevice != nullptr ? inputDevice->xruns : -1; }
 
     String open (const BigInteger& inputChannels, const BigInteger& outputChannels,
-                 double sampleRate, int bufferSizeSamples)
+                 double sampleRate, int bufferSizeSamples) override
     {
         close();
-        lastError = String::empty;
+        lastError.clear();
 
         if (sampleRates.size() == 0 && inputDevice != nullptr && outputDevice != nullptr)
         {
-            lastError = "The input and output devices don't share a common sample rate!";
+            lastError = TRANS("The input and output devices don't share a common sample rate!");
             return lastError;
         }
 
@@ -791,21 +1311,38 @@ public:
         lastKnownInputChannels    = inputChannels;
         lastKnownOutputChannels   = outputChannels;
 
-        if (inputDevice != nullptr && ! inputDevice->open (currentSampleRate, inputChannels))
+        if (inputDevice != nullptr && ! inputDevice->open (currentSampleRate, inputChannels, bufferSizeSamples))
         {
-            lastError = "Couldn't open the input device!";
+            lastError = TRANS("Couldn't open the input device!");
             return lastError;
         }
 
-        if (outputDevice != nullptr && ! outputDevice->open (currentSampleRate, outputChannels))
+        if (outputDevice != nullptr && ! outputDevice->open (currentSampleRate, outputChannels, bufferSizeSamples))
         {
             close();
-            lastError = "Couldn't open the output device!";
+            lastError = TRANS("Couldn't open the output device!");
             return lastError;
+        }
+
+        if (isExclusiveMode (deviceMode))
+        {
+            // This is to make sure that the callback uses actualBufferSize in case of exclusive mode
+            if (inputDevice != nullptr && outputDevice != nullptr && inputDevice->actualBufferSize != outputDevice->actualBufferSize)
+            {
+                close();
+                lastError = TRANS("Couldn't open the output device (buffer size mismatch)");
+                return lastError;
+            }
+
+            currentBufferSizeSamples = outputDevice != nullptr ? outputDevice->actualBufferSize
+                                                               : inputDevice->actualBufferSize;
         }
 
         if (inputDevice != nullptr)   ResetEvent (inputDevice->clientEvent);
         if (outputDevice != nullptr)  ResetEvent (outputDevice->clientEvent);
+
+        shouldShutdown = false;
+        deviceSampleRateChanged = false;
 
         startThread (8);
         Thread::sleep (5);
@@ -814,10 +1351,10 @@ public:
         {
             latencyIn = (int) (inputDevice->latencySamples + currentBufferSizeSamples);
 
-            if (! check (inputDevice->client->Start()))
+            if (! inputDevice->start (currentBufferSizeSamples))
             {
                 close();
-                lastError = "Couldn't start the input device!";
+                lastError = TRANS("Couldn't start the input device!");
                 return lastError;
             }
         }
@@ -826,10 +1363,10 @@ public:
         {
             latencyOut = (int) (outputDevice->latencySamples + currentBufferSizeSamples);
 
-            if (! check (outputDevice->client->Start()))
+            if (! outputDevice->start())
             {
                 close();
-                lastError = "Couldn't start the output device!";
+                lastError = TRANS("Couldn't start the output device!");
                 return lastError;
             }
         }
@@ -838,7 +1375,7 @@ public:
         return lastError;
     }
 
-    void close()
+    void close() override
     {
         stop();
         signalThreadShouldExit();
@@ -854,10 +1391,10 @@ public:
         isOpen_ = false;
     }
 
-    bool isOpen()       { return isOpen_ && isThreadRunning(); }
-    bool isPlaying()    { return isStarted && isOpen_ && isThreadRunning(); }
+    bool isOpen() override       { return isOpen_ && isThreadRunning(); }
+    bool isPlaying() override    { return isStarted && isOpen_ && isThreadRunning(); }
 
-    void start (AudioIODeviceCallback* call)
+    void start (AudioIODeviceCallback* call) override
     {
         if (isOpen_ && call != nullptr && ! isStarted)
         {
@@ -876,11 +1413,11 @@ public:
         }
     }
 
-    void stop()
+    void stop() override
     {
         if (isStarted)
         {
-            AudioIODeviceCallback* const callbackLocal = callback;
+            auto* callbackLocal = callback;
 
             {
                 const ScopedLock sl (startStopLock);
@@ -901,69 +1438,96 @@ public:
         if (avSetMmThreadCharacteristics != 0 && avSetMmThreadPriority != 0)
         {
             DWORD dummy = 0;
-            HANDLE h = avSetMmThreadCharacteristics (L"Pro Audio", &dummy);
 
-            if (h != 0)
+            if (auto h = avSetMmThreadCharacteristics (L"Pro Audio", &dummy))
                 avSetMmThreadPriority (h, AVRT_PRIORITY_NORMAL);
         }
     }
 
-    void run()
+    void run() override
     {
         setMMThreadPriority();
 
-        const int bufferSize        = currentBufferSizeSamples;
-        const int numInputBuffers   = getActiveInputChannels().countNumberOfSetBits();
-        const int numOutputBuffers  = getActiveOutputChannels().countNumberOfSetBits();
-        bool sampleRateChanged      = false;
+        auto bufferSize        = currentBufferSizeSamples;
+        auto numInputBuffers   = getActiveInputChannels().countNumberOfSetBits();
+        auto numOutputBuffers  = getActiveOutputChannels().countNumberOfSetBits();
 
-        AudioSampleBuffer ins  (jmax (1, numInputBuffers),  bufferSize + 32);
-        AudioSampleBuffer outs (jmax (1, numOutputBuffers), bufferSize + 32);
-        float** const inputBuffers  = ins.getArrayOfChannels();
-        float** const outputBuffers = outs.getArrayOfChannels();
+        AudioBuffer<float> ins  (jmax (1, numInputBuffers),  bufferSize + 32);
+        AudioBuffer<float> outs (jmax (1, numOutputBuffers), bufferSize + 32);
+        auto inputBuffers  = ins.getArrayOfWritePointers();
+        auto outputBuffers = outs.getArrayOfWritePointers();
         ins.clear();
+        outs.clear();
 
         while (! threadShouldExit())
         {
-            if (inputDevice != nullptr)
+            if ((outputDevice != nullptr && outputDevice->shouldShutdown)
+                || (inputDevice != nullptr && inputDevice->shouldShutdown))
             {
-                inputDevice->copyBuffers (inputBuffers, numInputBuffers, bufferSize, *this);
+                shouldShutdown = true;
+                triggerAsyncUpdate();
 
-                if (threadShouldExit())
-                    break;
+                break;
+            }
+
+            auto inputDeviceActive = (inputDevice != nullptr && inputDevice->isActive);
+            auto outputDeviceActive = (outputDevice != nullptr && outputDevice->isActive);
+
+            if (! inputDeviceActive && ! outputDeviceActive)
+                continue;
+
+            if (inputDeviceActive)
+            {
+                if (outputDevice == nullptr)
+                {
+                    if (WaitForSingleObject (inputDevice->clientEvent, 1000) == WAIT_TIMEOUT)
+                        break;
+
+                    inputDevice->handleDeviceBuffer();
+
+                    if (inputDevice->getNumSamplesInReservoir() < bufferSize)
+                        continue;
+                }
+                else
+                {
+                    if (isExclusiveMode (deviceMode) && WaitForSingleObject (inputDevice->clientEvent, 0) == WAIT_OBJECT_0)
+                        inputDevice->handleDeviceBuffer();
+                }
+
+                inputDevice->copyBuffersFromReservoir (inputBuffers, numInputBuffers, bufferSize);
 
                 if (inputDevice->sampleRateHasChanged)
                 {
-                    sampleRateChanged = true;
-                    sampleRateChangedByOutput = false;
+                    deviceSampleRateChanged = true;
+                    triggerAsyncUpdate();
+
+                    break;
                 }
             }
 
             {
-                const ScopedLock sl (startStopLock);
+                const ScopedTryLock sl (startStopLock);
 
-                if (isStarted)
-                    callback->audioDeviceIOCallback (const_cast <const float**> (inputBuffers), numInputBuffers,
+                if (sl.isLocked() && isStarted)
+                    callback->audioDeviceIOCallback (const_cast<const float**> (inputBuffers), numInputBuffers,
                                                      outputBuffers, numOutputBuffers, bufferSize);
                 else
                     outs.clear();
             }
 
-            if (outputDevice != nullptr)
+            if (outputDeviceActive)
             {
-                outputDevice->copyBuffers (const_cast <const float**> (outputBuffers), numOutputBuffers, bufferSize, *this);
+                // Note that this function is handed the input device so it can check for the event and make sure
+                // the input reservoir is filled up correctly even when bufferSize > device actualBufferSize
+                outputDevice->copyBuffers (const_cast<const float**> (outputBuffers), numOutputBuffers, bufferSize, inputDevice.get(), *this);
 
                 if (outputDevice->sampleRateHasChanged)
                 {
-                    sampleRateChanged = true;
-                    sampleRateChangedByOutput = true;
-                }
-            }
+                    deviceSampleRateChanged = true;
+                    triggerAsyncUpdate();
 
-            if (sampleRateChanged)
-            {
-                triggerAsyncUpdate();
-                break; // Quit the thread... will restart it later!
+                    break;
+                }
             }
         }
     }
@@ -974,87 +1538,108 @@ public:
 
 private:
     // Device stats...
-    ScopedPointer<WASAPIInputDevice> inputDevice;
-    ScopedPointer<WASAPIOutputDevice> outputDevice;
-    const bool useExclusiveMode;
-    double defaultSampleRate;
-    int minBufferSize, defaultBufferSize;
-    int latencyIn, latencyOut;
-    Array <double> sampleRates;
-    Array <int> bufferSizes;
+    std::unique_ptr<WASAPIInputDevice> inputDevice;
+    std::unique_ptr<WASAPIOutputDevice> outputDevice;
+    WASAPIDeviceMode deviceMode;
+    double defaultSampleRate = 0;
+    int minBufferSize = 0, defaultBufferSize = 0;
+    int lowLatencyMaxBufferSize = 0, lowLatencyBufferSizeMultiple = 0;
+    int latencyIn = 0, latencyOut = 0;
+    Array<double> sampleRates;
+    Array<int> bufferSizes;
 
     // Active state...
-    bool isOpen_, isStarted;
-    int currentBufferSizeSamples;
-    double currentSampleRate;
-    bool sampleRateChangedByOutput;
+    bool isOpen_ = false, isStarted = false;
+    int currentBufferSizeSamples = 0;
+    double currentSampleRate = 0;
 
-    AudioIODeviceCallback* callback;
+    AudioIODeviceCallback* callback = {};
     CriticalSection startStopLock;
+
+    std::atomic<bool> shouldShutdown { false }, deviceSampleRateChanged { false };
 
     BigInteger lastKnownInputChannels, lastKnownOutputChannels;
 
     //==============================================================================
     bool createDevices()
     {
-        ComSmartPtr <IMMDeviceEnumerator> enumerator;
+        ComSmartPtr<IMMDeviceEnumerator> enumerator;
+
         if (! check (enumerator.CoCreateInstance (__uuidof (MMDeviceEnumerator))))
             return false;
 
-        ComSmartPtr <IMMDeviceCollection> deviceCollection;
+        ComSmartPtr<IMMDeviceCollection> deviceCollection;
+
         if (! check (enumerator->EnumAudioEndpoints (eAll, DEVICE_STATE_ACTIVE, deviceCollection.resetAndGetPointerAddress())))
             return false;
 
         UINT32 numDevices = 0;
+
         if (! check (deviceCollection->GetCount (&numDevices)))
             return false;
 
         for (UINT32 i = 0; i < numDevices; ++i)
         {
-            ComSmartPtr <IMMDevice> device;
+            ComSmartPtr<IMMDevice> device;
+
             if (! check (deviceCollection->Item (i, device.resetAndGetPointerAddress())))
                 continue;
 
-            const String deviceId (getDeviceID (device));
+            auto deviceId = getDeviceID (device);
+
             if (deviceId.isEmpty())
                 continue;
 
-            const EDataFlow flow = getDataFlow (device);
+            auto flow = getDataFlow (device);
 
             if (deviceId == inputDeviceId && flow == eCapture)
-                inputDevice = new WASAPIInputDevice (device, useExclusiveMode);
+                inputDevice.reset (new WASAPIInputDevice (device, deviceMode));
             else if (deviceId == outputDeviceId && flow == eRender)
-                outputDevice = new WASAPIOutputDevice (device, useExclusiveMode);
+                outputDevice.reset (new WASAPIOutputDevice (device, deviceMode));
         }
 
         return (outputDeviceId.isEmpty() || (outputDevice != nullptr && outputDevice->isOk()))
-            && (inputDeviceId.isEmpty() || (inputDevice != nullptr && inputDevice->isOk()));
+             && (inputDeviceId.isEmpty() || (inputDevice != nullptr && inputDevice->isOk()));
     }
 
     //==============================================================================
-    void handleAsyncUpdate()
+    void handleAsyncUpdate() override
     {
-        stop();
+        auto closeDevices = [this]
+        {
+            close();
 
-        outputDevice = nullptr;
-        inputDevice = nullptr;
-        initialise();
+            outputDevice = nullptr;
+            inputDevice = nullptr;
+        };
 
-        open (lastKnownInputChannels, lastKnownOutputChannels,
-              getChangedSampleRate(), currentBufferSizeSamples);
+        if (shouldShutdown)
+        {
+            closeDevices();
+        }
+        else if (deviceSampleRateChanged)
+        {
+            auto sampleRateChangedByInput = (inputDevice != nullptr && inputDevice->sampleRateHasChanged);
 
-        start (callback);
-    }
+            closeDevices();
+            initialise();
 
-    double getChangedSampleRate() const
-    {
-        if (outputDevice != nullptr && sampleRateChangedByOutput)
-            return outputDevice->defaultSampleRate;
+            auto changedSampleRate = [this, sampleRateChangedByInput]()
+            {
+                if (inputDevice != nullptr && sampleRateChangedByInput)
+                    return inputDevice->defaultSampleRate;
 
-        if (inputDevice != nullptr && ! sampleRateChangedByOutput)
-            return inputDevice->defaultSampleRate;
+                if (outputDevice != nullptr && ! sampleRateChangedByInput)
+                    return outputDevice->defaultSampleRate;
 
-        return 0.0;
+                return 0.0;
+            }();
+
+            open (lastKnownInputChannels, lastKnownOutputChannels,
+                  changedSampleRate, currentBufferSizeSamples);
+
+            start (callback);
+        }
     }
 
     //==============================================================================
@@ -1067,10 +1652,10 @@ class WASAPIAudioIODeviceType  : public AudioIODeviceType,
                                  private DeviceChangeDetector
 {
 public:
-    WASAPIAudioIODeviceType()
-        : AudioIODeviceType ("Windows Audio"),
+    WASAPIAudioIODeviceType (WASAPIDeviceMode mode)
+        : AudioIODeviceType (getDeviceTypename (mode)),
           DeviceChangeDetector (L"Windows Audio"),
-          hasScanned (false)
+          deviceMode (mode)
     {
     }
 
@@ -1081,7 +1666,7 @@ public:
     }
 
     //==============================================================================
-    void scanForDevices()
+    void scanForDevices() override
     {
         hasScanned = true;
 
@@ -1094,7 +1679,7 @@ public:
               outputDeviceIds, inputDeviceIds);
     }
 
-    StringArray getDeviceNames (bool wantInputNames) const
+    StringArray getDeviceNames (bool wantInputNames) const override
     {
         jassert (hasScanned); // need to call scanForDevices() before doing this
 
@@ -1102,40 +1687,43 @@ public:
                               : outputDeviceNames;
     }
 
-    int getDefaultDeviceIndex (bool /*forInput*/) const
+    int getDefaultDeviceIndex (bool /*forInput*/) const override
     {
         jassert (hasScanned); // need to call scanForDevices() before doing this
         return 0;
     }
 
-    int getIndexOfDevice (AudioIODevice* device, bool asInput) const
+    int getIndexOfDevice (AudioIODevice* device, bool asInput) const override
     {
         jassert (hasScanned); // need to call scanForDevices() before doing this
-        WASAPIAudioIODevice* const d = dynamic_cast <WASAPIAudioIODevice*> (device);
-        return d == nullptr ? -1 : (asInput ? inputDeviceIds.indexOf (d->inputDeviceId)
-                                            : outputDeviceIds.indexOf (d->outputDeviceId));
+
+        if (auto d = dynamic_cast<WASAPIAudioIODevice*> (device))
+            return asInput ? inputDeviceIds.indexOf (d->inputDeviceId)
+                           : outputDeviceIds.indexOf (d->outputDeviceId);
+
+        return -1;
     }
 
-    bool hasSeparateInputsAndOutputs() const    { return true; }
+    bool hasSeparateInputsAndOutputs() const override    { return true; }
 
     AudioIODevice* createDevice (const String& outputDeviceName,
-                                 const String& inputDeviceName)
+                                 const String& inputDeviceName) override
     {
         jassert (hasScanned); // need to call scanForDevices() before doing this
 
-        const bool useExclusiveMode = false;
-        ScopedPointer<WASAPIAudioIODevice> device;
+        std::unique_ptr<WASAPIAudioIODevice> device;
 
-        const int outputIndex = outputDeviceNames.indexOf (outputDeviceName);
-        const int inputIndex = inputDeviceNames.indexOf (inputDeviceName);
+        auto outputIndex = outputDeviceNames.indexOf (outputDeviceName);
+        auto inputIndex = inputDeviceNames.indexOf (inputDeviceName);
 
         if (outputIndex >= 0 || inputIndex >= 0)
         {
-            device = new WASAPIAudioIODevice (outputDeviceName.isNotEmpty() ? outputDeviceName
-                                                                            : inputDeviceName,
-                                              outputDeviceIds [outputIndex],
-                                              inputDeviceIds [inputIndex],
-                                              useExclusiveMode);
+            device.reset (new WASAPIAudioIODevice (outputDeviceName.isNotEmpty() ? outputDeviceName
+                                                                                 : inputDeviceName,
+                                                   getTypeName(),
+                                                   outputDeviceIds [outputIndex],
+                                                   inputDeviceIds [inputIndex],
+                                                   deviceMode));
 
             if (! device->initialise())
                 device = nullptr;
@@ -1149,26 +1737,33 @@ public:
     StringArray inputDeviceNames, inputDeviceIds;
 
 private:
-    bool hasScanned;
+    WASAPIDeviceMode deviceMode;
+    bool hasScanned = false;
     ComSmartPtr<IMMDeviceEnumerator> enumerator;
 
     //==============================================================================
     class ChangeNotificationClient : public ComBaseClassHelper<IMMNotificationClient>
     {
     public:
-        ChangeNotificationClient (WASAPIAudioIODeviceType& d)
-            : ComBaseClassHelper <IMMNotificationClient> (0), device (d) {}
+        ChangeNotificationClient (WASAPIAudioIODeviceType* d)
+            : ComBaseClassHelper<IMMNotificationClient> (0), device (d) {}
 
-        HRESULT STDMETHODCALLTYPE OnDeviceAdded (LPCWSTR)                             { return notify(); }
-        HRESULT STDMETHODCALLTYPE OnDeviceRemoved (LPCWSTR)                           { return notify(); }
-        HRESULT STDMETHODCALLTYPE OnDeviceStateChanged (LPCWSTR, DWORD)               { return notify(); }
-        HRESULT STDMETHODCALLTYPE OnDefaultDeviceChanged (EDataFlow, ERole, LPCWSTR)  { return notify(); }
-        HRESULT STDMETHODCALLTYPE OnPropertyValueChanged (LPCWSTR, const PROPERTYKEY) { return notify(); }
+        JUCE_COMRESULT OnDeviceAdded (LPCWSTR)                             { return notify(); }
+        JUCE_COMRESULT OnDeviceRemoved (LPCWSTR)                           { return notify(); }
+        JUCE_COMRESULT OnDeviceStateChanged(LPCWSTR, DWORD)                { return notify(); }
+        JUCE_COMRESULT OnDefaultDeviceChanged (EDataFlow, ERole, LPCWSTR)  { return notify(); }
+        JUCE_COMRESULT OnPropertyValueChanged (LPCWSTR, const PROPERTYKEY) { return notify(); }
 
     private:
-        WASAPIAudioIODeviceType& device;
+        WeakReference<WASAPIAudioIODeviceType> device;
 
-        HRESULT notify()   { device.triggerAsyncDeviceChangeCallback(); return S_OK; }
+        HRESULT notify()
+        {
+            if (device != nullptr)
+                device->triggerAsyncDeviceChangeCallback();
+
+            return S_OK;
+        }
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChangeNotificationClient)
     };
@@ -1176,7 +1771,7 @@ private:
     ComSmartPtr<ChangeNotificationClient> notifyClient;
 
     //==============================================================================
-    static String getDefaultEndpoint (IMMDeviceEnumerator* const enumerator, const bool forCapture)
+    static String getDefaultEndpoint (IMMDeviceEnumerator* enumerator, bool forCapture)
     {
         String s;
         IMMDevice* dev = nullptr;
@@ -1199,24 +1794,24 @@ private:
     }
 
     //==============================================================================
-    void scan (StringArray& outputDeviceNames,
-               StringArray& inputDeviceNames,
-               StringArray& outputDeviceIds,
-               StringArray& inputDeviceIds)
+    void scan (StringArray& outDeviceNames,
+               StringArray& inDeviceNames,
+               StringArray& outDeviceIds,
+               StringArray& inDeviceIds)
     {
         if (enumerator == nullptr)
         {
             if (! check (enumerator.CoCreateInstance (__uuidof (MMDeviceEnumerator))))
                 return;
 
-            notifyClient = new ChangeNotificationClient (*this);
+            notifyClient = new ChangeNotificationClient (this);
             enumerator->RegisterEndpointNotificationCallback (notifyClient);
         }
 
-        const String defaultRenderer (getDefaultEndpoint (enumerator, false));
-        const String defaultCapture  (getDefaultEndpoint (enumerator, true));
+        auto defaultRenderer = getDefaultEndpoint (enumerator, false);
+        auto defaultCapture  = getDefaultEndpoint (enumerator, true);
 
-        ComSmartPtr <IMMDeviceCollection> deviceCollection;
+        ComSmartPtr<IMMDeviceCollection> deviceCollection;
         UINT32 numDevices = 0;
 
         if (! (check (enumerator->EnumAudioEndpoints (eAll, DEVICE_STATE_ACTIVE, deviceCollection.resetAndGetPointerAddress()))
@@ -1225,52 +1820,59 @@ private:
 
         for (UINT32 i = 0; i < numDevices; ++i)
         {
-            ComSmartPtr <IMMDevice> device;
+            ComSmartPtr<IMMDevice> device;
+
             if (! check (deviceCollection->Item (i, device.resetAndGetPointerAddress())))
                 continue;
 
             DWORD state = 0;
+
             if (! (check (device->GetState (&state)) && state == DEVICE_STATE_ACTIVE))
                 continue;
 
-            const String deviceId (getDeviceID (device));
+            auto deviceId = getDeviceID (device);
             String name;
 
             {
-                ComSmartPtr <IPropertyStore> properties;
+                ComSmartPtr<IPropertyStore> properties;
+
                 if (! check (device->OpenPropertyStore (STGM_READ, properties.resetAndGetPointerAddress())))
                     continue;
 
                 PROPVARIANT value;
-                PropVariantInit (&value);
+                zerostruct (value);
+
+                const PROPERTYKEY PKEY_Device_FriendlyName
+                    = { { 0xa45c254e, 0xdf1c, 0x4efd, { 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0 } }, 14 };
+
                 if (check (properties->GetValue (PKEY_Device_FriendlyName, &value)))
                     name = value.pwszVal;
 
                 PropVariantClear (&value);
             }
 
-            const EDataFlow flow = getDataFlow (device);
+            auto flow = getDataFlow (device);
 
             if (flow == eRender)
             {
                 const int index = (deviceId == defaultRenderer) ? 0 : -1;
-                outputDeviceIds.insert (index, deviceId);
-                outputDeviceNames.insert (index, name);
+                outDeviceIds.insert (index, deviceId);
+                outDeviceNames.insert (index, name);
             }
             else if (flow == eCapture)
             {
                 const int index = (deviceId == defaultCapture) ? 0 : -1;
-                inputDeviceIds.insert (index, deviceId);
-                inputDeviceNames.insert (index, name);
+                inDeviceIds.insert (index, deviceId);
+                inDeviceNames.insert (index, name);
             }
         }
 
-        inputDeviceNames.appendNumbersToDuplicates (false, false);
-        outputDeviceNames.appendNumbersToDuplicates (false, false);
+        inDeviceNames.appendNumbersToDuplicates (false, false);
+        outDeviceNames.appendNumbersToDuplicates (false, false);
     }
 
     //==============================================================================
-    void systemDeviceChanged()
+    void systemDeviceChanged() override
     {
         StringArray newOutNames, newInNames, newOutIds, newInIds;
         scan (newOutNames, newInNames, newOutIds, newInIds);
@@ -1291,16 +1893,79 @@ private:
     }
 
     //==============================================================================
+    static String getDeviceTypename (WASAPIDeviceMode mode)
+    {
+        if (mode == WASAPIDeviceMode::shared)            return "Windows Audio";
+        if (mode == WASAPIDeviceMode::sharedLowLatency)  return "Windows Audio (Low Latency Mode)";
+        if (mode == WASAPIDeviceMode::exclusive)         return "Windows Audio (Exclusive Mode)";
+
+        jassertfalse;
+        return {};
+    }
+
+    //==============================================================================
+    JUCE_DECLARE_WEAK_REFERENCEABLE (WASAPIAudioIODeviceType)
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (WASAPIAudioIODeviceType)
+};
+
+//==============================================================================
+struct MMDeviceMasterVolume
+{
+    MMDeviceMasterVolume()
+    {
+        ComSmartPtr<IMMDeviceEnumerator> enumerator;
+
+        if (check (enumerator.CoCreateInstance (__uuidof (MMDeviceEnumerator))))
+        {
+            ComSmartPtr<IMMDevice> device;
+
+            if (check (enumerator->GetDefaultAudioEndpoint (eRender, eConsole, device.resetAndGetPointerAddress())))
+                check (device->Activate (__uuidof (IAudioEndpointVolume), CLSCTX_INPROC_SERVER, nullptr,
+                                         (void**) endpointVolume.resetAndGetPointerAddress()));
+        }
+    }
+
+    float getGain() const
+    {
+        float vol = 0.0f;
+
+        if (endpointVolume != nullptr)
+            check (endpointVolume->GetMasterVolumeLevelScalar (&vol));
+
+        return vol;
+    }
+
+    bool setGain (float newGain) const
+    {
+        return endpointVolume != nullptr
+                && check (endpointVolume->SetMasterVolumeLevelScalar (jlimit (0.0f, 1.0f, newGain), nullptr));
+    }
+
+    bool isMuted() const
+    {
+        BOOL mute = 0;
+        return endpointVolume != nullptr
+                 && check (endpointVolume->GetMute (&mute)) && mute != 0;
+    }
+
+    bool setMuted (bool shouldMute) const
+    {
+        return endpointVolume != nullptr
+                && check (endpointVolume->SetMute (shouldMute, nullptr));
+    }
+
+    ComSmartPtr<IAudioEndpointVolume> endpointVolume;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MMDeviceMasterVolume)
 };
 
 }
 
 //==============================================================================
-AudioIODeviceType* AudioIODeviceType::createAudioIODeviceType_WASAPI()
-{
-    if (SystemStats::getOperatingSystemType() >= SystemStats::WinVista)
-        return new WasapiClasses::WASAPIAudioIODeviceType();
+#define JUCE_SYSTEMAUDIOVOL_IMPLEMENTED 1
+float JUCE_CALLTYPE SystemAudioVolume::getGain()              { return WasapiClasses::MMDeviceMasterVolume().getGain(); }
+bool  JUCE_CALLTYPE SystemAudioVolume::setGain (float gain)   { return WasapiClasses::MMDeviceMasterVolume().setGain (gain); }
+bool  JUCE_CALLTYPE SystemAudioVolume::isMuted()              { return WasapiClasses::MMDeviceMasterVolume().isMuted(); }
+bool  JUCE_CALLTYPE SystemAudioVolume::setMuted (bool mute)   { return WasapiClasses::MMDeviceMasterVolume().setMuted (mute); }
 
-    return nullptr;
-}
+} // namespace juce

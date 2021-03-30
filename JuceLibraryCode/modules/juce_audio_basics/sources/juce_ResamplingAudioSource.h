@@ -1,39 +1,35 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_RESAMPLINGAUDIOSOURCE_JUCEHEADER__
-#define __JUCE_RESAMPLINGAUDIOSOURCE_JUCEHEADER__
-
-#include "juce_AudioSource.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
     A type of AudioSource that takes an input source and changes its sample rate.
 
-    @see AudioSource
+    @see AudioSource, LagrangeInterpolator, CatmullRomInterpolator
+
+    @tags{Audio}
 */
 class JUCE_API  ResamplingAudioSource  : public AudioSource
 {
@@ -51,7 +47,7 @@ public:
                            int numChannels = 2);
 
     /** Destructor. */
-    ~ResamplingAudioSource();
+    ~ResamplingAudioSource() override;
 
     /** Changes the resampling ratio.
 
@@ -69,22 +65,27 @@ public:
     */
     double getResamplingRatio() const noexcept                  { return ratio; }
 
+    /** Clears any buffers and filters that the resampler is using. */
+    void flushBuffers();
+
     //==============================================================================
-    void prepareToPlay (int samplesPerBlockExpected, double sampleRate);
-    void releaseResources();
-    void getNextAudioBlock (const AudioSourceChannelInfo& bufferToFill);
+    void prepareToPlay (int samplesPerBlockExpected, double sampleRate) override;
+    void releaseResources() override;
+    void getNextAudioBlock (const AudioSourceChannelInfo&) override;
 
 private:
     //==============================================================================
     OptionalScopedPointer<AudioSource> input;
-    double ratio, lastRatio;
-    AudioSampleBuffer buffer;
-    int bufferPos, sampsInBuffer;
-    double subSampleOffset;
+    double ratio = 1.0, lastRatio = 1.0;
+    AudioBuffer<float> buffer;
+    int bufferPos = 0, sampsInBuffer = 0;
+    double subSampleOffset = 0.0;
     double coefficients[6];
     SpinLock ratioLock;
+    CriticalSection callbackLock;
     const int numChannels;
-    HeapBlock<float*> destBuffers, srcBuffers;
+    HeapBlock<float*> destBuffers;
+    HeapBlock<const float*> srcBuffers;
 
     void setFilterCoefficients (double c1, double c2, double c3, double c4, double c5, double c6);
     void createLowPass (double proportionalRate);
@@ -102,5 +103,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ResamplingAudioSource)
 };
 
-
-#endif   // __JUCE_RESAMPLINGAUDIOSOURCE_JUCEHEADER__
+} // namespace juce

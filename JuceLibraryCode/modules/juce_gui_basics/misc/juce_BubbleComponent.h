@@ -1,31 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_BUBBLECOMPONENT_JUCEHEADER__
-#define __JUCE_BUBBLECOMPONENT_JUCEHEADER__
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -41,6 +40,8 @@
     resize and position it, then make it visible.
 
     @see BubbleMessageComponent
+
+    @tags{GUI}
 */
 class JUCE_API  BubbleComponent  : public Component
 {
@@ -55,10 +56,10 @@ protected:
 
 public:
     /** Destructor. */
-    ~BubbleComponent();
+    ~BubbleComponent() override;
 
     //==============================================================================
-    /** A list of permitted placements for the bubble, relative to the co-ordinates
+    /** A list of permitted placements for the bubble, relative to the coordinates
         at which it should be pointing.
 
         @see setAllowedPlacement
@@ -95,33 +96,38 @@ public:
         on where there's the most space, honouring any restrictions that were set
         with setAllowedPlacement().
     */
-    void setPosition (Component* componentToPointTo);
+    void setPosition (Component* componentToPointTo,
+                      int distanceFromTarget = 15, int arrowLength = 10);
 
     /** Moves and resizes the bubble to point at a given point.
 
         This will resize the bubble to fit its content, then position it
-        so that the tip of the bubble points to the given co-ordinate. The co-ordinates
+        so that the tip of the bubble points to the given coordinate. The coordinates
         are relative to either the bubble component's parent component if it has one, or
-        they are screen co-ordinates if not.
+        they are screen coordinates if not.
 
         It'll put itself either above, below, or to the side of this point, depending
         on where there's the most space, honouring any restrictions that were set
         with setAllowedPlacement().
     */
-    void setPosition (const Point<int>& arrowTipPosition);
+    void setPosition (Point<int> arrowTipPosition, int arrowLength = 10);
 
     /** Moves and resizes the bubble to point at a given rectangle.
 
         This will resize the bubble to fit its content, then find a position for it
         so that it's next to, but doesn't overlap the given rectangle. The rectangle's
-        co-ordinates are relative to either the bubble component's parent component
-        if it has one, or they are screen co-ordinates if not.
+        coordinates are relative to either the bubble component's parent component
+        if it has one, or they are screen coordinates if not.
 
         It'll put itself either above, below, or to the side of the component depending
         on where there's the most space, honouring any restrictions that were set
         with setAllowedPlacement().
+
+        distanceFromTarget is the amount of space to leave between the bubble and the
+        target rectangle, and arrowLength is the length of the arrow that it will draw.
     */
-    void setPosition (const Rectangle<int>& rectangleToPointTo);
+    void setPosition (Rectangle<int> rectangleToPointTo,
+                      int distanceFromTarget = 15, int arrowLength = 10);
 
     //==============================================================================
     /** A set of colour IDs to use to change the colour of various aspects of the bubble component.
@@ -135,6 +141,19 @@ public:
     {
         backgroundColourId            = 0x1000af0, /**< A background colour to fill the bubble with. */
         outlineColourId               = 0x1000af1  /**< The colour to use for an outline around the bubble. */
+    };
+
+
+    //==============================================================================
+    /** This abstract base class is implemented by LookAndFeel classes.
+    */
+    struct JUCE_API  LookAndFeelMethods
+    {
+        virtual ~LookAndFeelMethods() = default;
+
+        virtual void drawBubble (Graphics&, BubbleComponent&,
+                                 const Point<float>& positionOfTip,
+                                 const Rectangle<float>& body) = 0;
     };
 
 protected:
@@ -153,7 +172,7 @@ protected:
 
 public:
     /** @internal */
-    void paint (Graphics& g);
+    void paint (Graphics&) override;
 
 private:
     Rectangle<int> content;
@@ -164,5 +183,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BubbleComponent)
 };
 
-
-#endif   // __JUCE_BUBBLECOMPONENT_JUCEHEADER__
+} // namespace juce

@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_CALLBACKMESSAGE_JUCEHEADER__
-#define __JUCE_CALLBACKMESSAGE_JUCEHEADER__
-
-#include "juce_MessageManager.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -44,16 +38,21 @@
     Always create a new instance of a CallbackMessage on the heap, as it will be
     deleted automatically after the message has been delivered.
 
-    @see MessageManager, MessageListener, ActionListener, ChangeListener
+    Note that this class was essential back in the days before C++11, but in modern
+    times you may prefer to use MessageManager::callAsync() with a lambda.
+
+    @see MessageManager::callAsync, MessageListener, ActionListener, ChangeListener
+
+    @tags{Events}
 */
 class JUCE_API  CallbackMessage   : public MessageManager::MessageBase
 {
 public:
     //==============================================================================
-    CallbackMessage() noexcept {}
+    CallbackMessage() = default;
 
     /** Destructor. */
-    ~CallbackMessage() {}
+    ~CallbackMessage() override = default;
 
     //==============================================================================
     /** Called when the message is delivered.
@@ -64,7 +63,7 @@ public:
         Note that like all other messages, this object will be deleted immediately
         after this method has been invoked.
     */
-    virtual void messageCallback() = 0;
+    virtual void messageCallback() override = 0;
 
 private:
     // Avoid the leak-detector because for plugins, the host can unload our DLL with undelivered
@@ -72,5 +71,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE (CallbackMessage)
 };
 
-
-#endif   // __JUCE_CALLBACKMESSAGE_JUCEHEADER__
+} // namespace juce

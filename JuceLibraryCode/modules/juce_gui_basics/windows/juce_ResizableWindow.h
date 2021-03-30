@@ -1,36 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_RESIZABLEWINDOW_JUCEHEADER__
-#define __JUCE_RESIZABLEWINDOW_JUCEHEADER__
-
-#include "juce_TopLevelWindow.h"
-#include "../mouse/juce_ComponentDragger.h"
-#include "../layout/juce_ResizableBorderComponent.h"
-#include "../layout/juce_ResizableCornerComponent.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -51,6 +45,8 @@
     to choose the style of resizing to use.
 
     @see TopLevelWindow
+
+    @tags{GUI}
 */
 class JUCE_API  ResizableWindow  : public TopLevelWindow
 {
@@ -76,13 +72,13 @@ public:
                                     desktop; if false, you can use it as a child component
     */
     ResizableWindow (const String& name,
-                     const Colour& backgroundColour,
+                     Colour backgroundColour,
                      bool addToDesktop);
 
     /** Destructor.
         If a content component has been set with setContentOwned(), it will be deleted.
     */
-    ~ResizableWindow();
+    ~ResizableWindow() override;
 
     //==============================================================================
     /** Returns the colour currently being used for the window's background.
@@ -111,7 +107,7 @@ public:
 
         @see getBackgroundColour
     */
-    void setBackgroundColour (const Colour& newColour);
+    void setBackgroundColour (Colour newColour);
 
     //==============================================================================
     /** Make the window resizable or fixed.
@@ -125,8 +121,7 @@ public:
     void setResizable (bool shouldBeResizable,
                        bool useBottomRightCornerResizer);
 
-    /** True if resizing is enabled.
-
+    /** Returns true if resizing is enabled.
         @see setResizable
     */
     bool isResizable() const noexcept;
@@ -136,8 +131,9 @@ public:
         If the window's current size is outside these limits, it will be resized to
         make sure it's within them.
 
-        Calling setBounds() on the component will bypass any size checking - it's only when
-        the window is being resized by the user that these values are enforced.
+        A direct call to setBounds() will bypass any constraint checks, but when the
+        window is dragged by the user or resized by other indirect means, the constrainer
+        will limit the numbers involved.
 
         @see setResizable, setFixedAspectRatio
     */
@@ -146,8 +142,13 @@ public:
                           int newMaximumWidth,
                           int newMaximumHeight) noexcept;
 
-    /** Returns the bounds constrainer object that this window is using.
+    /** Can be used to enable or disable user-dragging of the window. */
+    void setDraggable (bool shouldBeDraggable) noexcept;
 
+    /** Returns true if the window can be dragged around by the user. */
+    bool isDraggable() const noexcept                               { return canDrag; }
+
+    /** Returns the bounds constrainer object that this window is using.
         You can access this to change its properties.
     */
     ComponentBoundsConstrainer* getConstrainer() noexcept           { return constrainer; }
@@ -155,23 +156,21 @@ public:
     /** Sets the bounds-constrainer object to use for resizing and dragging this window.
 
         A pointer to the object you pass in will be kept, but it won't be deleted
-        by this object, so it's the caller's responsiblity to manage it.
+        by this object, so it's the caller's responsibility to manage it.
 
-        If you pass 0, then no contraints will be placed on the positioning of the window.
+        If you pass a nullptr, then no constraints will be placed on the positioning of the window.
     */
     void setConstrainer (ComponentBoundsConstrainer* newConstrainer);
 
     /** Calls the window's setBounds method, after first checking these bounds
         with the current constrainer.
-
         @see setConstrainer
     */
-    void setBoundsConstrained (const Rectangle<int>& bounds);
+    void setBoundsConstrained (const Rectangle<int>& newBounds);
 
 
     //==============================================================================
     /** Returns true if the window is currently in full-screen mode.
-
         @see setFullScreen
     */
     bool isFullScreen() const;
@@ -186,7 +185,6 @@ public:
     void setFullScreen (bool shouldBeFullScreen);
 
     /** Returns true if the window is currently minimised.
-
         @see setMinimised
     */
     bool isMinimised() const;
@@ -200,8 +198,10 @@ public:
     */
     void setMinimised (bool shouldMinimise);
 
-    /** Adds the window to the desktop using the default flags. */
-    void addToDesktop();
+    /** Returns true if the window has been placed in kiosk-mode.
+        @see Desktop::setKioskComponent
+    */
+    bool isKioskMode() const;
 
     //==============================================================================
     /** Returns a string which encodes the window's current size and position.
@@ -218,7 +218,7 @@ public:
 
     /** Restores the window to a previously-saved size and position.
 
-        This restores the window's size, positon and full-screen status from an
+        This restores the window's size, position and full-screen status from an
         string that was previously created with the getWindowStateAsString()
         method.
 
@@ -313,36 +313,53 @@ public:
     };
 
     //==============================================================================
-    /** @deprecated - use setContentOwned() and setContentNonOwned() instead. */
+    // Deprecated: use setContentOwned() and setContentNonOwned() instead.
     JUCE_DEPRECATED (void setContentComponent (Component* newContentComponent,
                                                bool deleteOldOne = true,
                                                bool resizeToFit = false));
     using TopLevelWindow::addToDesktop;
 
-protected:
     //==============================================================================
+    /** This abstract base class is implemented by LookAndFeel classes to provide
+        window drawing functionality.
+    */
+    struct JUCE_API  LookAndFeelMethods
+    {
+        virtual ~LookAndFeelMethods() = default;
+
+        //==============================================================================
+        virtual void drawCornerResizer (Graphics&, int w, int h, bool isMouseOver, bool isMouseDragging) = 0;
+        virtual void drawResizableFrame (Graphics&, int w, int h, const BorderSize<int>&) = 0;
+
+        virtual void fillResizableWindowBackground (Graphics&, int w, int h, const BorderSize<int>&, ResizableWindow&) = 0;
+        virtual void drawResizableWindowBorder (Graphics&, int w, int h, const BorderSize<int>& border, ResizableWindow&) = 0;
+    };
+
+protected:
     /** @internal */
-    void paint (Graphics& g);
+    void paint (Graphics&) override;
     /** (if overriding this, make sure you call ResizableWindow::moved() in your subclass) */
-    void moved();
+    void moved() override;
     /** (if overriding this, make sure you call ResizableWindow::resized() in your subclass) */
-    void resized();
+    void resized() override;
     /** @internal */
-    void mouseDown (const MouseEvent& e);
+    void mouseDown (const MouseEvent&) override;
     /** @internal */
-    void mouseDrag (const MouseEvent& e);
+    void mouseDrag (const MouseEvent&) override;
     /** @internal */
-    void lookAndFeelChanged();
+    void mouseUp (const MouseEvent&) override;
     /** @internal */
-    void childBoundsChanged (Component* child);
+    void lookAndFeelChanged() override;
     /** @internal */
-    void parentSizeChanged();
+    void childBoundsChanged (Component*) override;
     /** @internal */
-    void visibilityChanged();
+    void parentSizeChanged() override;
     /** @internal */
-    void activeWindowStatusChanged();
+    void visibilityChanged() override;
     /** @internal */
-    int getDesktopWindowStyleFlags() const;
+    void activeWindowStatusChanged() override;
+    /** @internal */
+    int getDesktopWindowStyleFlags() const override;
 
    #if JUCE_DEBUG
     /** Overridden to warn people about adding components directly to this component
@@ -351,34 +368,36 @@ protected:
         If you know what you're doing and are sure you really want to add a component, specify
         a base-class method call to Component::addAndMakeVisible(), to side-step this warning.
     */
-    void addChildComponent (Component* child, int zOrder = -1);
+    void addChildComponent (Component*, int zOrder = -1);
     /** Overridden to warn people about adding components directly to this component
         instead of using setContentOwned().
 
         If you know what you're doing and are sure you really want to add a component, specify
         a base-class method call to Component::addAndMakeVisible(), to side-step this warning.
     */
-    void addAndMakeVisible (Component* child, int zOrder = -1);
+    void addAndMakeVisible (Component*, int zOrder = -1);
    #endif
 
-    ScopedPointer <ResizableCornerComponent> resizableCorner;
-    ScopedPointer <ResizableBorderComponent> resizableBorder;
+    std::unique_ptr<ResizableCornerComponent> resizableCorner;
+    std::unique_ptr<ResizableBorderComponent> resizableBorder;
 
 private:
     //==============================================================================
-    Component::SafePointer <Component> contentComponent;
-    bool ownsContentComponent, resizeToFitContent, fullscreen;
+    Component::SafePointer<Component> contentComponent, splashScreen;
+    bool ownsContentComponent = false, resizeToFitContent = false, fullscreen = false, canDrag = true, dragStarted = false;
     ComponentDragger dragger;
     Rectangle<int> lastNonFullScreenPos;
     ComponentBoundsConstrainer defaultConstrainer;
-    ComponentBoundsConstrainer* constrainer;
-    #if JUCE_DEBUG
-    bool hasBeenResized;
-    #endif
+    ComponentBoundsConstrainer* constrainer = nullptr;
+   #if JUCE_DEBUG
+    bool hasBeenResized = false;
+   #endif
 
     void initialise (bool addToDesktop);
-    void updateLastPos();
+    void updateLastPosIfNotFullScreen();
+    void updateLastPosIfShowing();
     void setContent (Component*, bool takeOwnership, bool resizeToFit);
+    void updatePeerConstrainer();
 
    #if JUCE_CATCH_DEPRECATED_CODE_MISUSE
     // The parameters for these methods have changed - please update your code!
@@ -389,5 +408,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ResizableWindow)
 };
 
-
-#endif   // __JUCE_RESIZABLEWINDOW_JUCEHEADER__
+} // namespace juce

@@ -1,30 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-UnitTest::UnitTest (const String& name_)
-    : name (name_), runner (nullptr)
+namespace juce
+{
+
+UnitTest::UnitTest (const String& nm, const String& ctg)
+    : name (nm), category (ctg)
 {
     getAllTests().add (this);
 }
@@ -40,13 +40,38 @@ Array<UnitTest*>& UnitTest::getAllTests()
     return tests;
 }
 
+Array<UnitTest*> UnitTest::getTestsInCategory (const String& category)
+{
+    if (category.isEmpty())
+        return getAllTests();
+
+    Array<UnitTest*> unitTests;
+
+    for (auto* test : getAllTests())
+        if (test->getCategory() == category)
+            unitTests.add (test);
+
+    return unitTests;
+}
+
+StringArray UnitTest::getAllCategories()
+{
+    StringArray categories;
+
+    for (auto* test : getAllTests())
+        if (test->getCategory().isNotEmpty())
+            categories.addIfNotAlreadyThere (test->getCategory());
+
+    return categories;
+}
+
 void UnitTest::initialise()  {}
 void UnitTest::shutdown()   {}
 
-void UnitTest::performTest (UnitTestRunner* const runner_)
+void UnitTest::performTest (UnitTestRunner* const newRunner)
 {
-    jassert (runner_ != nullptr);
-    runner = runner_;
+    jassert (newRunner != nullptr);
+    runner = newRunner;
 
     initialise();
     runTest();
@@ -55,33 +80,42 @@ void UnitTest::performTest (UnitTestRunner* const runner_)
 
 void UnitTest::logMessage (const String& message)
 {
+    // This method's only valid while the test is being run!
+    jassert (runner != nullptr);
+
     runner->logMessage (message);
 }
 
 void UnitTest::beginTest (const String& testName)
 {
+    // This method's only valid while the test is being run!
+    jassert (runner != nullptr);
+
     runner->beginNewTest (this, testName);
 }
 
 void UnitTest::expect (const bool result, const String& failureMessage)
 {
+    // This method's only valid while the test is being run!
+    jassert (runner != nullptr);
+
     if (result)
         runner->addPass();
     else
         runner->addFail (failureMessage);
 }
 
-//==============================================================================
-UnitTestRunner::UnitTestRunner()
-    : currentTest (nullptr),
-      assertOnFailure (true),
-      logPasses (false)
+Random UnitTest::getRandom() const
 {
+    // This method's only valid while the test is being run!
+    jassert (runner != nullptr);
+
+    return runner->randomForTest;
 }
 
-UnitTestRunner::~UnitTestRunner()
-{
-}
+//==============================================================================
+UnitTestRunner::UnitTestRunner() {}
+UnitTestRunner::~UnitTestRunner() {}
 
 void UnitTestRunner::setAssertOnFailure (bool shouldAssert) noexcept
 {
@@ -107,32 +141,47 @@ void UnitTestRunner::resultsUpdated()
 {
 }
 
-void UnitTestRunner::runTests (const Array<UnitTest*>& tests)
+void UnitTestRunner::runTests (const Array<UnitTest*>& tests, int64 randomSeed)
 {
     results.clear();
     resultsUpdated();
 
-    for (int i = 0; i < tests.size(); ++i)
+    if (randomSeed == 0)
+        randomSeed = Random().nextInt (0x7ffffff);
+
+    randomForTest = Random (randomSeed);
+    logMessage ("Random seed: 0x" + String::toHexString (randomSeed));
+
+    for (auto* t : tests)
     {
         if (shouldAbortTests())
             break;
 
+       #if JUCE_EXCEPTIONS_DISABLED
+        t->performTest (this);
+       #else
         try
         {
-            tests.getUnchecked(i)->performTest (this);
+            t->performTest (this);
         }
         catch (...)
         {
             addFail ("An unhandled exception was thrown!");
         }
+       #endif
     }
 
     endTest();
 }
 
-void UnitTestRunner::runAllTests()
+void UnitTestRunner::runAllTests (int64 randomSeed)
 {
-    runTests (UnitTest::getAllTests());
+    runTests (UnitTest::getAllTests(), randomSeed);
+}
+
+void UnitTestRunner::runTestsInCategory (const String& category, int64 randomSeed)
+{
+    runTests (UnitTest::getTestsInCategory (category), randomSeed);
 }
 
 void UnitTestRunner::logMessage (const String& message)
@@ -150,24 +199,20 @@ void UnitTestRunner::beginNewTest (UnitTest* const test, const String& subCatego
     endTest();
     currentTest = test;
 
-    TestResult* const r = new TestResult();
-    results.add (r);
-    r->unitTestName = test->getName();
-    r->subcategoryName = subCategory;
-    r->passes = 0;
-    r->failures = 0;
+    auto testName = test->getName();
+    results.add (new TestResult (testName, subCategory));
 
     logMessage ("-----------------------------------------------------------------");
-    logMessage ("Starting test: " + r->unitTestName + " / " + subCategory + "...");
+    logMessage ("Starting test: " + testName + " / " + subCategory + "...");
 
     resultsUpdated();
 }
 
 void UnitTestRunner::endTest()
 {
-    if (results.size() > 0)
+    if (auto* r = results.getLast())
     {
-        TestResult* const r = results.getLast();
+        r->endTime = Time::getCurrentTime();
 
         if (r->failures > 0)
         {
@@ -175,9 +220,9 @@ void UnitTestRunner::endTest()
             m << r->failures << (r->failures == 1 ? " test" : " tests")
               << " failed, out of a total of " << (r->passes + r->failures);
 
-            logMessage (String::empty);
+            logMessage (String());
             logMessage (m);
-            logMessage (String::empty);
+            logMessage (String());
         }
         else
         {
@@ -191,7 +236,7 @@ void UnitTestRunner::addPass()
     {
         const ScopedLock sl (results.getLock());
 
-        TestResult* const r = results.getLast();
+        auto* r = results.getLast();
         jassert (r != nullptr); // You need to call UnitTest::beginTest() before performing any tests!
 
         r->passes++;
@@ -212,7 +257,7 @@ void UnitTestRunner::addFail (const String& failureMessage)
     {
         const ScopedLock sl (results.getLock());
 
-        TestResult* const r = results.getLast();
+        auto* r = results.getLast();
         jassert (r != nullptr); // You need to call UnitTest::beginTest() before performing any tests!
 
         r->failures++;
@@ -230,5 +275,7 @@ void UnitTestRunner::addFail (const String& failureMessage)
 
     resultsUpdated();
 
-    if (assertOnFailure) { jassertfalse }
+    if (assertOnFailure) { jassertfalse; }
 }
+
+} // namespace juce

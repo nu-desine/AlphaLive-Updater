@@ -1,43 +1,41 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
+
+namespace juce
+{
 
 class AsyncUpdater::AsyncUpdaterMessage  : public CallbackMessage
 {
 public:
     AsyncUpdaterMessage (AsyncUpdater& au)  : owner (au) {}
 
-    void messageCallback()
+    void messageCallback() override
     {
         if (shouldDeliver.compareAndSetBool (0, 1))
             owner.handleAsyncUpdate();
     }
 
-    Atomic<int> shouldDeliver;
-
-private:
     AsyncUpdater& owner;
+    Atomic<int> shouldDeliver;
 
     JUCE_DECLARE_NON_COPYABLE (AsyncUpdaterMessage)
 };
@@ -45,7 +43,7 @@ private:
 //==============================================================================
 AsyncUpdater::AsyncUpdater()
 {
-    message = new AsyncUpdaterMessage (*this);
+    activeMessage = *new AsyncUpdaterMessage (*this);
 }
 
 AsyncUpdater::~AsyncUpdater()
@@ -54,32 +52,42 @@ AsyncUpdater::~AsyncUpdater()
     // pending on the main event thread - that's pretty dodgy threading, as the callback could
     // happen after this destructor has finished. You should either use a MessageManagerLock while
     // deleting this object, or find some other way to avoid such a race condition.
-    jassert ((! isUpdatePending()) || MessageManager::getInstance()->currentThreadHasLockedMessageManager());
+    jassert ((! isUpdatePending())
+              || MessageManager::getInstanceWithoutCreating() == nullptr
+              || MessageManager::getInstanceWithoutCreating()->currentThreadHasLockedMessageManager());
 
-    message->shouldDeliver.set (0);
+    activeMessage->shouldDeliver.set (0);
 }
 
 void AsyncUpdater::triggerAsyncUpdate()
 {
-    if (message->shouldDeliver.compareAndSetBool (1, 0))
-        message->post();
+    // If you're calling this before (or after) the MessageManager is
+    // running, then you're not going to get any callbacks!
+    JUCE_ASSERT_MESSAGE_MANAGER_EXISTS
+
+    if (activeMessage->shouldDeliver.compareAndSetBool (1, 0))
+        if (! activeMessage->post())
+            cancelPendingUpdate(); // if the message queue fails, this avoids getting
+                                   // trapped waiting for the message to arrive
 }
 
 void AsyncUpdater::cancelPendingUpdate() noexcept
 {
-    message->shouldDeliver.set (0);
+    activeMessage->shouldDeliver.set (0);
 }
 
 void AsyncUpdater::handleUpdateNowIfNeeded()
 {
     // This can only be called by the event thread.
-    jassert (MessageManager::getInstance()->currentThreadHasLockedMessageManager());
+    JUCE_ASSERT_MESSAGE_MANAGER_IS_LOCKED
 
-    if (message->shouldDeliver.exchange (0) != 0)
+    if (activeMessage->shouldDeliver.exchange (0) != 0)
         handleAsyncUpdate();
 }
 
 bool AsyncUpdater::isUpdatePending() const noexcept
 {
-    return message->shouldDeliver.value != 0;
+    return activeMessage->shouldDeliver.value != 0;
 }
+
+} // namespace juce

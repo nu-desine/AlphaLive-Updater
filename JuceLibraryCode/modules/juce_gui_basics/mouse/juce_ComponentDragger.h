@@ -1,34 +1,30 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_COMPONENTDRAGGER_JUCEHEADER__
-#define __JUCE_COMPONENTDRAGGER_JUCEHEADER__
-
-#include "juce_MouseEvent.h"
-#include "../layout/juce_ComponentBoundsConstrainer.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -56,6 +52,8 @@
         }
     };
     @endcode
+
+    @tags{GUI}
 */
 class JUCE_API  ComponentDragger
 {
@@ -79,16 +77,14 @@ public:
 
     /** Call this from your mouseDrag() callback to move the component.
 
-        This will move the component, but will first check the validity of the
-        component's new position using the checkPosition() method, which you
-        can override if you need to enforce special positioning limits on the
-        component.
+        This will move the component, using the given constrainer object to check
+        the new position.
 
         @param componentToDrag      the component that you want to drag
         @param e                    the current mouse-drag event
         @param constrainer          an optional constrainer object that should be used
                                     to apply limits to the component's position. Pass
-                                    null if you don't want to contrain the movement.
+                                    null if you don't want to constrain the movement.
         @see startDraggingComponent
     */
     void dragComponent (Component* componentToDrag,
@@ -102,4 +98,4 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ComponentDragger)
 };
 
-#endif   // __JUCE_COMPONENTDRAGGER_JUCEHEADER__
+} // namespace juce

@@ -1,39 +1,61 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 ChildProcess::ChildProcess() {}
 ChildProcess::~ChildProcess() {}
 
+bool ChildProcess::isRunning() const
+{
+    return activeProcess != nullptr && activeProcess->isRunning();
+}
+
+int ChildProcess::readProcessOutput (void* dest, int numBytes)
+{
+    return activeProcess != nullptr ? activeProcess->read (dest, numBytes) : 0;
+}
+
+bool ChildProcess::kill()
+{
+    return activeProcess == nullptr || activeProcess->killProcess();
+}
+
+uint32 ChildProcess::getExitCode() const
+{
+    return activeProcess != nullptr ? activeProcess->getExitCode() : 0;
+}
+
 bool ChildProcess::waitForProcessToFinish (const int timeoutMs) const
 {
-    const uint32 timeoutTime = Time::getMillisecondCounter() + (uint32) timeoutMs;
+    auto timeoutTime = Time::getMillisecondCounter() + (uint32) timeoutMs;
 
     do
     {
         if (! isRunning())
             return true;
+
+        Thread::sleep (2);
     }
     while (timeoutMs < 0 || Time::getMillisecondCounter() < timeoutTime);
 
@@ -46,8 +68,8 @@ String ChildProcess::readAllProcessOutput()
 
     for (;;)
     {
-        char buffer [512];
-        const int num = readProcessOutput (buffer, sizeof (buffer));
+        char buffer[512];
+        auto num = readProcessOutput (buffer, sizeof (buffer));
 
         if (num <= 0)
             break;
@@ -58,15 +80,19 @@ String ChildProcess::readAllProcessOutput()
     return result.toString();
 }
 
+
+//==============================================================================
 //==============================================================================
 #if JUCE_UNIT_TESTS
 
 class ChildProcessTests  : public UnitTest
 {
 public:
-    ChildProcessTests() : UnitTest ("ChildProcess") {}
+    ChildProcessTests()
+        : UnitTest ("ChildProcess", UnitTestCategories::threads)
+    {}
 
-    void runTest()
+    void runTest() override
     {
         beginTest ("Child Processes");
 
@@ -79,8 +105,8 @@ public:
         expect (p.start ("ls /"));
        #endif
 
-        //String output (p.readAllProcessOutput());
-        //expect (output.isNotEmpty());
+        auto output = p.readAllProcessOutput();
+        expect (output.isNotEmpty());
       #endif
     }
 };
@@ -88,3 +114,5 @@ public:
 static ChildProcessTests childProcessUnitTests;
 
 #endif
+
+} // namespace juce

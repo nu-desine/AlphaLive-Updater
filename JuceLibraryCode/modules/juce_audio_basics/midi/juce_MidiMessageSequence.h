@@ -1,33 +1,27 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   The code included in this file is provided under the terms of the ISC license
+   http://www.isc.org/downloads/software-support-policy/isc-license. Permission
+   To use, copy, modify, and/or distribute this software for any purpose with or
+   without fee is hereby granted provided that the above copyright notice and
+   this permission notice appear in all copies.
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  ------------------------------------------------------------------------------
-
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
-#ifndef __JUCE_MIDIMESSAGESEQUENCE_JUCEHEADER__
-#define __JUCE_MIDIMESSAGESEQUENCE_JUCEHEADER__
-
-#include "juce_MidiMessage.h"
-
+namespace juce
+{
 
 //==============================================================================
 /**
@@ -37,6 +31,8 @@
     written to a standard midi file.
 
     @see MidiMessage, MidiFile
+
+    @tags{Audio}
 */
 class JUCE_API  MidiMessageSequence
 {
@@ -46,10 +42,16 @@ public:
     MidiMessageSequence();
 
     /** Creates a copy of another sequence. */
-    MidiMessageSequence (const MidiMessageSequence& other);
+    MidiMessageSequence (const MidiMessageSequence&);
 
     /** Replaces this sequence with another one. */
-    MidiMessageSequence& operator= (const MidiMessageSequence& other);
+    MidiMessageSequence& operator= (const MidiMessageSequence&);
+
+    /** Move constructor */
+    MidiMessageSequence (MidiMessageSequence&&) noexcept;
+
+    /** Move assignment operator */
+    MidiMessageSequence& operator= (MidiMessageSequence&&) noexcept;
 
     /** Destructor. */
     ~MidiMessageSequence();
@@ -69,24 +71,24 @@ public:
         /** Destructor. */
         ~MidiEventHolder();
 
-        /** The message itself, whose timestamp is used to specify the event's time.
-        */
+        /** The message itself, whose timestamp is used to specify the event's time. */
         MidiMessage message;
 
         /** The matching note-off event (if this is a note-on event).
 
-            If this isn't a note-on, this pointer will be null.
+            If this isn't a note-on, this pointer will be nullptr.
 
             Use the MidiMessageSequence::updateMatchedPairs() method to keep these
             note-offs up-to-date after events have been moved around in the sequence
             or deleted.
         */
-        MidiEventHolder* noteOffObject;
+        MidiEventHolder* noteOffObject = nullptr;
 
     private:
         //==============================================================================
         friend class MidiMessageSequence;
-        MidiEventHolder (const MidiMessage& message);
+        MidiEventHolder (const MidiMessage&);
+        MidiEventHolder (MidiMessage&&);
         JUCE_LEAK_DETECTOR (MidiEventHolder)
     };
 
@@ -95,55 +97,59 @@ public:
     void clear();
 
     /** Returns the number of events in the sequence. */
-    int getNumEvents() const;
+    int getNumEvents() const noexcept;
 
     /** Returns a pointer to one of the events. */
-    MidiEventHolder* getEventPointer (int index) const;
+    MidiEventHolder* getEventPointer (int index) const noexcept;
+
+    /** Iterator for the list of MidiEventHolders */
+    MidiEventHolder** begin() noexcept;
+
+    /** Iterator for the list of MidiEventHolders */
+    MidiEventHolder* const* begin() const noexcept;
+
+    /** Iterator for the list of MidiEventHolders */
+    MidiEventHolder** end() noexcept;
+
+    /** Iterator for the list of MidiEventHolders */
+    MidiEventHolder* const* end() const noexcept;
 
     /** Returns the time of the note-up that matches the note-on at this index.
-
         If the event at this index isn't a note-on, it'll just return 0.
-
         @see MidiMessageSequence::MidiEventHolder::noteOffObject
     */
-    double getTimeOfMatchingKeyUp (int index) const;
+    double getTimeOfMatchingKeyUp (int index) const noexcept;
 
     /** Returns the index of the note-up that matches the note-on at this index.
-
         If the event at this index isn't a note-on, it'll just return -1.
-
         @see MidiMessageSequence::MidiEventHolder::noteOffObject
     */
-    int getIndexOfMatchingKeyUp (int index) const;
+    int getIndexOfMatchingKeyUp (int index) const noexcept;
 
     /** Returns the index of an event. */
-    int getIndexOf (MidiEventHolder* event) const;
+    int getIndexOf (const MidiEventHolder* event) const noexcept;
 
     /** Returns the index of the first event on or after the given timestamp.
-
         If the time is beyond the end of the sequence, this will return the
         number of events.
     */
-    int getNextIndexAtTime (double timeStamp) const;
+    int getNextIndexAtTime (double timeStamp) const noexcept;
 
     //==============================================================================
     /** Returns the timestamp of the first event in the sequence.
-
         @see getEndTime
     */
-    double getStartTime() const;
+    double getStartTime() const noexcept;
 
     /** Returns the timestamp of the last event in the sequence.
-
         @see getStartTime
     */
-    double getEndTime() const;
+    double getEndTime() const noexcept;
 
     /** Returns the timestamp of the event at a given index.
-
         If the index is out-of-range, this will return 0.0
     */
-    double getEventTime (int index) const;
+    double getEventTime (int index) const noexcept;
 
     //==============================================================================
     /** Inserts a midi message into the sequence.
@@ -158,8 +164,21 @@ public:
                                 that will be inserted
         @see updateMatchedPairs
     */
-    MidiEventHolder* addEvent (const MidiMessage& newMessage,
-                               double timeAdjustment = 0);
+    MidiEventHolder* addEvent (const MidiMessage& newMessage, double timeAdjustment = 0);
+
+    /** Inserts a midi message into the sequence.
+
+        The index at which the new message gets inserted will depend on its timestamp,
+        because the sequence is kept sorted.
+
+        Remember to call updateMatchedPairs() after adding note-on events.
+
+        @param newMessage       the new message to add (an internal copy will be made)
+        @param timeAdjustment   an optional value to add to the timestamp of the message
+                                that will be inserted
+        @see updateMatchedPairs
+    */
+    MidiEventHolder* addEvent (MidiMessage&& newMessage, double timeAdjustment = 0);
 
     /** Deletes one of the events in the sequence.
 
@@ -172,7 +191,6 @@ public:
     void deleteEvent (int index, bool deleteMatchingNoteUp);
 
     /** Merges another sequence into this one.
-
         Remember to call updateMatchedPairs() after using this method.
 
         @param other                    the sequence to add from
@@ -190,20 +208,30 @@ public:
                       double firstAllowableDestTime,
                       double endOfAllowableDestTimes);
 
+    /** Merges another sequence into this one.
+        Remember to call updateMatchedPairs() after using this method.
+
+        @param other                    the sequence to add from
+        @param timeAdjustmentDelta      an amount to add to the timestamps of the midi events
+                                        as they are read from the other sequence
+    */
+    void addSequence (const MidiMessageSequence& other,
+                      double timeAdjustmentDelta);
+
     //==============================================================================
     /** Makes sure all the note-on and note-off pairs are up-to-date.
 
-        Call this after moving messages about or deleting/adding messages, and it
+        Call this after re-ordering messages or deleting/adding messages, and it
         will scan the list and make sure all the note-offs in the MidiEventHolder
         structures are pointing at the correct ones.
     */
-    void updateMatchedPairs();
+    void updateMatchedPairs() noexcept;
 
     /** Forces a sort of the sequence.
         You may need to call this if you've manually modified the timestamps of some
         events such that the overall order now needs updating.
     */
-    void sort();
+    void sort() noexcept;
 
     //==============================================================================
     /** Copies all the messages for a particular midi channel to another sequence.
@@ -219,7 +247,6 @@ public:
                                      bool alsoIncludeMetaEvents) const;
 
     /** Copies all midi sys-ex messages to another sequence.
-
         @param destSequence     this is the sequence to which any sys-exes in this sequence
                                 will be added
         @see extractMidiChannelMessages
@@ -227,20 +254,17 @@ public:
     void extractSysExMessages (MidiMessageSequence& destSequence) const;
 
     /** Removes any messages in this sequence that have a specific midi channel.
-
         @param channelNumberToRemove    the midi channel to look for, in the range 1 to 16
     */
     void deleteMidiChannelMessages (int channelNumberToRemove);
 
-    /** Removes any sys-ex messages from this sequence.
-    */
+    /** Removes any sys-ex messages from this sequence. */
     void deleteSysExMessages();
 
     /** Adds an offset to the timestamps of all events in the sequence.
-
         @param deltaTime    the amount to add to each timestamp.
     */
-    void addTimeToMessages (double deltaTime);
+    void addTimeToMessages (double deltaTime) noexcept;
 
     //==============================================================================
     /** Scans through the sequence to determine the state of any midi controllers at
@@ -263,19 +287,20 @@ public:
                                 state at the required time.
     */
     void createControllerUpdatesForTime (int channelNumber, double time,
-                                         OwnedArray<MidiMessage>& resultMessages);
+                                         Array<MidiMessage>& resultMessages);
 
     //==============================================================================
     /** Swaps this sequence with another one. */
-    void swapWith (MidiMessageSequence& other) noexcept;
+    void swapWith (MidiMessageSequence&) noexcept;
 
 private:
     //==============================================================================
     friend class MidiFile;
-    OwnedArray <MidiEventHolder> list;
+    OwnedArray<MidiEventHolder> list;
+
+    MidiEventHolder* addEvent (MidiEventHolder*, double);
 
     JUCE_LEAK_DETECTOR (MidiMessageSequence)
 };
 
-
-#endif   // __JUCE_MIDIMESSAGESEQUENCE_JUCEHEADER__
+} // namespace juce

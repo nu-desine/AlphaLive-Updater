@@ -1,43 +1,47 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library - "Jules' Utility Class Extensions"
-   Copyright 2004-11 by Raw Material Software Ltd.
+   This file is part of the JUCE library.
+   Copyright (c) 2020 - Raw Material Software Limited
 
-  ------------------------------------------------------------------------------
+   JUCE is an open source library subject to commercial or open-source
+   licensing.
 
-   JUCE can be redistributed and/or modified under the terms of the GNU General
-   Public License (Version 2), as published by the Free Software Foundation.
-   A copy of the license is included in the JUCE distribution, or can be found
-   online at www.gnu.org/licenses.
+   By using JUCE, you agree to the terms of both the JUCE 6 End-User License
+   Agreement and JUCE Privacy Policy (both effective as of the 16th June 2020).
 
-   JUCE is distributed in the hope that it will be useful, but WITHOUT ANY
-   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+   End User License Agreement: www.juce.com/juce-6-licence
+   Privacy Policy: www.juce.com/juce-privacy-policy
 
-  ------------------------------------------------------------------------------
+   Or: You may also use this code under the terms of the GPL v3 (see
+   www.gnu.org/licenses).
 
-   To release a closed-source product which uses JUCE, commercial licenses are
-   available: visit www.rawmaterialsoftware.com/juce for more information.
+   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
+   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
+   DISCLAIMED.
 
   ==============================================================================
 */
 
+namespace juce
+{
+
 namespace PropertyFileConstants
 {
-    static const int magicNumber            = (int) ByteOrder::littleEndianInt ("PROP");
-    static const int magicNumberCompressed  = (int) ByteOrder::littleEndianInt ("CPRP");
+    constexpr static const int magicNumber            = (int) ByteOrder::makeInt ('P', 'R', 'O', 'P');
+    constexpr static const int magicNumberCompressed  = (int) ByteOrder::makeInt ('C', 'P', 'R', 'P');
 
-    static const char* const fileTag        = "PROPERTIES";
-    static const char* const valueTag       = "VALUE";
-    static const char* const nameAttribute  = "name";
-    static const char* const valueAttribute = "val";
+    constexpr static const char* const fileTag        = "PROPERTIES";
+    constexpr static const char* const valueTag       = "VALUE";
+    constexpr static const char* const nameAttribute  = "name";
+    constexpr static const char* const valueAttribute = "val";
 }
 
 //==============================================================================
 PropertiesFile::Options::Options()
     : commonToAllUsers (false),
       ignoreCaseOfKeyNames (false),
+      doNotSave (false),
       millisecondsBeforeSaving (3000),
       storageFormat (PropertiesFile::storeAsXML),
       processLock (nullptr)
@@ -53,15 +57,19 @@ File PropertiesFile::Options::getDefaultFile() const
     File dir (commonToAllUsers ?  "/Library/"
                                : "~/Library/");
 
-    if (osxLibrarySubFolder != "Preferences" && osxLibrarySubFolder != "Application Support")
+    if (osxLibrarySubFolder != "Preferences"
+        && ! osxLibrarySubFolder.startsWith ("Application Support")
+        && ! osxLibrarySubFolder.startsWith ("Containers"))
     {
         /* The PropertiesFile class always used to put its settings files in "Library/Preferences", but Apple
-           have changed their advice, and now stipulate that settings should go in "Library/Application Support".
+           have changed their advice, and now stipulate that settings should go in "Library/Application Support",
+           or Library/Containers/[app_bundle_id] for a sandboxed app.
 
            Because older apps would be broken by a silent change in this class's behaviour, you must now
            explicitly set the osxLibrarySubFolder value to indicate which path you want to use.
 
-           In newer apps, you should always set this to "Application Support".
+           In newer apps, you should always set this to "Application Support"
+           or "Application Support/YourSubFolderName".
 
            If your app needs to load settings files that were created by older versions of juce and
            you want to maintain backwards-compatibility, then you can set this to "Preferences".
@@ -82,39 +90,38 @@ File PropertiesFile::Options::getDefaultFile() const
         dir = dir.getChildFile (folderName);
 
    #elif JUCE_LINUX || JUCE_ANDROID
-    const File dir ((commonToAllUsers ? "/var/" : "~/")
-                        + (folderName.isNotEmpty() ? folderName
-                                                   : ("." + applicationName)));
+    auto dir = File (commonToAllUsers ? "/var" : "~")
+                      .getChildFile (folderName.isNotEmpty() ? folderName
+                                                             : ("." + applicationName));
 
    #elif JUCE_WINDOWS
-    File dir (File::getSpecialLocation (commonToAllUsers ? File::commonApplicationDataDirectory
-                                                         : File::userApplicationDataDirectory));
+    auto dir = File::getSpecialLocation (commonToAllUsers ? File::commonApplicationDataDirectory
+                                                          : File::userApplicationDataDirectory);
 
-    if (dir == File::nonexistent)
-        return File::nonexistent;
+    if (dir == File())
+        return {};
 
     dir = dir.getChildFile (folderName.isNotEmpty() ? folderName
                                                     : applicationName);
    #endif
 
-    return dir.getChildFile (applicationName)
-              .withFileExtension (filenameSuffix);
+    return (filenameSuffix.startsWithChar (L'.')
+               ? dir.getChildFile (applicationName).withFileExtension (filenameSuffix)
+               : dir.getChildFile (applicationName + "." + filenameSuffix));
 }
 
 
 //==============================================================================
 PropertiesFile::PropertiesFile (const File& f, const Options& o)
     : PropertySet (o.ignoreCaseOfKeyNames),
-      file (f), options (o),
-      loadedOk (false), needsWriting (false)
+      file (f), options (o)
 {
     reload();
 }
 
 PropertiesFile::PropertiesFile (const Options& o)
     : PropertySet (o.ignoreCaseOfKeyNames),
-      file (o.getDefaultFile()), options (o),
-      loadedOk (false), needsWriting (false)
+      file (o.getDefaultFile()), options (o)
 {
     reload();
 }
@@ -164,7 +171,8 @@ bool PropertiesFile::save()
 
     stopTimer();
 
-    if (file == File::nonexistent
+    if (options.doNotSave
+         || file == File()
          || file.isDirectory()
          || ! file.getParentDirectory().createDirectory())
         return false;
@@ -177,37 +185,20 @@ bool PropertiesFile::save()
 
 bool PropertiesFile::loadAsXml()
 {
-    XmlDocument parser (file);
-    ScopedPointer<XmlElement> doc (parser.getDocumentElement (true));
-
-    if (doc != nullptr && doc->hasTagName (PropertyFileConstants::fileTag))
+    if (auto doc = parseXMLIfTagMatches (file, PropertyFileConstants::fileTag))
     {
-        doc = parser.getDocumentElement();
-
-        if (doc != nullptr)
+        for (auto* e : doc->getChildWithTagNameIterator (PropertyFileConstants::valueTag))
         {
-            forEachXmlChildElementWithTagName (*doc, e, PropertyFileConstants::valueTag)
-            {
-                const String name (e->getStringAttribute (PropertyFileConstants::nameAttribute));
+            auto name = e->getStringAttribute (PropertyFileConstants::nameAttribute);
 
-                if (name.isNotEmpty())
-                {
-                    getAllProperties().set (name,
-                                            e->getFirstChildElement() != nullptr
-                                                ? e->getFirstChildElement()->createDocument (String::empty, true)
-                                                : e->getStringAttribute (PropertyFileConstants::valueAttribute));
-                }
-            }
+            if (name.isNotEmpty())
+                getAllProperties().set (name,
+                                        e->getFirstChildElement() != nullptr
+                                            ? e->getFirstChildElement()->toString (XmlElement::TextFormat().singleLine().withoutHeader())
+                                            : e->getStringAttribute (PropertyFileConstants::valueAttribute));
+        }
 
-            return true;
-        }
-        else
-        {
-            // must be a pretty broken XML file we're trying to parse here,
-            // or a sign that this object needs an InterProcessLock,
-            // or just a failure reading the file.  This last reason is why
-            // we don't jassertfalse here.
-        }
+        return true;
     }
 
     return false;
@@ -216,18 +207,18 @@ bool PropertiesFile::loadAsXml()
 bool PropertiesFile::saveAsXml()
 {
     XmlElement doc (PropertyFileConstants::fileTag);
+    auto& props = getAllProperties();
 
-    for (int i = 0; i < getAllProperties().size(); ++i)
+    for (int i = 0; i < props.size(); ++i)
     {
-        XmlElement* const e = doc.createNewChildElement (PropertyFileConstants::valueTag);
-        e->setAttribute (PropertyFileConstants::nameAttribute, getAllProperties().getAllKeys() [i]);
+        auto* e = doc.createNewChildElement (PropertyFileConstants::valueTag);
+        e->setAttribute (PropertyFileConstants::nameAttribute, props.getAllKeys() [i]);
 
         // if the value seems to contain xml, store it as such..
-        if (XmlElement* const childElement = XmlDocument::parse (getAllProperties().getAllValues() [i]))
-            e->addChildElement (childElement);
+        if (auto childElement = parseXML (props.getAllValues() [i]))
+            e->addChildElement (childElement.release());
         else
-            e->setAttribute (PropertyFileConstants::valueAttribute,
-                             getAllProperties().getAllValues() [i]);
+            e->setAttribute (PropertyFileConstants::valueAttribute, props.getAllValues() [i]);
     }
 
     ProcessScopedLock pl (createProcessLock());
@@ -235,7 +226,7 @@ bool PropertiesFile::saveAsXml()
     if (pl != nullptr && ! pl->isLocked())
         return false; // locking failure..
 
-    if (doc.writeToFile (file, String::empty))
+    if (doc.writeTo (file, {}))
     {
         needsWriting = false;
         return true;
@@ -250,7 +241,7 @@ bool PropertiesFile::loadAsBinary()
 
     if (fileStream.openedOk())
     {
-        const int magicNumber = fileStream.readInt();
+        auto magicNumber = fileStream.readInt();
 
         if (magicNumber == PropertyFileConstants::magicNumberCompressed)
         {
@@ -258,10 +249,9 @@ bool PropertiesFile::loadAsBinary()
             GZIPDecompressorInputStream gzip (subStream);
             return loadAsBinary (gzip);
         }
-        else if (magicNumber == PropertyFileConstants::magicNumber)
-        {
+
+        if (magicNumber == PropertyFileConstants::magicNumber)
             return loadAsBinary (fileStream);
-        }
     }
 
     return false;
@@ -275,10 +265,10 @@ bool PropertiesFile::loadAsBinary (InputStream& input)
 
     while (--numValues >= 0 && ! in.isExhausted())
     {
-        const String key (in.readString());
-        const String value (in.readString());
-
+        auto key = in.readString();
+        auto value = in.readString();
         jassert (key.isNotEmpty());
+
         if (key.isNotEmpty())
             getAllProperties().set (key, value);
     }
@@ -294,45 +284,59 @@ bool PropertiesFile::saveAsBinary()
         return false; // locking failure..
 
     TemporaryFile tempFile (file);
-    ScopedPointer <OutputStream> out (tempFile.getFile().createOutputStream());
 
-    if (out != nullptr)
     {
+        FileOutputStream out (tempFile.getFile());
+
+        if (! out.openedOk())
+            return false;
+
         if (options.storageFormat == storeAsCompressedBinary)
         {
-            out->writeInt (PropertyFileConstants::magicNumberCompressed);
-            out->flush();
+            out.writeInt (PropertyFileConstants::magicNumberCompressed);
+            out.flush();
 
-            out = new GZIPCompressorOutputStream (out.release(), 9, true);
+            GZIPCompressorOutputStream zipped (out, 9);
+
+            if (! writeToStream (zipped))
+                return false;
         }
         else
         {
             // have you set up the storage option flags correctly?
             jassert (options.storageFormat == storeAsBinary);
 
-            out->writeInt (PropertyFileConstants::magicNumber);
-        }
+            out.writeInt (PropertyFileConstants::magicNumber);
 
-        const int numProperties = getAllProperties().size();
-
-        out->writeInt (numProperties);
-
-        for (int i = 0; i < numProperties; ++i)
-        {
-            out->writeString (getAllProperties().getAllKeys() [i]);
-            out->writeString (getAllProperties().getAllValues() [i]);
-        }
-
-        out = nullptr;
-
-        if (tempFile.overwriteTargetFileWithTemporary())
-        {
-            needsWriting = false;
-            return true;
+            if (! writeToStream (out))
+                return false;
         }
     }
 
-    return false;
+    if (! tempFile.overwriteTargetFileWithTemporary())
+        return false;
+
+    needsWriting = false;
+    return true;
+}
+
+bool PropertiesFile::writeToStream (OutputStream& out)
+{
+    auto& props  = getAllProperties();
+    auto& keys   = props.getAllKeys();
+    auto& values = props.getAllValues();
+    auto numProperties = props.size();
+
+    if (! out.writeInt (numProperties))
+        return false;
+
+    for (int i = 0; i < numProperties; ++i)
+    {
+        if (! out.writeString (keys[i]))   return false;
+        if (! out.writeString (values[i])) return false;
+    }
+
+    return true;
 }
 
 void PropertiesFile::timerCallback()
@@ -343,7 +347,6 @@ void PropertiesFile::timerCallback()
 void PropertiesFile::propertyChanged()
 {
     sendChangeMessage();
-
     needsWriting = true;
 
     if (options.millisecondsBeforeSaving > 0)
@@ -351,3 +354,5 @@ void PropertiesFile::propertyChanged()
     else if (options.millisecondsBeforeSaving == 0)
         saveIfNeeded();
 }
+
+} // namespace juce
