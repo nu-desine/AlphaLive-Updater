@@ -50,14 +50,14 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
     addAndMakeVisible (infoLabel = new Label());
     
     alphaLiveDirectory = File::getSpecialLocation (File::currentApplicationFile).getParentDirectory().getParentDirectory();
-    updateDirectory = alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive_update";
+    updateDirectory = alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive_update";
     
     // Make sure this application is being launch from the correct place
     #if JUCE_MAC || JUCE_LINUX
-    File alphaLiveApp (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.app");
+    File alphaLiveApp (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.app");
     #endif
     #if JUCE_WINDOWS
-    File alphaLiveApp (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
+    File alphaLiveApp (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.exe");
     #endif
     
     bool shouldUpdate;
@@ -223,7 +223,7 @@ void MainContentComponent::run()
         // directory of each file being the AlphaLive directory.
         
         File deleteFile =   updateDirectory.getFullPathName() +
-                            File::separatorString +
+                            File::getSeparatorString() +
                             "files_to_delete.txt";
         
         if (deleteFile.exists())
@@ -237,10 +237,10 @@ void MainContentComponent::run()
                 //If so, we don't want to turn this into a file path to delete otherwise we will
                 //end up deleting the whole AlphaLive directory!
                 
-                if (filesToDeleteArray[i] != String::empty)
+                if (filesToDeleteArray[i] != String())
                 {
                     String fileString = alphaLiveDirectory.getFullPathName() +
-                    File::separatorString +
+                    File::getSeparatorString() +
                     filesToDeleteArray[i];
                     
                     if (File::isAbsolutePath(fileString))
@@ -259,9 +259,9 @@ void MainContentComponent::run()
         // ==============================================================================
         
         Array<File> filesToCopy;
-        File applicatDataDir (updateDirectory.getFullPathName() + File::separatorString + "Application Data");
-        File libraryDir (updateDirectory.getFullPathName() + File::separatorString + "Library");
-        File documentationDir (updateDirectory.getFullPathName() + File::separatorString + "Documentation");
+        File applicatDataDir (updateDirectory.getFullPathName() + File::getSeparatorString() + "Application Data");
+        File libraryDir (updateDirectory.getFullPathName() + File::getSeparatorString() + "Library");
+        File documentationDir (updateDirectory.getFullPathName() + File::getSeparatorString() + "Documentation");
         
         applicatDataDir.findChildFiles(filesToCopy, 2, true);
         libraryDir.findChildFiles(filesToCopy, 2, true);
@@ -277,7 +277,7 @@ void MainContentComponent::run()
             totalSize += filesToCopy[i].getSize();
         
         #if JUCE_MAC
-        File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/AlphaLive.app");
+        File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Mac Files/AlphaLive.app");
         
         Array<File> allFiles;
         newAppFile.findChildFiles(allFiles, 3, true);
@@ -285,7 +285,7 @@ void MainContentComponent::run()
             totalSize += allFiles[i].getSize();
         allFiles.clear();
         
-        File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Mac Files/firmwareUpdater");
+        File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Mac Files/firmwareUpdater");
         if (newFirmwareFile.exists())
             totalSize += newFirmwareFile.getSize();
 
@@ -294,17 +294,17 @@ void MainContentComponent::run()
         #if JUCE_WINDOWS
         if (SystemStats::isOperatingSystem64Bit())
         {
-            File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/AlphaLive.exe");
+            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files/AlphaLive.exe");
             totalSize += newAppFile.getSize();
-            File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/firmwareUpdater.exe");
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files/firmwareUpdater.exe");
             if (newFirmwareFile.exists())
                 totalSize += newFirmwareFile.getSize();
         }
         else
         {
-            File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/AlphaLive.exe");
+            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files/AlphaLive.exe");
             totalSize += newAppFile.getSize();
-            File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/firmwareUpdater.exe");
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files/firmwareUpdater.exe");
             if (newFirmwareFile.exists())
                 totalSize += newFirmwareFile.getSize();
         }
@@ -331,7 +331,7 @@ void MainContentComponent::run()
 			if (copyFile == true)
 			{
 				File oldFile (alphaLiveDirectory.getFullPathName() + 
-				              File::separatorString + 
+				              File::getSeparatorString() + 
 				              filesToCopy[i].getRelativePathFrom(updateDirectory));
 				
 				bool doesParentExist = oldFile.getParentDirectory().isDirectory();
@@ -374,7 +374,7 @@ void MainContentComponent::run()
         
         //platform specific files - can't use relative paths here
         #if JUCE_MAC
-        File oldAppFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.app");
+        File oldAppFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.app");
         oldAppFile.deleteRecursively();
         
         newAppFile.findChildFiles(allFiles, 3, true);
@@ -403,7 +403,7 @@ void MainContentComponent::run()
         
         if (newFirmwareFile.exists())
         {
-            File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "Application Data/firmwareUpdater");
+            File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "Application Data/firmwareUpdater");
             oldFirmwareFile.deleteRecursively();
             
             // Increase the extracted size to we can work out the current progress bar value
@@ -423,8 +423,8 @@ void MainContentComponent::run()
         #if JUCE_WINDOWS
         if (SystemStats::isOperatingSystem64Bit())
         {
-            File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/AlphaLive.exe");
-            File oldAppFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
+            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files/AlphaLive.exe");
+            File oldAppFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.exe");
             oldAppFile.deleteRecursively();
             
             {
@@ -441,10 +441,10 @@ void MainContentComponent::run()
             
             newAppFile.copyFileTo (oldAppFile);
             
-            File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win64 Files/firmwareUpdater.exe");
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files/firmwareUpdater.exe");
             if (newFirmwareFile.exists())
             {
-                File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "Application Data/firmwareUpdater.exe");
+                File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "Application Data/firmwareUpdater.exe");
                 oldFirmwareFile.deleteRecursively();
                 
                 // Increase the extracted size to we can work out the current progress bar value
@@ -462,8 +462,8 @@ void MainContentComponent::run()
         }
         else
         {
-            File newAppFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/AlphaLive.exe");
-            File oldAppFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
+            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files/AlphaLive.exe");
+            File oldAppFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.exe");
             oldAppFile.deleteRecursively();
             
             {
@@ -480,10 +480,10 @@ void MainContentComponent::run()
             
             newAppFile.copyFileTo (oldAppFile);
             
-            File newFirmwareFile (updateDirectory.getFullPathName() + File::separatorString + "Win32 Files/firmwareUpdater.exe");
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files/firmwareUpdater.exe");
             if (newFirmwareFile.exists())
             {
-                File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "Application Data/firmwareUpdater.exe");
+                File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "Application Data/firmwareUpdater.exe");
                 oldFirmwareFile.deleteRecursively();
                 
                 // Increase the extracted size to we can work out the current progress bar value
@@ -510,10 +510,10 @@ void MainContentComponent::run()
 			deleteMe.deleteRecursively();
         
         #if JUCE_MAC
-        File appFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.app");
+        File appFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.app");
         #endif 
         #if JUCE_WINDOWS
-        File appFile (alphaLiveDirectory.getFullPathName() + File::separatorString + "AlphaLive.exe");
+        File appFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.exe");
         #endif 
         
         progress = -1;
@@ -572,11 +572,11 @@ void MainContentComponent::setLocalisation()
     
     if (countryCode == "ja" || countryCode == "jpn") //japanese
     {
-        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_ja.txt");
+        File transFile (dataDir.getFullPathName() + File::getSeparatorString() + "trans_ja.txt");
         
         if (transFile.exists())
         {
-            trans = new LocalisedStrings (transFile);
+            trans = new LocalisedStrings (transFile, false);
             LocalisedStrings::setCurrentMappings(trans);
             
             String fontToUse = "Arial Unicode MS"; // available on OSX 10.5 and above
@@ -602,11 +602,11 @@ void MainContentComponent::setLocalisation()
     }
     else if (countryCode == "zh" || countryCode == "zho" || countryCode == "zh-Hant" || countryCode == "zh-Hans") //chinese. do i need the first two?
     {
-        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_zh.txt");
+        File transFile (dataDir.getFullPathName() + File::getSeparatorString() + "trans_zh.txt");
         
         if (transFile.exists())
         {
-            trans = new LocalisedStrings (transFile);
+            trans = new LocalisedStrings (transFile, false);
             LocalisedStrings::setCurrentMappings(trans);
             
             String fontToUse = "Arial Unicode MS"; // available on OSX 10.5 and above
@@ -632,11 +632,11 @@ void MainContentComponent::setLocalisation()
     }
     else if (countryCode == "ko" || countryCode == "kor") //Korean
     {
-        File transFile (dataDir.getFullPathName() + File::separatorString + "trans_ko.txt");
+        File transFile (dataDir.getFullPathName() + File::getSeparatorString() + "trans_ko.txt");
         
         if (transFile.exists())
         {
-            trans = new LocalisedStrings (transFile);
+            trans = new LocalisedStrings (transFile, false);
             LocalisedStrings::setCurrentMappings(trans);
             
             String fontToUse = "AppleMyungjo"; // available on OSX 10.5 and above

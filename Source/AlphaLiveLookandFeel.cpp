@@ -368,15 +368,15 @@ void AlphaLiveLookandFeel::drawButtonBackground (Graphics& g,
 	
 }
 
-Font AlphaLiveLookandFeel::getTextButtonFont (TextButton& button)
+Font AlphaLiveLookandFeel::getTextButtonFont (TextButton& button, int buttonHeight)
 {
-    return button.getFont();
+    return Font (jmin (15.0f, buttonHeight * 0.6f));
 }
 
 void AlphaLiveLookandFeel::drawButtonText (Graphics& g, TextButton& button,
                                   bool isMouseOverButton, bool isButtonDown)
 {
-    Font font (getTextButtonFont (button));
+    Font font (getTextButtonFont (button, button.getHeight()));
     g.setFont (10);
     g.setColour (button.findColour (button.getToggleState() ? TextButton::textColourOnId
 									: TextButton::textColourOffId)

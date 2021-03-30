@@ -45,7 +45,7 @@ namespace AlphaColours
     
 }
 
-class AlphaLiveLookandFeel : public LookAndFeel
+class AlphaLiveLookandFeel : public LookAndFeel_V2
 
 
 {
@@ -59,12 +59,12 @@ public:
                                        Button& button,
                                        const Colour& backgroundColour,
                                        bool isMouseOverButton,
-                                       bool isButtonDown);
+                                       bool isButtonDown) override;
 	
-	Font getTextButtonFont (TextButton& button);
+    Font getTextButtonFont (TextButton &, int buttonHeight) override;
 	
 	void drawButtonText (Graphics& g, TextButton& button,
-						 bool isMouseOverButton, bool isButtonDown);
+						 bool isMouseOverButton, bool isButtonDown) override;
 	
 	
                                     
