@@ -88,7 +88,7 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
                            "\n" + 
                            translate("2. Unzip the downloaded folder.") +
                            "\n" +
-                           translate("3. Move the unzipped folder to the 'AlphaLive' directory in the 'Applications' directory on this computer.") +
+                           translate("3. Move the unzipped folder to the '/Users/Shared/AlphaLive' directory on this computer.") +
                            "\n" +
                            translate("4. If the download contains a version of this 'AlphaLive Updater' application in 'Mac Files', close this application and move the new version to 'AlphaLive/Application Data' to replace the current version.") +
                            "\n" +
@@ -105,7 +105,7 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
                            "\n" + 
                            translate("2. Unzip the downloaded folder, and locate the 'AlphaLive_Update' sub-folder inside of it.") +
                            "\n" +
-                           translate("3. Move this sub-folder to the 'AlphaLive' directory in the 'Program Files' directory on this computer.") +
+                           translate("3. Move this sub-folder to the 'C:\Users\Public\Documents\AlphaLive' directory on this computer.") +
                            "\n" +
                            translate("4. If the download contains a version of this 'AlphaLive Updater' application in either 'Win32 Files' or 'Win64 Files', close this application and move the new relevant version to 'AlphaLive/Application Data' to replace the current version.") +
                            "\n" +
