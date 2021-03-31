@@ -28,6 +28,10 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+//FYI: attempting to delete / modify files in the macOS Application directory
+//here doesn't appear to work unless this application is from an identifed developer.
+//Therefore attempting to updating the macOS AlphaLive app here may not work...
+
 #include "MainComponent.h"
 #include "BinaryData.h"
 
