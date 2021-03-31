@@ -37,8 +37,6 @@
 #define BOX_W (getWidth()/10)*8
 #define BOX_H (getHeight()/10)*6
 
-
-
 //==============================================================================
 MainContentComponent::MainContentComponent() :  Thread ("installerThread")
 {
@@ -49,22 +47,30 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
     
     addAndMakeVisible (infoLabel = new Label());
     
-    alphaLiveDirectory = File::getSpecialLocation (File::currentApplicationFile).getParentDirectory().getParentDirectory();
+    alphaLiveDirectory = File::getSpecialLocation (File::commonDocumentsDirectory).getFullPathName() +
+                        File::getSeparatorString() +
+                        "AlphaLive";
     updateDirectory = alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive_update";
     
     // Make sure this application is being launch from the correct place
     #if JUCE_MAC || JUCE_LINUX
-    File alphaLiveApp (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.app");
+    alphaLiveAppFile = (File::getSpecialLocation (File::globalApplicationsDirectory).getFullPathName() +
+                        File::getSeparatorString() +
+                        "AlphaLive.app");
     #endif
     #if JUCE_WINDOWS
-    File alphaLiveApp (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.exe");
+    alphaLiveAppFile = (File::getSpecialLocation (File::globalApplicationsDirectory).getFullPathName() +
+                        File::getSeparatorString() +
+                        "AlphaLive" +
+                        File::getSeparatorString() +
+                        "AlphaLive.exe");
     #endif
     
     bool shouldUpdate;
     
     // If the app seems to be launched from the wrong location,
     // or the update directory doesn't exist, display instructions to the user
-    if ((! alphaLiveApp.exists()) || (! updateDirectory.isDirectory()))
+    if ((! alphaLiveAppFile.exists()) || (! updateDirectory.isDirectory()))
     {
         shouldUpdate = false;
         
@@ -277,7 +283,7 @@ void MainContentComponent::run()
             totalSize += filesToCopy[i].getSize();
         
         #if JUCE_MAC
-        File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Mac Files/AlphaLive.app");
+        File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Mac Files" + File::getSeparatorString() + "AlphaLive.app");
         
         Array<File> allFiles;
         newAppFile.findChildFiles(allFiles, 3, true);
@@ -285,7 +291,7 @@ void MainContentComponent::run()
             totalSize += allFiles[i].getSize();
         allFiles.clear();
         
-        File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Mac Files/firmwareUpdater");
+        File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Mac Files" + File::getSeparatorString() + "firmwareUpdater");
         if (newFirmwareFile.exists())
             totalSize += newFirmwareFile.getSize();
 
@@ -294,17 +300,17 @@ void MainContentComponent::run()
         #if JUCE_WINDOWS
         if (SystemStats::isOperatingSystem64Bit())
         {
-            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files/AlphaLive.exe");
+            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files" + File::getSeparatorString() + "AlphaLive.exe");
             totalSize += newAppFile.getSize();
-            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files/firmwareUpdater.exe");
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files" + File::getSeparatorString() + "firmwareUpdater.exe");
             if (newFirmwareFile.exists())
                 totalSize += newFirmwareFile.getSize();
         }
         else
         {
-            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files/AlphaLive.exe");
+            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files" + File::getSeparatorString() + "AlphaLive.exe");
             totalSize += newAppFile.getSize();
-            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files/firmwareUpdater.exe");
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files" + File::getSeparatorString() + "firmwareUpdater.exe");
             if (newFirmwareFile.exists())
                 totalSize += newFirmwareFile.getSize();
         }
@@ -374,7 +380,7 @@ void MainContentComponent::run()
         
         //platform specific files - can't use relative paths here
         #if JUCE_MAC
-        File oldAppFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.app");
+        File oldAppFile = alphaLiveAppFile;
         oldAppFile.deleteRecursively();
         
         newAppFile.findChildFiles(allFiles, 3, true);
@@ -403,7 +409,7 @@ void MainContentComponent::run()
         
         if (newFirmwareFile.exists())
         {
-            File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "Application Data/firmwareUpdater");
+            File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "Application Data" + File::getSeparatorString() + "firmwareUpdater");
             oldFirmwareFile.deleteRecursively();
             
             // Increase the extracted size to we can work out the current progress bar value
@@ -423,8 +429,8 @@ void MainContentComponent::run()
         #if JUCE_WINDOWS
         if (SystemStats::isOperatingSystem64Bit())
         {
-            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files/AlphaLive.exe");
-            File oldAppFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.exe");
+            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files" + File::getSeparatorString() + "AlphaLive.exe");
+            File oldAppFile = alphaLiveAppFile;
             oldAppFile.deleteRecursively();
             
             {
@@ -441,10 +447,10 @@ void MainContentComponent::run()
             
             newAppFile.copyFileTo (oldAppFile);
             
-            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files/firmwareUpdater.exe");
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win64 Files" + File::getSeparatorString() + "firmwareUpdater.exe");
             if (newFirmwareFile.exists())
             {
-                File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "Application Data/firmwareUpdater.exe");
+                File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "Application Data" + File::getSeparatorString() + "firmwareUpdater.exe");
                 oldFirmwareFile.deleteRecursively();
                 
                 // Increase the extracted size to we can work out the current progress bar value
@@ -462,8 +468,8 @@ void MainContentComponent::run()
         }
         else
         {
-            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files/AlphaLive.exe");
-            File oldAppFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.exe");
+            File newAppFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files" + File::getSeparatorString() + "AlphaLive.exe");
+            File oldAppFile = alphaLiveAppFile;
             oldAppFile.deleteRecursively();
             
             {
@@ -480,10 +486,10 @@ void MainContentComponent::run()
             
             newAppFile.copyFileTo (oldAppFile);
             
-            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files/firmwareUpdater.exe");
+            File newFirmwareFile (updateDirectory.getFullPathName() + File::getSeparatorString() + "Win32 Files" + File::getSeparatorString() + "firmwareUpdater.exe");
             if (newFirmwareFile.exists())
             {
-                File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "Application Data/firmwareUpdater.exe");
+                File oldFirmwareFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "Application Data" + File::getSeparatorString() + "firmwareUpdater.exe");
                 oldFirmwareFile.deleteRecursively();
                 
                 // Increase the extracted size to we can work out the current progress bar value
@@ -509,13 +515,6 @@ void MainContentComponent::run()
 		if (deleteMe.exists())
 			deleteMe.deleteRecursively();
         
-        #if JUCE_MAC
-        File appFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.app");
-        #endif 
-        #if JUCE_WINDOWS
-        File appFile (alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive.exe");
-        #endif 
-        
         progress = -1;
         
         {
@@ -531,7 +530,7 @@ void MainContentComponent::run()
         
         wait(2000);
         
-        appFile.startAsProcess();
+        alphaLiveAppFile.startAsProcess();
         
         wait(500);
         

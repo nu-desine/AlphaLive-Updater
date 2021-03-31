@@ -69,7 +69,9 @@ private:
     ScopedPointer <ProgressBar> progressBar;
     double progress;
     
+    //alphaLiveDirectory is the directory where all the supporting app files are stored
     File alphaLiveDirectory, updateDirectory;
+    File alphaLiveAppFile;
     
     LocalisedStrings *trans;
     String currentLanguage;
