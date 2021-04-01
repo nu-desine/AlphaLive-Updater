@@ -7,3 +7,6 @@ Builds/MacOSX/AlphaLive Updater.xcodeproj/Liam.pbxuser
 Builds/VisualStudio2010/Release/
 UserInterfaceState.xcuserstate
 Builds/MacOSX/build
+Builds/VisualStudio2019/.vs/
+Builds/VisualStudio2019/x64/
+Builds/VisualStudio2019/AlphaLive Updater_App.vcxproj.user
