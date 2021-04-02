@@ -29,8 +29,13 @@
 //
 
 //FYI: attempting to delete / modify files in the macOS Application directory
-//here doesn't appear to work unless this application is from an identifed developer.
+//here doesn't appear to work unless this application is from an identified developer (?).
 //Therefore attempting to updating the macOS AlphaLive app here may not work...
+
+//WARNING: Don't use File::currentApplicationFile or File::currentExecutableFile here, as on macOS
+//if the app is flagged as being from an 'unidentified' developer (which it currently
+//will be) then the app may actually be run from a different location (/private/var/folders/)
+//meaning these file locations won't be what we expect and cause incorrect file access!
 
 #include "MainComponent.h"
 #include "BinaryData.h"
@@ -44,21 +49,22 @@
 //==============================================================================
 MainContentComponent::MainContentComponent() :  Thread ("installerThread")
 {
-    setLocalisation();
-    
-    // Load binary data into Image
-    backgroundImage = ImageCache::getFromMemory(BinaryData::background_png, BinaryData::background_pngSize);
-    
-    addAndMakeVisible (infoLabel = new Label());
-    
-    alphaLiveDirectory = File::getSpecialLocation (File::commonDocumentsDirectory).getFullPathName() +
+    alphaLiveDirectory = File::getSpecialLocation (File::globalApplicationsDirectory).getFullPathName() +
                         File::getSeparatorString() +
                         "AlphaLive";
     updateDirectory = alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "AlphaLive_update";
     
+    setLocalisation();
+    
+    // Load binary data into Image
+    backgroundImage = ImageCache::getFromMemory(BinaryData::background_png, BinaryData::background_pngSize);
+    addAndMakeVisible (infoLabel = new Label());
+    
     // Make sure this application is being launch from the correct place
     #if JUCE_MAC || JUCE_LINUX
     alphaLiveAppFile = (File::getSpecialLocation (File::globalApplicationsDirectory).getFullPathName() +
+                        File::getSeparatorString() +
+                        "AlphaLive" +
                         File::getSeparatorString() +
                         "AlphaLive.app");
     #endif
@@ -92,11 +98,11 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
                            "\n" + 
                            translate("2. Unzip the downloaded folder.") +
                            "\n" +
-                           translate("3. Move the unzipped folder to the '/Users/Shared/AlphaLive' directory on this computer.") +
+                           translate("3. Move the unzipped folder to the '/Applications/AlphaLive' directory on this computer.") +
                            "\n" +
-                           translate("4. If the download contains a version of this 'AlphaLive Updater' application in 'Mac Files', close this application and move the new version to 'AlphaLive/Application Data' to replace the current version.") +
+                           translate("4. If the download contains a version of this 'AlphaLive Updater' application in 'Mac Files', close this application and move the new version to '/Applications/AlphaLive/Application Data' to replace the current version.") +
                            "\n" +
-                           translate("5. Make sure that AlphaLive is closed, and relaunch 'AlphaLive Updater' from 'AlphaLive/Application Data'. If steps 1-4 were done correctly, these instructions won't appear again."), 
+                           translate("5. Make sure that AlphaLive is closed, and relaunch 'AlphaLive Updater' from '/Applications/AlphaLive/Application Data'. If steps 1-4 were done correctly, these instructions won't appear again."),
                            dontSendNotification);
         #endif
         #if JUCE_WINDOWS
@@ -109,11 +115,11 @@ MainContentComponent::MainContentComponent() :  Thread ("installerThread")
                            "\n" + 
                            translate("2. Unzip the downloaded folder, and locate the 'AlphaLive_Update' sub-folder inside of it.") +
                            "\n" +
-                           translate("3. Move this sub-folder to the 'C:\\Users\\Public\\Documents\\AlphaLive' directory on this computer.") +
+                           translate("3. Move this sub-folder to the 'C:\\Program Files\\AlphaLive' directory on this computer.") +
                            "\n" +
-                           translate("4. If the download contains a version of this 'AlphaLive Updater' application in 'Win64 Files', close this application and move the new relevant version to 'AlphaLive\\Application Data' to replace the current version.") +
+                           translate("4. If the download contains a version of this 'AlphaLive Updater' application in 'Win64 Files', close this application and move the new version to 'C:\\Program Files\\AlphaLive\\Application Data' to replace the current version.") +
                            "\n" +
-                           translate("5. Make sure that AlphaLive is closed, and relaunch 'AlphaLive Updater' from 'AlphaLive\\Application Data'. If steps 1-4 were done correctly, these instructions won't appear again."), 
+                           translate("5. Make sure that AlphaLive is closed, and relaunch 'AlphaLive Updater' from 'C:\\Program Files\\AlphaLive\\Application Data'. If steps 1-4 were done correctly, these instructions won't appear again."), 
                            dontSendNotification);
     #endif
     }
@@ -562,8 +568,8 @@ void MainContentComponent::setLocalisation()
     static String countryCode = SystemStats::getDisplayLanguage();
     std::cout << "Language: " << countryCode << std::endl;
     
-    File dataDir = File::getSpecialLocation (File::currentApplicationFile).getParentDirectory();
-    
+    File appDataDir = alphaLiveDirectory.getFullPathName() + File::getSeparatorString() + "Application Data";
+
     //We may need to find suitable fonst that exists on the current system
     //for languages such as Chinese, Japanese, and Korean.
     //http://en.wikipedia.org/wiki/List_of_CJK_fonts
@@ -575,7 +581,7 @@ void MainContentComponent::setLocalisation()
     
     if (countryCode == "ja" || countryCode == "jpn") //japanese
     {
-        File transFile (dataDir.getFullPathName() + File::getSeparatorString() + "trans_ja.txt");
+        File transFile (appDataDir.getFullPathName() + File::getSeparatorString() + "trans_ja.txt");
         
         if (transFile.exists())
         {
@@ -605,7 +611,7 @@ void MainContentComponent::setLocalisation()
     }
     else if (countryCode == "zh" || countryCode == "zho" || countryCode == "zh-Hant" || countryCode == "zh-Hans") //chinese. do i need the first two?
     {
-        File transFile (dataDir.getFullPathName() + File::getSeparatorString() + "trans_zh.txt");
+        File transFile (appDataDir.getFullPathName() + File::getSeparatorString() + "trans_zh.txt");
         
         if (transFile.exists())
         {
@@ -635,7 +641,7 @@ void MainContentComponent::setLocalisation()
     }
     else if (countryCode == "ko" || countryCode == "kor") //Korean
     {
-        File transFile (dataDir.getFullPathName() + File::getSeparatorString() + "trans_ko.txt");
+        File transFile (appDataDir.getFullPathName() + File::getSeparatorString() + "trans_ko.txt");
         
         if (transFile.exists())
         {
